@@ -25,8 +25,9 @@ const shared = {
     sourcemap: true,
     jsx: 'automatic',
     loader: { '.js': 'jsx' },
-    // React is the host's: the package never carries its own copy, or the host would have two Reacts and hooks would break.
-    external: ['react', 'react-dom', 'react/jsx-runtime']
+    // React is the host's (a peer dependency): the package never carries its own copy, or the host would have two Reacts and hooks would break. zag.js is a
+    // plain dependency, installed with the package and shared with the host's own copy when the versions agree.
+    external: ['react', 'react-dom', 'react/jsx-runtime', '@zag-js/*']
 };
 
 // The React part is marked "use client": Next.js renders it on the server once and then hands it to the browser, which is right for an interactive grid.

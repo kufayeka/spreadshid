@@ -7,6 +7,12 @@ import { keyAction } from './keys.js';
 import { columnNeed } from './measure.js';
 import { copyBlock, clipText, clipHtml, clipFromHtml, pasteClip, pasteText, fillBlock } from '../core/transfer.js';
 import { fillTarget } from '../core/fill.js';
+import { sortRange } from '../core/search.js';
+import { Menu } from './Menu.js';
+
+// The last copy made in this page, for the Paste of the right-click menu: a page can read the clipboard's text, not the formulas inside it, so when the
+// text is the one this copy put there, the copy itself is pasted (formulas and styles included).
+let lastCopy = null;
 
 // the smallest a column or a row can be dragged to
 const MIN_SIZE = 4;
@@ -118,7 +124,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory }) {
     const scroller = useRef(null);
     const view = useRef(null);
     const sink = useRef(null);
@@ -136,6 +142,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const [fillPreview, setFillPreview] = useState(null);
     // Ctrl+Shift+V was pressed: the paste that follows takes the values only
     const valuesOnly = useRef(false);
+    // the right-click menu: where it opens, and on what (cells, whole rows, whole columns)
+    const [menu, setMenu] = useState(null);
     const moveTo = (next) => { reveal.current = true; setSel(next); };
 
     // the grid fills its box: measured once on screen and whenever the box changes size
@@ -149,6 +157,17 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         ro.observe(el);
         return () => ro.disconnect();
     }, []);
+
+    // Each sheet is shown where it was left, as in Google Sheets: the grid is made again for every sheet (the host keys it by the sheet), and puts
+    // the scroll back once it has its size, from the positions the host keeps per sheet.
+    const placed = useRef(false);
+    useIsoLayoutEffect(() => {
+        const el = scroller.current;
+        if (placed.current || !el || !box.width) return;
+        placed.current = true;
+        const at = scrollMemory && scrollMemory.get(sheetId);
+        if (at) { el.scrollTop = at.top; el.scrollLeft = at.left; setScroll({ top: el.scrollTop, left: el.scrollLeft }); }
+    }, [box.width]);
 
     const props = useMemo(() => wb.sheetProps(sheetId), [wb, sheetId, revision]);
     const rowAxis = wb.rowAxis(sheetId);
@@ -237,6 +256,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             return;
         }
         if (e.key === 'Escape' && clipMark) { setClipMark(null); return; }
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'f' || e.key === 'F' || e.key === 'h' || e.key === 'H')) {
+            e.preventDefault();
+            if (onFind) onFind(e.key.toLowerCase() === 'f' ? 'find' : 'replace');
+            return;
+        }
         // the paste itself comes as a paste event right after this key, with the clipboard's content
         if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) { valuesOnly.current = e.shiftKey; return; }
         const answer = keyAction(e, {
@@ -270,6 +294,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         e.preventDefault();
         const clip = copyBlock(wb, sheetId, rects[0], cut);
         e.clipboardData.setData('text/plain', clipText(clip));
+        lastCopy = clip;
         e.clipboardData.setData('text/html', clipHtml(clip));
         setClipMark({ sheetId, rect: rects[0], cut });
     }
@@ -438,6 +463,109 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         window.addEventListener('mouseup', up);
     }
 
+    // ---- the right-click menu ----------------------------------------------------------------------------------------------------------------------
+
+    function onContextMenu(e) {
+        const { x, y } = pointIn(e);
+        const target = hit(x, y);
+        if (target.kind === 'all') return;
+        e.preventDefault();
+        if (editing) commit(null);
+        if (sink.current) sink.current.focus({ preventScroll: true });
+        // a right click inside the selection keeps it; elsewhere it selects what it is on, as a left click would
+        const inside = target.kind === 'cell' ? rects.some((b) => target.r >= b.r1 && target.r <= b.r2 && target.c >= b.c1 && target.c <= b.c2)
+            : target.kind === 'col' ? rects.some((b) => b.r1 === 0 && b.r2 === size.rows - 1 && target.c >= b.c1 && target.c <= b.c2)
+            : rects.some((b) => b.c1 === 0 && b.c2 === size.cols - 1 && target.r >= b.r1 && target.r <= b.r2);
+        let current = sel;
+        if (!inside) {
+            current = target.kind === 'col' ? selectCols(target.c, target.c, size.rows) : target.kind === 'row' ? selectRows(target.r, target.r, size.cols) : selectCell(target.r, target.c);
+            setSel(current);
+        }
+        setMenu({ x: e.clientX, y: e.clientY, kind: target.kind, rect: rectsOf(current)[rectsOf(current).length - 1] });
+    }
+
+    function menuItems(m) {
+        const b = m.rect;
+        const nr = b.r2 - b.r1 + 1, nc = b.c2 - b.c1 + 1;
+        const rowsText = nr === 1 ? 'row ' + (b.r1 + 1) : 'rows ' + (b.r1 + 1) + ' - ' + (b.r2 + 1);
+        const colsText = nc === 1 ? 'column ' + colName(b.c1) : 'columns ' + colName(b.c1) + ' - ' + colName(b.c2);
+        const merged = blocks.some((x) => x.r1 <= b.r2 && x.r2 >= b.r1 && x.c1 <= b.c2 && x.c2 >= b.c1);
+        let hiddenRows = false, hiddenCols = false;
+        for (let r = b.r1; r <= b.r2 && !hiddenRows && m.kind === 'row'; r++) if (!rowAxis.size(r)) hiddenRows = true;
+        for (let c = b.c1; c <= b.c2 && !hiddenCols && m.kind === 'col'; c++) if (!colAxis.size(c)) hiddenCols = true;
+        const items = [
+            { value: 'cut', label: 'Cut', hint: 'Ctrl+X' },
+            { value: 'copy', label: 'Copy', hint: 'Ctrl+C' },
+            { value: 'paste', label: 'Paste', hint: 'Ctrl+V' },
+            { value: 'pasteValues', label: 'Paste values only', hint: 'Ctrl+Shift+V' },
+            { separator: true }
+        ];
+        if (m.kind !== 'col') items.push({ value: 'rowsAbove', label: 'Insert ' + nr + (nr === 1 ? ' row' : ' rows') + ' above' }, { value: 'rowsBelow', label: 'Insert ' + nr + (nr === 1 ? ' row' : ' rows') + ' below' });
+        if (m.kind !== 'row') items.push({ value: 'colsLeft', label: 'Insert ' + nc + (nc === 1 ? ' column' : ' columns') + ' left' }, { value: 'colsRight', label: 'Insert ' + nc + (nc === 1 ? ' column' : ' columns') + ' right' });
+        items.push({ separator: true });
+        if (m.kind !== 'col') items.push({ value: 'deleteRows', label: 'Delete ' + rowsText });
+        if (m.kind !== 'row') items.push({ value: 'deleteCols', label: 'Delete ' + colsText });
+        items.push({ value: 'clear', label: 'Clear contents', hint: 'Delete' });
+        if (m.kind === 'row') items.push({ value: 'hideRows', label: 'Hide ' + rowsText }, ...(hiddenRows ? [{ value: 'showRows', label: 'Unhide rows' }] : []));
+        if (m.kind === 'col') items.push({ value: 'hideCols', label: 'Hide ' + colsText }, ...(hiddenCols ? [{ value: 'showCols', label: 'Unhide columns' }] : []));
+        items.push({ separator: true });
+        if (m.kind === 'col') items.push({ value: 'sortSheetAsc', label: 'Sort sheet A to Z' }, { value: 'sortSheetDesc', label: 'Sort sheet Z to A' });
+        else if (m.kind === 'cell' && nr > 1) items.push({ value: 'sortRangeAsc', label: 'Sort range by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'sortRangeDesc', label: 'Sort range by column ' + colName(sel.active.c) + ' (Z to A)' });
+        if (m.kind === 'cell') items.push(merged ? { value: 'unmerge', label: 'Unmerge cells' } : { value: 'merge', label: 'Merge cells', disabled: nr === 1 && nc === 1 });
+        // no separator at the end
+        while (items.length && items[items.length - 1].separator) items.pop();
+        return items;
+    }
+
+    function onMenuSelect(value) {
+        const m = menu;
+        setMenu(null);
+        const b = m.rect;
+        const nr = b.r2 - b.r1 + 1, nc = b.c2 - b.c1 + 1;
+        const how = { source: 'user' };
+        const run = (fn) => { try { fn(); } catch (err) { if (onError) onError(err.message); } };
+        if (sink.current) sink.current.focus({ preventScroll: true });
+        switch (value) {
+            case 'cut': case 'copy': document.execCommand(value); break;
+            case 'paste': case 'pasteValues': pasteFromMenu(value === 'pasteValues' ? 'values' : 'all'); break;
+            case 'rowsAbove': run(() => wb.insertRows(sheetId, b.r1, nr, how)); break;
+            case 'rowsBelow': run(() => wb.insertRows(sheetId, b.r2 + 1, nr, how)); break;
+            case 'colsLeft': run(() => wb.insertCols(sheetId, b.c1, nc, how)); break;
+            case 'colsRight': run(() => wb.insertCols(sheetId, b.c2 + 1, nc, how)); break;
+            case 'deleteRows': run(() => wb.deleteRows(sheetId, b.r1, nr, how)); setSel(selectCell(Math.min(b.r1, Math.max(0, size.rows - nr - 1)), sel.active.c)); break;
+            case 'deleteCols': run(() => wb.deleteCols(sheetId, b.c1, nc, how)); setSel(selectCell(sel.active.r, Math.min(b.c1, Math.max(0, size.cols - nc - 1)))); break;
+            case 'clear': wb.clear(sheetId, rects, how); break;
+            case 'hideRows': run(() => wb.setRowProps(sheetId, range(b.r1, b.r2), { hidden: true }, how)); break;
+            case 'showRows': run(() => wb.setRowProps(sheetId, range(b.r1, b.r2), { hidden: null }, how)); break;
+            case 'hideCols': run(() => wb.setColProps(sheetId, range(b.c1, b.c2), { hidden: true }, how)); break;
+            case 'showCols': run(() => wb.setColProps(sheetId, range(b.c1, b.c2), { hidden: null }, how)); break;
+            case 'sortSheetAsc': case 'sortSheetDesc': {
+                // the whole sheet below its frozen rows (the header stays), by the column clicked
+                const last = wb.lastFilled(sheetId);
+                if (last.r > layout.fr) run(() => sortRange(wb, sheetId, { r1: layout.fr, c1: 0, r2: last.r, c2: Math.max(last.c, b.c2) }, b.c1, value === 'sortSheetAsc' ? 'asc' : 'desc'));
+                break;
+            }
+            case 'sortRangeAsc': case 'sortRangeDesc': run(() => sortRange(wb, sheetId, b, sel.active.c, value === 'sortRangeAsc' ? 'asc' : 'desc')); break;
+            case 'merge': run(() => wb.mergeCells(sheetId, b, how)); break;
+            case 'unmerge': run(() => wb.unmergeCells(sheetId, b, how)); break;
+            default: break;
+        }
+    }
+
+    const range = (a, z) => { const out = []; for (let i = a; i <= z; i++) out.push(i); return out; };
+
+    // The menu's Paste reads the clipboard's text (the browser asks the person the first time). A page cannot read the formulas a copy put in the
+    // clipboard, so when the text is the one the last copy here made, that copy is pasted whole.
+    async function pasteFromMenu(only) {
+        const target = rects[rects.length - 1];
+        let text;
+        try { text = await navigator.clipboard.readText(); } catch { if (onError) onError('The browser does not let the page read the clipboard: use Ctrl+V to paste.'); return; }
+        let landed;
+        if (lastCopy && text === clipText(lastCopy)) { landed = pasteClip(wb, sheetId, target, lastCopy, only); if (lastCopy.cut) { setClipMark(null); lastCopy = null; } }
+        else if (text) landed = pasteText(wb, sheetId, target, text);
+        if (landed) setSel({ ranges: [{ anchor: { r: landed.r1, c: landed.c1 }, focus: { r: landed.r2, c: landed.c2 } }], active: { r: landed.r1, c: landed.c1 } });
+    }
+
     function onDoubleClick(e) {
         const edge = e.target && e.target.dataset;
         if (edge && edge.resizeCol !== undefined) { fit('col', Number(edge.resizeCol)); return; }
@@ -452,26 +580,40 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // ---- the active cell stays on screen ------------------------------------------------------------------------------------------------------------
 
     const focus = focusOf(sel);
+    // the host (the find bar) asks for the active cell to be shown
+    useEffect(() => { if (revealTick) { reveal.current = true; showCell(sel.active); } }, [revealTick]);
     useEffect(() => {
+        if (!reveal.current) return;
+        showCell(focus);
+    }, [focus.r, focus.c, box.width]);
+
+    function showCell(p) {
         const el = scroller.current;
         if (!el || !box.width || !reveal.current) return;
         reveal.current = false;
-        const p = focus;
-        if (p.r >= layout.fr) {
+        // a cell in the frozen rows (or columns) is always on screen, but going there takes the scrolling part back to its start, as in Google Sheets
+        // (Ctrl+Home from the bottom of a sheet with a frozen header ends at the top)
+        if (p.r < layout.fr) el.scrollTop = 0;
+        else {
             const y = rowAxis.start(p.r) - fh, h = rowAxis.size(p.r);
             if (y < el.scrollTop) el.scrollTop = y;
             else if (y + h > el.scrollTop + layout.mainHeight) el.scrollTop = y + h - layout.mainHeight;
         }
-        if (p.c >= layout.fc) {
+        if (p.c < layout.fc) el.scrollLeft = 0;
+        else {
             const x = colAxis.start(p.c) - fw, w = colAxis.size(p.c);
             if (x < el.scrollLeft) el.scrollLeft = x;
             else if (x + w > el.scrollLeft + layout.mainWidth) el.scrollLeft = x + w - layout.mainWidth;
         }
-    }, [focus.r, focus.c, box.width]);
+    }
 
     // ---- drawing --------------------------------------------------------------------------------------------------------------------------------------
 
-    const onScroll = (e) => setScroll({ top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft });
+    const onScroll = (e) => {
+        const at = { top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft };
+        setScroll(at);
+        if (scrollMemory) scrollMemory.set(sheetId, at);
+    };
     const rects = rectsOf(sel);
 
     // The cells of a pane, against the sheet: a scrolling direction counts from the end of the frozen part, and the pane's layer moves by the scroll.
@@ -513,6 +655,12 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         };
         if (clipMark && clipMark.sheetId === sheetId) frame('clip', 'ks-clipmark', clipMark.rect);
         if (fillPreview) frame('fill', 'ks-fillpreview', fillPreview);
+        if (marks && marks.length) {
+            for (let i = 0; i < marks.length; i++) {
+                const m = marks[i];
+                if (m.r >= rows.from && m.r <= rows.to && m.c >= cols.from && m.c <= cols.to) frame('mark' + i, 'ks-mark', { r1: m.r, c1: m.c, r2: m.r, c2: m.c });
+            }
+        }
         // the fill handle, at the corner of the selection when it is one rectangle
         if (rects.length === 1 && !editing) {
             const b = rects[0];
@@ -574,7 +722,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     return (
         <div className="ks-grid" ref={scroller} onScroll={onScroll}>
             <div className="ks-spacer" style={{ width: layout.contentWidth, height: layout.contentHeight }} />
-            <div className="ks-view" ref={view} style={{ width: box.width, height: box.height }} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick}>
+            <div className="ks-view" ref={view} style={{ width: box.width, height: box.height }} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick} onContextMenu={onContextMenu}>
                 {box.width > 0 ? (
                     <>
                         <Pane className="ks-main" left={left + fw} top={top + fh} width={layout.mainWidth} height={layout.mainHeight} shiftX={sx} shiftY={sy}>{paneCells(R.scrolling, C.scrolling, true, true)}</Pane>
@@ -595,6 +743,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                     aria-label={'Cell ' + colName(sel.active.c) + (sel.active.r + 1)} onKeyDown={onSinkKeyDown} onInput={onSinkInput}
                     onCompositionStart={onCompositionStart} onBlur={() => { if (editing) commit(null); }}
                     onCopy={(e) => onCopyOrCut(e, false)} onCut={(e) => onCopyOrCut(e, true)} onPaste={onPaste} />
+                {menu ? <Menu at={{ x: menu.x, y: menu.y }} items={menuItems(menu)} onSelect={onMenuSelect} onClose={() => setMenu(null)} container={container} label="Cell" /> : null}
                 <span ref={mirror} className="ks-mirror" style={editStyle ? { fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily } : undefined} />
             </div>
         </div>

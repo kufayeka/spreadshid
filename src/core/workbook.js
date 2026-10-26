@@ -862,6 +862,52 @@ export function createWorkbook(doc, options) {
         return apply([{ t: 'moveSheet', id: s, before: sheetOf(s).key, after: keyBetween(before, after) }], how);
     }
 
+    /**
+     * A copy of a sheet, right after it, called "Copy of …" (a number is added when that name is taken); returns its id. Every row, column and the sheet
+     * itself get new ids, and the formulas and merged blocks that point inside the sheet are pointed at the copy's own rows and columns: the copy stands on
+     * its own, it does not read the sheet it was made from. Formulas that read other sheets still read them.
+     */
+    function duplicateSheet(s, how) {
+        const source = snapshotSheet(sheetOf(s));
+        const ids = new Map();
+        const renew = (old) => { if (old === null || old === undefined) return old; let n = ids.get(old); if (!n) ids.set(old, (n = newId())); return n; };
+        for (const c of source.columns) renew(c.id);
+        for (const r of source.rows) renew(r.id);
+        const moveFormula = (v) => (isStoredFormula(v)
+            ? { f: v.f, refs: v.refs.map((ref) => (ref.s ? { ...ref } : { ...ref, r1: renew(ref.r1), c1: renew(ref.c1), r2: renew(ref.r2), c2: renew(ref.c2) })) }
+            : v);
+        const name = (() => {
+            const base = 'Copy of ' + (source.props.name || 'Sheet');
+            if (!grid.sheetIdByName(base)) return base;
+            let n = 2;
+            while (grid.sheetIdByName(base + ' ' + n)) n++;
+            return base + ' ' + n;
+        })();
+        const at = sheetOrder.indexOf(s);
+        const next = sheetOrder[at + 1];
+        const props = { ...source.props, name };
+        if (props.merges) props.merges = props.merges.map((m) => ({ r1: renew(m.r1), c1: renew(m.c1), r2: renew(m.r2), c2: renew(m.c2) }));
+        delete props.hidden;
+        const copy = {
+            id: newId(), key: keyBetween(source.key, next ? sheets.get(next).key : null), props,
+            columns: source.columns.map((c) => ({ id: ids.get(c.id), key: c.key, props: c.props })),
+            rows: source.rows.map((r) => {
+                const cells = {}, style = {};
+                for (const cid in r.cells) cells[ids.get(cid)] = moveFormula(r.cells[cid]);
+                for (const cid in r.style) style[ids.get(cid)] = r.style[cid];
+                return { id: ids.get(r.id), key: r.key, cells, style, props: r.props };
+            })
+        };
+        const done = apply([{ t: 'addSheet', sheet: copy }], how);
+        return done && done.length ? copy.id : null;
+    }
+
+    /** Hides a sheet (its tab goes; its cells still count in formulas). The last sheet that shows cannot be hidden. */
+    function hideSheet(s, hidden, how) {
+        if (hidden && !sheetOrder.some((x) => x !== s && !sheets.get(x).props.hidden)) throw new Error('the last sheet that shows cannot be hidden');
+        return setSheetProps(s, { hidden: hidden ? true : null }, how);
+    }
+
     // ---- reading ----------------------------------------------------------------------------------------------------------------------------------
 
     function snapshotSheet(sheet) {
@@ -977,7 +1023,7 @@ export function createWorkbook(doc, options) {
         setValues, clear, setStyle, setBlock, lastFilled,
         insertRows, deleteRows, insertCols, deleteCols, moveRows, moveCols,
         setRowProps, setColProps, setSheetProps, setSettings,
-        addSheet, removeSheet, moveSheet,
+        addSheet, removeSheet, moveSheet, duplicateSheet, hideSheet,
         /** NOW() and TODAY() are worked out again (the host calls this on a timer when it wants a live clock). */
         tick: () => engine.tick(),
         // saving

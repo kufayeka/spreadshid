@@ -30,6 +30,8 @@ for (let i = 0; i < LINES; i++) {
 wb.setValues(boq, 3, 0, rows);
 wb.setValues(boq, 0, 7, [['Total'], ['=SUM(F4:F' + (LINES + 3) + ')']]);
 wb.setStyle(boq, { r1: 0, c1: 7, r2: 1, c2: 7 }, { bold: true });
+const rates = wb.addSheet('Rates');
+wb.setValues(rates, 0, 0, [['Material', 'Rate'], ['Concrete K-300', 1250000], ['Rebar', 14500]]);
 wb.saved(wb.pendingPatch());
 
 window.__workbook = wb;
