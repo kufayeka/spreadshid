@@ -1,0 +1,16 @@
+/* The look of the sheet. Every colour and size is a custom property, so a host changes the theme without overriding selectors. */
+.ks-sheet {
+    --ks-font: 13px/1.4 "IBM Plex Sans", system-ui, sans-serif;
+    --ks-bg: #ffffff;
+    --ks-fg: #161616;
+    --ks-line: #e0e0e0;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    font: var(--ks-font);
+    color: var(--ks-fg);
+    background: var(--ks-bg);
+    border: 1px solid var(--ks-line);
+}
+.ks-empty { padding: 12px; color: #6f6f6f; }

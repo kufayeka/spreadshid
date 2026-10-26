@@ -1,0 +1,45 @@
+{
+  "name": "@kufayeka/sheet",
+  "version": "0.1.0",
+  "description": "A spreadsheet for React, like Google Sheets: people make and format their own sheets, the code that hosts it keeps control of every change.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/types/core/index.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./style.css": "./dist/sheet.css"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "prepare": "node build.js",
+    "test": "node test/run-all.js",
+    "example": "node example/serve.js"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "esbuild": "^0.24.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3"
+  },
+  "author": "kufayeka",
+  "license": "UNLICENSED"
+}
