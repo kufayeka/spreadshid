@@ -4,6 +4,10 @@ import { displayOf } from '../core/display.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
 import { keyAction } from './keys.js';
+import { columnNeed } from './measure.js';
+
+// the smallest a column or a row can be dragged to
+const MIN_SIZE = 4;
 
 // useLayoutEffect warns when React renders on a server (Next.js); there is nothing to measure there anyway
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -39,11 +43,14 @@ function bordersCss(borders) {
     return { borderTop: side(borders.top), borderRight: side(borders.right), borderBottom: side(borders.bottom), borderLeft: side(borders.left) };
 }
 
-function Cell({ r, c, x, y, w, h, merged, display, style }) {
+// A cell is drawn only when it shows something (a value, a fill, a border). It leaves the last pixel on its right and at its bottom to the grid lines,
+// which are drawn once per row and once per column under the cells; a cell that must hide the lines inside it (a merged block, a text that runs on over
+// empty cells) covers them with the sheet's colour, as Google Sheets does.
+function Cell({ r, c, x, y, w, h, merged, cover, display, style }) {
     const css = cellCss(style, display);
     return (
-        <div className={'ks-cell' + (merged ? ' ks-merged' : '')} data-r={r} data-c={c}
-            style={{ left: x, top: y, width: w, height: h, background: css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
+        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '')} data-r={r} data-c={c}
+            style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
             <span className="ks-text" style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>
             {style && style.borders ? <span className="ks-borders" style={bordersCss(style.borders)} /> : null}
         </div>
@@ -67,6 +74,8 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         if (!w) continue;
         const display = displayOf(wb.value(sheetId, r, c));
         const style = wb.style(sheetId, r, c);
+        // an empty cell with no style is not drawn: the grid lines are all it shows
+        if (display.kind === 'empty' && !style) continue;
         // a text that does not wrap runs on into the empty cells on its right, which are then not drawn (their grid lines would cross the text)
         let width = w;
         if (display.kind === 'text' && (!style || (!style.wrap && (!style.align || style.align === 'left')))) {
@@ -77,7 +86,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
                 next++;
             }
         }
-        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} display={display} style={style} />);
+        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} display={display} style={style} />);
     }
     return cells;
 });
@@ -117,6 +126,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const [editorSize, setEditorSize] = useState(null);
     // the grid scrolls to the cell the keyboard moved to; a selection made with the mouse (a whole column above all) is where the person is looking already
     const reveal = useRef(false);
+    // the line that shows where a dragged edge of a column or a row will be
+    const [guide, setGuide] = useState(null);
     const moveTo = (next) => { reveal.current = true; setSel(next); };
 
     // the grid fills its box: measured once on screen and whenever the box changes size
@@ -252,8 +263,65 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         return { x: e.clientX - rect.left, y: e.clientY - rect.top, rect };
     }
 
+    // ---- resizing columns and rows: their edges in the headers are dragged, or double-clicked to fit the content ---------------------------------
+
+    // the columns (or rows) a resize applies to: all the whole columns selected when the dragged one is one of them, else the dragged one alone
+    function resizeTargets(kind, i) {
+        const out = new Set();
+        for (const b of rects) {
+            const whole = kind === 'col' ? b.r1 === 0 && b.r2 === size.rows - 1 : b.c1 === 0 && b.c2 === size.cols - 1;
+            const lo = kind === 'col' ? b.c1 : b.r1, hi = kind === 'col' ? b.c2 : b.r2;
+            if (whole && i >= lo && i <= hi) for (let k = lo; k <= hi; k++) out.add(k);
+        }
+        return out.size ? [...out] : [i];
+    }
+
+    function startResize(kind, i, e) {
+        const axis = kind === 'col' ? colAxis : rowAxis;
+        const frozen = kind === 'col' ? layout.fc : layout.fr;
+        const origin = (kind === 'col' ? left : top) + axis.start(i) - (i >= frozen ? (kind === 'col' ? scroll.left : scroll.top) : 0);
+        const startSize = axis.size(i);
+        const from = kind === 'col' ? e.clientX : e.clientY;
+        let current = startSize;
+        setGuide({ kind, at: origin + startSize });
+        const move = (ev) => {
+            current = Math.max(MIN_SIZE, startSize + (kind === 'col' ? ev.clientX : ev.clientY) - from);
+            setGuide({ kind, at: origin + current });
+        };
+        const up = () => {
+            window.removeEventListener('mousemove', move);
+            window.removeEventListener('mouseup', up);
+            setGuide(null);
+            if (current === startSize) return;
+            const targets = resizeTargets(kind, i);
+            if (kind === 'col') wb.setColProps(sheetId, targets, { width: current }, { source: 'user' });
+            else wb.setRowProps(sheetId, targets, { height: current }, { source: 'user' });
+        };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+    }
+
+    // a double click on an edge: columns as wide as their widest text; rows back to the height their text needs (the height set by hand is taken away)
+    function fit(kind, i) {
+        const targets = resizeTargets(kind, i);
+        if (kind === 'row') { wb.setRowProps(sheetId, targets, { height: null }, { source: 'user' }); return; }
+        const each = (fn) => wb.forEachFilledRow(sheetId, fn);
+        wb.setColProps(sheetId, targets, (c) => ({ width: columnNeed(each, wb.colId(sheetId, c), (r) => wb.value(sheetId, r, c)) }), { source: 'user' });
+    }
+
     function onMouseDown(e) {
         if (e.button !== 0) return;
+        const edge = e.target && e.target.dataset;
+        if (edge && (edge.resizeCol !== undefined || edge.resizeRow !== undefined)) {
+            e.preventDefault();
+            if (editing) commit(null);
+            // the keyboard stays with the grid, so Ctrl+Z right after the drag takes it back
+            if (sink.current) sink.current.focus({ preventScroll: true });
+            // the second press of a double click: the double click fits, it does not drag
+            if (e.detail >= 2) return;
+            startResize(edge.resizeCol !== undefined ? 'col' : 'row', Number(edge.resizeCol !== undefined ? edge.resizeCol : edge.resizeRow), e);
+            return;
+        }
         const { x, y } = pointIn(e);
         const target = hit(x, y);
         // the editor keeps the focus and the text: a click elsewhere ends the edit with what was typed
@@ -296,6 +364,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     }
 
     function onDoubleClick(e) {
+        const edge = e.target && e.target.dataset;
+        if (edge && edge.resizeCol !== undefined) { fit('col', Number(edge.resizeCol)); return; }
+        if (edge && edge.resizeRow !== undefined) { fit('row', Number(edge.resizeRow)); return; }
         const { x, y } = pointIn(e);
         const target = hit(x, y);
         if (target.kind !== 'cell') return;
@@ -333,6 +404,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const out = [];
         if (rows.to < rows.from || cols.to < cols.from) return out;
         const yBase = rowsScroll ? fh : 0, xBase = colsScroll ? fw : 0;
+        // the grid lines first, under the cells: one along the bottom of each row, one along the right of each column
+        const x0 = colAxis.start(cols.from) - xBase, x1 = colAxis.start(cols.to + 1) - xBase;
+        const y0 = rowAxis.start(rows.from) - yBase, y1 = rowAxis.start(rows.to + 1) - yBase;
+        for (let r = rows.from; r <= rows.to; r++) if (rowAxis.size(r)) out.push(<div key={'h' + r} className="ks-line-h" style={{ top: rowAxis.start(r + 1) - yBase - 1, left: x0, width: x1 - x0 }} />);
+        for (let c = cols.from; c <= cols.to; c++) if (colAxis.size(c)) out.push(<div key={'v' + c} className="ks-line-v" style={{ left: colAxis.start(c + 1) - xBase - 1, top: y0, height: y1 - y0 }} />);
         for (let r = rows.from; r <= rows.to; r++) {
             const h = rowAxis.size(r);
             if (!h) continue;
@@ -378,7 +454,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const base = scrolling ? fw : 0;
         for (let c = cols.from; c <= cols.to; c++) {
             const w = colAxis.size(c);
-            if (w) out.push(<div key={c} className={'ks-colhead' + colState(c)} data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HEADER_HEIGHT }}>{colName(c)}</div>);
+            if (!w) continue;
+            out.push(<div key={c} className={'ks-colhead' + colState(c)} data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HEADER_HEIGHT }}>{colName(c)}</div>);
+            out.push(<div key={'e' + c} className="ks-colresize" data-resize-col={c} style={{ left: colAxis.start(c + 1) - base - 3, height: HEADER_HEIGHT }} />);
         }
         return out;
     };
@@ -387,7 +465,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const base = scrolling ? fh : 0;
         for (let r = rows.from; r <= rows.to; r++) {
             const h = rowAxis.size(r);
-            if (h) out.push(<div key={r} className={'ks-rowhead' + rowState(r)} data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: ROW_HEADER_WIDTH }}>{r + 1}</div>);
+            if (!h) continue;
+            out.push(<div key={r} className={'ks-rowhead' + rowState(r)} data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: ROW_HEADER_WIDTH }}>{r + 1}</div>);
+            out.push(<div key={'e' + r} className="ks-rowresize" data-resize-row={r} style={{ top: rowAxis.start(r + 1) - base - 3, width: ROW_HEADER_WIDTH }} />);
         }
         return out;
     };
@@ -418,6 +498,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                         <div className="ks-origin" style={{ width: ROW_HEADER_WIDTH, height: HEADER_HEIGHT }} />
                         {fh > 0 ? <div className="ks-freeze-line ks-h" style={{ top: top + fh - 1, width: box.width }} /> : null}
                         {fw > 0 ? <div className="ks-freeze-line ks-v" style={{ left: left + fw - 1, height: box.height }} /> : null}
+                        {guide ? <div className={'ks-guide ' + (guide.kind === 'col' ? 'ks-v' : 'ks-h')} style={guide.kind === 'col' ? { left: guide.at - 1, height: box.height } : { top: guide.at - 1, width: box.width }} /> : null}
                     </>
                 ) : null}
                 <textarea ref={sink} className={'ks-input' + (editing ? ' ks-editing' : '')} style={sinkStyle} spellCheck={false} autoComplete="off"

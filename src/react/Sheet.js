@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { createWorkbook, VERSION } from '../core/index.js';
 import { selectCell } from '../core/selection.js';
 import { Grid } from './Grid.js';
+import { useAutoHeights } from './autoHeights.js';
 
 /**
  * Follows a workbook: the component draws again whenever a change is applied to it (by a person, by code, by undo).
@@ -9,7 +10,7 @@ import { Grid } from './Grid.js';
  */
 export function useWorkbookRevision(wb) {
     return useSyncExternalStore(
-        (notify) => { const offOp = wb.on('op', notify); const offSaved = wb.on('saved', notify); return () => { offOp(); offSaved(); }; },
+        (notify) => { const offs = ['op', 'saved', 'layout'].map((type) => wb.on(type, notify)); return () => offs.forEach((off) => off()); },
         () => wb.revision,
         () => wb.revision
     );
@@ -34,6 +35,7 @@ export function Sheet(props) {
     const sheetId = props.sheet && ids.includes(props.sheet) ? props.sheet : ids[0];
     const [sel, setSel] = useState(() => selectCell(0, 0));
     const [editing, setEditing] = useState(null);
+    useAutoHeights(wb, sheetId);
 
     // Nothing here may touch window or document while rendering: Next.js renders this on the server first, where neither exists.
     return (

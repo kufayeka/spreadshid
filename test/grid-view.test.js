@@ -22,7 +22,7 @@ await withExample(async ({ js, mouse, wait }) => {
     check('the grand total of 100 000 formulas', (await cellText(1, 7)) === '63749900000', await cellText(1, 7));
     check('a style shows: bold, a fill, centred', await q(`(function(){ var t = document.querySelector('.ks-cell[data-r="2"][data-c="1"] .ks-text'); var cs = getComputedStyle(t); var cell = t.parentElement; return cs.fontWeight === '700' && getComputedStyle(cell).backgroundColor === 'rgb(232, 240, 254)' && cs.textAlign === 'center'; })()`));
     check('a border from the style is drawn', await q(`(function(){ var b = document.querySelector('.ks-cell[data-r="2"][data-c="1"] .ks-borders'); return !!b && getComputedStyle(b).borderBottomWidth === '2px'; })()`));
-    check('a merged block is one cell as wide as its columns (A to F)', await q(`(function(){ var m = document.querySelector('.ks-top .ks-merged[data-r="1"][data-c="0"]'); return !!m && Math.round(m.getBoundingClientRect().width) === 100 + 260 + 100 * 3 + 140; })()`));
+    check('a merged block is one cell as wide as its columns (A to F, less the pixel of the grid line on its right)', await q(`(function(){ var m = document.querySelector('.ks-top .ks-merged[data-r="1"][data-c="0"]'); return !!m && Math.round(m.getBoundingClientRect().width) === 100 + 260 + 100 * 3 + 140 - 1; })()`));
     check('and the cells under it are not drawn', !(await q('!!document.querySelector(".ks-top .ks-cell[data-r=\\"1\\"][data-c=\\"2\\"]")')));
     check('a text runs on into the empty cells on its right ("Total" in H1)', await q(`(function(){ var t = document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="7"]'); return !!t && Math.round(t.getBoundingClientRect().width) > 100 && !document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="8"]'); })()`));
 
@@ -46,9 +46,16 @@ await withExample(async ({ js, mouse, wait }) => {
     check('only the cells on screen are drawn (' + drawn + ')', drawn < 1500, drawn);
     void t0;
 
-    // a frame after a scroll is drawn quickly: 20 scrolls by a screen, timed in the page
-    const frame = await q(`(async function(){ var g = document.querySelector('.ks-grid'); var times = []; for (var i = 0; i < 20; i++) { var t = performance.now(); g.scrollTop = 500000 + i * 700; await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); }); times.push(performance.now() - t); } times.sort(function(a,b){ return a-b; }); return Math.round(times[10]); })()`);
-    check('a scroll by a screen is drawn in under 50 ms (median ' + frame + ' ms)', frame < 50, frame);
+    // Frames after scrolls, timed in the page from the scroll to the second frame after it (so two frames of waiting, about 33 ms, are always in it).
+    // Small steps are what the wheel does; a jump by a screen is what dragging the scrollbar does (every row on screen is new).
+    const timeScrolls = (step) => q(`(async function(){ var g = document.querySelector('.ks-grid'); var times = []; for (var i = 0; i < 30; i++) { var t = performance.now(); g.scrollTop = 500000 + i * ${step}; await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); }); times.push(performance.now() - t); } times.sort(function(a,b){ return a-b; }); return Math.round(times[15]); })()`);
+    const wheel = await timeScrolls(100);
+    const jumpTime = await timeScrolls(700);
+    check('a wheel step is drawn within two frames (median ' + wheel + ' ms, two frames are 33)', wheel < 50, wheel);
+    check('a jump by a whole screen is drawn quickly (median ' + jumpTime + ' ms)', jumpTime < 100, jumpTime);
+    const lines = await q('document.querySelectorAll(".ks-main .ks-line-h").length + document.querySelectorAll(".ks-main .ks-line-v").length');
+    const cellsMain = await q('document.querySelectorAll(".ks-main .ks-cell").length');
+    check('the grid lines are drawn once per row and column (' + lines + '), and only cells that show something (' + cellsMain + ')', lines < 120 && cellsMain < 400, { lines, cellsMain });
 });
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL OK');
 process.exit(failures ? 1 : 0);

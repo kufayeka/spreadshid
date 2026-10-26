@@ -34,15 +34,17 @@
 .ks-cell {
     position: absolute;
     display: flex;
-    padding: 0 3px 1px;
+    padding: 0 3px 0;
     overflow: visible;
     font: var(--ks-font);
-    border-right: 1px solid var(--ks-grid);
-    border-bottom: 1px solid var(--ks-grid);
 }
+.ks-cell.ks-cover { background: var(--ks-bg); }
 .ks-cell.ks-merged { background: var(--ks-bg); z-index: 1; }
+/* the grid lines, one per row and one per column */
+.ks-line-h { position: absolute; height: 1px; background: var(--ks-grid); }
+.ks-line-v { position: absolute; width: 1px; background: var(--ks-grid); }
 .ks-text { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; }
-.ks-borders { position: absolute; inset: -1px 0 0 -1px; pointer-events: none; }
+.ks-borders { position: absolute; inset: -1px -1px -1px -1px; pointer-events: none; }
 
 /* the headers */
 .ks-colhead, .ks-rowhead {
@@ -93,3 +95,11 @@
 }
 .ks-input.ks-editing { opacity: 1; pointer-events: auto; padding-top: 2px; box-shadow: 0 0 0 2px var(--ks-accent), 0 2px 6px rgba(0, 0, 0, 0.25); }
 .ks-mirror { position: absolute; visibility: hidden; white-space: pre; font: var(--ks-font); line-height: 1.25; left: -9999px; top: 0; padding: 0 3px; }
+
+/* the edges of the headers: dragged to resize, double-clicked to fit */
+.ks-colresize { position: absolute; top: 0; width: 7px; cursor: col-resize; z-index: 2; }
+.ks-rowresize { position: absolute; left: 0; height: 7px; cursor: row-resize; z-index: 2; }
+.ks-colresize:hover, .ks-rowresize:hover { background: rgba(26, 115, 232, 0.35); }
+.ks-guide { position: absolute; background: var(--ks-accent); z-index: 6; pointer-events: none; }
+.ks-guide.ks-v { top: 0; width: 2px; }
+.ks-guide.ks-h { left: 0; height: 2px; }

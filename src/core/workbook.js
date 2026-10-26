@@ -425,12 +425,56 @@ export function createWorkbook(doc, options) {
         const sheet = sheetOf(sheetIdOf(s));
         if (!sheet.rowAxis) {
             const fallback = sheet.props.rowHeight || DEFAULT_ROW_HEIGHT;
+            const auto = sheet.autoHeights;
+            // a height set by hand wins; else the height the screen measured for the row's text (wrapped, several lines, a big font); else the default
             sheet.rowAxis = createAxis(sheet.rowOrder.length, (i) => {
-                const p = sheet.rows.get(sheet.rowOrder[i]).props;
-                return p.hidden ? 0 : p.height || fallback;
+                const rid = sheet.rowOrder[i];
+                const p = sheet.rows.get(rid).props;
+                if (p.hidden) return 0;
+                if (p.height) return p.height;
+                const measured = auto && auto.get(rid);
+                return measured && measured > fallback ? measured : fallback;
             });
         }
         return sheet.rowAxis;
+    }
+
+    /**
+     * The heights the screen measured for rows whose text needs more room than a row has (wrapped text, several lines, a big font). They depend on fonts,
+     * which only a browser can measure, so they are not part of the workbook: not an op, not undone, not saved. A row with a height set by hand keeps it.
+     * @param {string} s
+     * @param {Map<string, number>} heights  row id -> height in pixels (0 or absent: the default height)
+     */
+    function setAutoHeights(s, heights) {
+        const sheet = sheetOf(sheetIdOf(s));
+        if (!sheet.autoHeights) sheet.autoHeights = new Map();
+        let changed = false;
+        for (const [rid, h] of heights) {
+            const before = sheet.autoHeights.get(rid) || 0;
+            if (before === (h || 0)) continue;
+            if (h) sheet.autoHeights.set(rid, h); else sheet.autoHeights.delete(rid);
+            changed = true;
+        }
+        if (!changed) return false;
+        sheet.rowAxis = null;
+        revision++;
+        emit('layout', { sheet: sheet.id });
+        return true;
+    }
+
+    /**
+     * Calls fn(r, cells, styles) for every row that holds content or style, in order. `cells` and `styles` are the workbook's own objects (column id ->
+     * content / style), given without a copy for speed: they must only be read.
+     */
+    function forEachFilledRow(s, fn) {
+        const sheet = sheetOf(sheetIdOf(s));
+        for (let r = 0; r < sheet.rowOrder.length; r++) {
+            const row = sheet.rows.get(sheet.rowOrder[r]);
+            let any = false;
+            for (const k in row.cells) { any = true; break; }
+            if (!any) for (const k in row.style) { any = true; break; }
+            if (any) fn(r, row.cells, row.style);
+        }
     }
 
     /** The width of every column (hidden columns: 0), as positions. */
@@ -703,20 +747,43 @@ export function createWorkbook(doc, options) {
 
     const merged = (base, patch) => { const out = Object.assign({}, base, patch); for (const k of Object.keys(out)) if (out[k] === null || out[k] === undefined) delete out[k]; return out; };
 
-    /** Merges `patch` into the props of rows (height, hidden, group level ...). */
+    /**
+     * Merges a patch into the props of rows (height, hidden, group level ...). `patch` is one object for every row, or a function of the row's number that
+     * gives each its own (fitting rows to their text gives each its height); either way it is one change, undone at once.
+     */
     function setRowProps(s, rows, patch, how) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
-        const changes = rows.map((r) => sheet.rowOrder[r]).filter(Boolean).map((rid) => { const p = sheet.rows.get(rid).props; return { id: rid, before: clone(p), after: merged(p, patch) }; });
+        const changes = [];
+        for (const r of rows) {
+            const rid = sheet.rowOrder[r];
+            if (!rid) continue;
+            const p = sheet.rows.get(rid).props;
+            changes.push({ id: rid, before: clone(p), after: merged(p, typeof patch === 'function' ? patch(r) : patch) });
+        }
         return changes.length ? apply([{ t: 'rowProps', sheet: s, changes }], how) : [];
     }
 
-    /** Merges `patch` into the props of columns (width, hidden, header name, format ...). */
+    /** Merges a patch into the props of columns (width, hidden, header name, format ...): one object, or a function of the column's number. */
     function setColProps(s, cols, patch, how) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
-        const changes = cols.map((c) => sheet.colOrder[c]).filter(Boolean).map((cid) => { const p = sheet.cols.get(cid).props; return { id: cid, before: clone(p), after: merged(p, patch) }; });
+        const changes = [];
+        for (const c of cols) {
+            const cid = sheet.colOrder[c];
+            if (!cid) continue;
+            const p = sheet.cols.get(cid).props;
+            changes.push({ id: cid, before: clone(p), after: merged(p, typeof patch === 'function' ? patch(c) : patch) });
+        }
         return changes.length ? apply([{ t: 'colProps', sheet: s, changes }], how) : [];
+    }
+
+    /** The content and the styles of a row (column id -> ...), the workbook's own objects: only to be read. */
+    function rowContent(s, r) {
+        const sheet = sheetOf(sheetIdOf(s));
+        const rid = sheet.rowOrder[r];
+        const row = rid && sheet.rows.get(rid);
+        return row ? { id: rid, cells: row.cells, styles: row.style } : null;
     }
 
     /** Merges `patch` into the props of a sheet (name, freeze, colours ...). */
@@ -817,7 +884,7 @@ export function createWorkbook(doc, options) {
         /** Raised on every applied change: a screen draws again when it moves. */
         get revision() { return revision; },
         // the layout
-        rowAxis, colAxis, merges, mergeCells, unmergeCells,
+        rowAxis, colAxis, merges, mergeCells, unmergeCells, setAutoHeights, forEachFilledRow, rowContent,
         // reading
         sheetIds: () => [...sheetOrder],
         sheetProps: (s) => clone(sheetOf(sheetIdOf(s)).props),
