@@ -1,16 +1,68 @@
 /* The look of the sheet. Every colour and size is a custom property, so a host changes the theme without overriding selectors. */
 .ks-sheet {
-    --ks-font: 13px/1.4 "IBM Plex Sans", system-ui, sans-serif;
+    --ks-font: 10pt/1.25 Arial, "Helvetica Neue", Helvetica, sans-serif;
+    --ks-ui-font: 13px/1.4 "IBM Plex Sans", system-ui, sans-serif;
     --ks-bg: #ffffff;
     --ks-fg: #161616;
-    --ks-line: #e0e0e0;
+    --ks-grid: #e2e3e3;
+    --ks-head-bg: #f8f9fa;
+    --ks-head-fg: #575757;
+    --ks-head-line: #c0c0c0;
+    --ks-freeze: #bdc1c6;
+    --ks-error: #d93025;
+    --ks-accent: #1a73e8;
     box-sizing: border-box;
     position: relative;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     height: 100%;
-    font: var(--ks-font);
+    font: var(--ks-ui-font);
     color: var(--ks-fg);
     background: var(--ks-bg);
-    border: 1px solid var(--ks-line);
+    border: 1px solid var(--ks-grid);
 }
+.ks-sheet *, .ks-sheet *::before, .ks-sheet *::after { box-sizing: border-box; }
+
+/* the scroller: the browser's own scrolling (wheel, touch, scrollbars); the view inside stays in place and draws what the scroll shows */
+.ks-grid { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; }
+.ks-spacer { position: absolute; top: 0; left: 0; pointer-events: none; }
+.ks-view { position: sticky; top: 0; left: 0; overflow: hidden; }
+.ks-pane { position: absolute; overflow: hidden; }
+
+/* a cell: its box draws the grid line on its right and its bottom */
+.ks-cell {
+    position: absolute;
+    display: flex;
+    padding: 0 3px 1px;
+    overflow: visible;
+    font: var(--ks-font);
+    border-right: 1px solid var(--ks-grid);
+    border-bottom: 1px solid var(--ks-grid);
+}
+.ks-cell.ks-merged { background: var(--ks-bg); z-index: 1; }
+.ks-text { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.ks-borders { position: absolute; inset: -1px 0 0 -1px; pointer-events: none; }
+
+/* the headers */
+.ks-colhead, .ks-rowhead {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: 11px/1 Arial, sans-serif;
+    color: var(--ks-head-fg);
+    background: var(--ks-head-bg);
+    border-right: 1px solid var(--ks-head-line);
+    border-bottom: 1px solid var(--ks-head-line);
+    user-select: none;
+}
+.ks-colhead { top: 0; }
+.ks-rowhead { left: 0; }
+.ks-origin { position: absolute; top: 0; left: 0; background: var(--ks-head-bg); border-right: 1px solid var(--ks-head-line); border-bottom: 1px solid var(--ks-head-line); }
+.ks-freeze-line { position: absolute; background: var(--ks-freeze); z-index: 3; pointer-events: none; }
+.ks-freeze-line.ks-h { left: 0; height: 3px; }
+.ks-freeze-line.ks-v { top: 0; width: 3px; }
+
 .ks-empty { padding: 12px; color: #6f6f6f; }
+.ks-layer { position: absolute; top: 0; left: 0; will-change: transform; }

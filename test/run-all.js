@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const TESTS = ['core.test.js', 'core-scale.test.js', 'ssr.test.js', 'chrome-smoke.test.js'];
+const TESTS = ['core.test.js', 'core-scale.test.js', 'ssr.test.js', 'chrome-smoke.test.js', 'grid-view.test.js'];
 
 execFileSync(process.execPath, [join(here, '..', 'build.js')], { stdio: 'inherit' });
 let failed = 0;

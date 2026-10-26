@@ -13,6 +13,7 @@ import { createEngine } from './calc.js';
 import { storeFormula, formulaText, isStoredFormula } from './refs.js';
 import { colName } from './formula/address.js';
 import { parseInput } from './input.js';
+import { createAxis } from './axis.js';
 
 /**
  * A workbook as it is stored (and as a patch carries its parts).
@@ -46,6 +47,9 @@ import { parseInput } from './input.js';
 
 const DEFAULT_ROWS = 1000;
 const DEFAULT_COLS = 26;
+// the sizes Google Sheets gives a new sheet, in pixels
+const DEFAULT_ROW_HEIGHT = 21;
+const DEFAULT_COL_WIDTH = 100;
 
 // A copy of what is kept, so that the caller cannot change the workbook behind its back. Numbers, texts and booleans (most cells) need no copy at all.
 const clone = (v) => (v === null || typeof v !== 'object' ? v : isStoredFormula(v) ? { f: v.f, refs: v.refs.map((r) => ({ ...r })) } : JSON.parse(JSON.stringify(v)));
@@ -401,6 +405,87 @@ export function createWorkbook(doc, options) {
 
     // ---- the one door ---------------------------------------------------------------------------------------------------------------------------
 
+    // ---- the layout: sizes of rows and columns, merged cells ------------------------------------------------------------------------------------------
+
+    // Raised on every change that is applied, so a screen knows when to draw again (React reads it with useSyncExternalStore).
+    let revision = 0;
+
+    const ROW_OPS = new Set(['insertRows', 'deleteRows', 'moveRows', 'rowProps']);
+    const COL_OPS = new Set(['insertCols', 'deleteCols', 'moveCols', 'colProps']);
+    // the sizes of a sheet are made into positions once, and again only after a change of a size, a row or a column
+    function forgetLayout(op) {
+        const sheet = op.sheet && typeof op.sheet === 'string' ? sheets.get(op.sheet) : null;
+        if (!sheet) return;
+        if (ROW_OPS.has(op.t) || op.t === 'sheetProps') sheet.rowAxis = null;
+        if (COL_OPS.has(op.t) || op.t === 'sheetProps') sheet.colAxis = null;
+    }
+
+    /** The height of every row (hidden rows: 0), as positions. */
+    function rowAxis(s) {
+        const sheet = sheetOf(sheetIdOf(s));
+        if (!sheet.rowAxis) {
+            const fallback = sheet.props.rowHeight || DEFAULT_ROW_HEIGHT;
+            sheet.rowAxis = createAxis(sheet.rowOrder.length, (i) => {
+                const p = sheet.rows.get(sheet.rowOrder[i]).props;
+                return p.hidden ? 0 : p.height || fallback;
+            });
+        }
+        return sheet.rowAxis;
+    }
+
+    /** The width of every column (hidden columns: 0), as positions. */
+    function colAxis(s) {
+        const sheet = sheetOf(sheetIdOf(s));
+        if (!sheet.colAxis) {
+            const fallback = sheet.props.colWidth || DEFAULT_COL_WIDTH;
+            sheet.colAxis = createAxis(sheet.colOrder.length, (i) => {
+                const p = sheet.cols.get(sheet.colOrder[i]).props;
+                return p.hidden ? 0 : p.width || fallback;
+            });
+        }
+        return sheet.colAxis;
+    }
+
+    /**
+     * The merged blocks of a sheet, by position: [{ r1, c1, r2, c2 }]. They are kept by the ids of their corners, so a block moves with its rows; a block
+     * whose corner row or column was deleted is left out.
+     */
+    // where one stored block stands now, or null when a corner of it was deleted
+    function resolveMerge(s, m) {
+        const r1 = grid.rowIndexOf(s, m.r1), r2 = grid.rowIndexOf(s, m.r2), c1 = grid.colIndexOf(s, m.c1), c2 = grid.colIndexOf(s, m.c2);
+        if (r1 < 0 || r2 < 0 || c1 < 0 || c2 < 0) return null;
+        return { r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) };
+    }
+
+    function merges(s) {
+        s = sheetIdOf(s);
+        const out = [];
+        for (const m of sheetOf(s).props.merges || []) { const at = resolveMerge(s, m); if (at) out.push(at); }
+        return out;
+    }
+
+    const overlaps = (a, b) => a.r1 <= b.r2 && a.r2 >= b.r1 && a.c1 <= b.c2 && a.c2 >= b.c1;
+
+    // the stored blocks that stand and do not overlap `range` (a block that lost a corner is dropped on the way)
+    const mergesApartFrom = (s, range) => (sheetOf(s).props.merges || []).filter((m) => { const at = resolveMerge(s, m); return at && !overlaps(at, range); });
+
+    /** Merges a rectangle into one cell (blocks it overlaps are taken apart first). The cells under it keep their content, unseen, as undo needs. */
+    function mergeCells(s, range, how) {
+        s = sheetIdOf(s);
+        const sheet = sheetOf(s);
+        if (range.r1 === range.r2 && range.c1 === range.c2) return [];
+        const block = { r1: sheet.rowOrder[range.r1], c1: sheet.colOrder[range.c1], r2: sheet.rowOrder[range.r2], c2: sheet.colOrder[range.c2] };
+        return setSheetProps(s, { merges: mergesApartFrom(s, range).concat([block]) }, how);
+    }
+
+    /** Takes apart every merged block that overlaps the rectangle. */
+    function unmergeCells(s, range, how) {
+        s = sheetIdOf(s);
+        const all = sheetOf(s).props.merges || [];
+        const kept = mergesApartFrom(s, range);
+        return kept.length === all.length ? [] : setSheetProps(s, { merges: kept.length ? kept : null }, how);
+    }
+
     /**
      * Applies a change: a list of ops that belong together (one paste, one insert, one undo). The host's beforeOp sees each op first; if it refuses one,
      * nothing of the change is applied. Returns the ops that were applied (after beforeOp), or null when the change was refused.
@@ -435,6 +520,8 @@ export function createWorkbook(doc, options) {
             if (undoStack.length > undoLimit) undoStack.shift();
             redoStack.length = 0;
         }
+        for (const op of accepted) forgetLayout(op);
+        revision++;
         const stamped = accepted.map((op) => ({ ...op, user: opt.user || null, at }));
         emit('op', { ops: stamped, source });
         return stamped;
@@ -695,6 +782,7 @@ export function createWorkbook(doc, options) {
      * @param {{ version?: number }} [answer]  The new version the server gave the workbook.
      */
     function saved(patch, answer) {
+        revision++;
         const forget = (map) => { for (const [k, n] of [...map]) if (n <= patch.upTo) map.delete(k); };
         forget(dirty.rows); forget(dirty.columns); forget(dirty.sheets);
         forget(gone.rows); forget(gone.columns); forget(gone.sheets);
@@ -706,6 +794,10 @@ export function createWorkbook(doc, options) {
     const api = {
         id,
         get version() { return version; },
+        /** Raised on every applied change: a screen draws again when it moves. */
+        get revision() { return revision; },
+        // the layout
+        rowAxis, colAxis, merges, mergeCells, unmergeCells,
         // reading
         sheetIds: () => [...sheetOrder],
         sheetProps: (s) => clone(sheetOf(sheetIdOf(s)).props),

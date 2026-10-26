@@ -17,7 +17,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 export async function serveExample(port = 0, entry = 'main.js') {
     // The example takes React from the devDependencies of the package, bundled in, so the page needs nothing else.
     await build({ entryPoints: [join(root, 'example', entry)], outfile: join(root, 'example', 'dist', 'main.js'), bundle: true, format: 'esm',
-        jsx: 'automatic', loader: { '.js': 'jsx' }, sourcemap: true, define: { 'process.env.NODE_ENV': '"development"' } });
+        jsx: 'automatic', loader: { '.js': 'jsx' }, sourcemap: true, define: { 'process.env.NODE_ENV': '"production"' } });
     const server = createServer(async (req, res) => {
         const path = decodeURIComponent(req.url.split('?')[0]);
         const file = normalize(join(root, path === '/' ? 'example/index.html' : path));
