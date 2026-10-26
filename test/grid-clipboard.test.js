@@ -51,18 +51,18 @@ await withExample(async ({ js, send, click, mouse, key, wait }) => {
     await clickCell(20, 7);
     await clickCell(20, 8, 8);
     await cut();
-    await clickCell(26, 10);
+    await clickCell(13, 10);
     await paste(false);
-    check('Ctrl+X then Ctrl+V moves the cells (H21 is empty, K27 has the value)', (await value(20, 7)) === null && (await value(26, 10)) === 17500, [await value(20, 7), await value(26, 10)]);
+    check('Ctrl+X then Ctrl+V moves the cells (H21 is empty, K14 has the value)', (await value(20, 7)) === null && (await value(13, 10)) === 17500, [await value(20, 7), await value(13, 10)]);
     check('and the frame of the cut is gone once it is pasted', !(await q('!!document.querySelector(".ks-clipmark")')));
     await key('z', 'KeyZ', 90, 2);
-    check('one Ctrl+Z puts the cut back', (await value(20, 7)) === 17500 && (await value(26, 10)) === null);
+    check('one Ctrl+Z puts the cut back', (await value(20, 7)) === 17500 && (await value(13, 10)) === null);
 
     // text from another program
     await q(`navigator.clipboard.writeText('Bolt\\t12\\nNut\\t30').then(function(){ return 1; })`);
-    await clickCell(30, 7);
+    await clickCell(15, 8);
     await paste(false);
-    check('text from another program (tab-separated) pastes as typed', (await value(30, 7)) === 'Bolt' && (await value(31, 8)) === 30, [await value(30, 7), await value(31, 8)]);
+    check('text from another program (tab-separated) pastes as typed', (await value(15, 8)) === 'Bolt' && (await value(16, 9)) === 30, [await value(15, 8), await value(16, 9)]);
 
     // the fill handle, dragged with the real mouse: 1, 2 in J5:J6 go on 3, 4, 5, 6 (column J is wholly on screen: the handle of a cell at the edge is cut off, as in any sheet)
     await q(`window.__workbook.setValues(${S}, 4, 9, [[1], [2]])`);

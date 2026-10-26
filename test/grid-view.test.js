@@ -18,7 +18,7 @@ await withExample(async ({ js, mouse, wait }) => {
     const firstRowShown = () => q(`(function(){ var heads = Array.from(document.querySelectorAll('.ks-heads-rows:not(.ks-frozen) .ks-rowhead')); var pane = document.querySelector('.ks-heads-rows:not(.ks-frozen)').getBoundingClientRect(); var seen = heads.filter(function(h){ var r = h.getBoundingClientRect(); return r.bottom > pane.top + 2; }); return seen.length ? Number(seen[0].textContent) : null; })()`);
 
     check('column letters and row numbers', (await q('document.querySelector(".ks-colhead[data-c=\\"1\\"]").textContent')) === 'B' && (await q('document.querySelector(".ks-rowhead[data-r=\\"3\\"]").textContent')) === '4');
-    check('a cell shows its value, a formula its result', (await cellText(3, 1)) === 'Work item number 1' && (await cellText(3, 5)) === '15000');
+    check('a cell shows its value, a formula its result (through the money format of its column, in Indonesian)', (await cellText(3, 1)) === 'Work item number 1' && (await cellText(3, 5)) === 'Rp 15.000,00', await cellText(3, 5));
     check('the grand total of 100 000 formulas', (await cellText(1, 7)) === '63749900000', await cellText(1, 7));
     check('a style shows: bold, a fill, centred', await q(`(function(){ var t = document.querySelector('.ks-cell[data-r="2"][data-c="1"] .ks-text'); var cs = getComputedStyle(t); var cell = t.parentElement; return cs.fontWeight === '700' && getComputedStyle(cell).backgroundColor === 'rgb(232, 240, 254)' && cs.textAlign === 'center'; })()`));
     check('a border from the style is drawn', await q(`(function(){ var b = document.querySelector('.ks-cell[data-r="2"][data-c="1"] .ks-borders'); return !!b && getComputedStyle(b).borderBottomWidth === '2px'; })()`));

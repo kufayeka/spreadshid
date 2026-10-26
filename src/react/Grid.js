@@ -1,18 +1,16 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { colName } from '../core/formula/address.js';
-import { displayOf } from '../core/display.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
+import { createAxis } from '../core/axis.js';
+import { toggle, setFormat, clearFormatting } from './toolbarActions.js';
 import { keyAction } from './keys.js';
 import { columnNeed } from './measure.js';
 import { copyBlock, clipText, clipHtml, clipFromHtml, pasteClip, pasteText, fillBlock } from '../core/transfer.js';
 import { fillTarget } from '../core/fill.js';
 import { sortRange } from '../core/search.js';
 import { Menu } from './Menu.js';
-
-// The last copy made in this page, for the Paste of the right-click menu: a page can read the clipboard's text, not the formulas inside it, so when the
-// text is the one this copy put there, the copy itself is pasted (formulas and styles included).
-let lastCopy = null;
+import { rememberCopy, forgetCut, pasteFromClipboard } from './commands.js';
 
 // the smallest a column or a row can be dragged to
 const MIN_SIZE = 4;
@@ -33,15 +31,19 @@ export function cellCss(style, display) {
         fontWeight: s.bold ? 700 : undefined,
         fontStyle: s.italic ? 'italic' : undefined,
         textDecoration: deco || undefined,
-        color: s.color || (display.kind === 'error' ? 'var(--ks-error)' : undefined),
+        color: s.color || display.color || (display.kind === 'error' ? 'var(--ks-error)' : undefined),
         background: s.fill || undefined,
-        fontSize: s.fontSize ? s.fontSize + 'pt' : undefined,
+        fontSize: s.fontSize ? 'calc(' + s.fontSize + 'pt * var(--ks-zoom, 1))' : undefined,
         fontFamily: s.font || undefined,
         justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
         textAlign: align,
         alignItems: valign === 'top' ? 'flex-start' : valign === 'middle' ? 'center' : 'flex-end',
         whiteSpace: s.wrap === 'wrap' ? 'pre-wrap' : 'pre',
-        overflow: s.wrap === 'clip' || s.wrap === 'wrap' ? 'hidden' : undefined
+        overflow: s.wrap === 'clip' || s.wrap === 'wrap' ? 'hidden' : undefined,
+        // turned text: an angle (up is positive, as in Google Sheets), or letters stacked one under the other
+        transform: typeof s.rotate === 'number' && s.rotate ? 'rotate(' + -s.rotate + 'deg)' : undefined,
+        writingMode: s.rotate === 'vertical' ? 'vertical-rl' : undefined,
+        textOrientation: s.rotate === 'vertical' ? 'upright' : undefined
     };
 }
 
@@ -59,7 +61,8 @@ function Cell({ r, c, x, y, w, h, merged, cover, display, style }) {
     return (
         <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '')} data-r={r} data-c={c}
             style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
-            <span className="ks-text" style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>
+            <span className={'ks-text' + (style && style.link ? ' ks-link' : '')} title={style && style.link ? style.link + ' (Ctrl+click to open)' : undefined}
+                style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>
             {style && style.borders ? <span className="ks-borders" style={bordersCss(style.borders)} /> : null}
         </div>
     );
@@ -80,7 +83,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         if (covered.has(c)) continue;
         const w = colAxis.size(c);
         if (!w) continue;
-        const display = displayOf(wb.value(sheetId, r, c));
+        const display = wb.display(sheetId, r, c);
         const style = wb.style(sheetId, r, c);
         // an empty cell with no style is not drawn: the grid lines are all it shows
         if (display.kind === 'empty' && !style) continue;
@@ -124,10 +127,12 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting }) {
     const scroller = useRef(null);
     const view = useRef(null);
-    const sink = useRef(null);
+    // the keyboard sink is the host's when it gives one (the formula bar gives the keyboard back to it)
+    const ownSink = useRef(null);
+    const sink = sinkRef || ownSink;
     const mirror = useRef(null);
     const [box, setBox] = useState({ width: 0, height: 0 });
     const [scroll, setScroll] = useState({ top: 0, left: 0 });
@@ -170,8 +175,10 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     }, [box.width]);
 
     const props = useMemo(() => wb.sheetProps(sheetId), [wb, sheetId, revision]);
-    const rowAxis = wb.rowAxis(sheetId);
-    const colAxis = wb.colAxis(sheetId);
+    // the sizes of the sheet at the zoom (the workbook keeps them at 100%)
+    const baseRows = wb.rowAxis(sheetId), baseCols = wb.colAxis(sheetId);
+    const rowAxis = useMemo(() => (zoom === 1 ? baseRows : createAxis(baseRows.count, (i) => baseRows.size(i) * zoom)), [baseRows, zoom]);
+    const colAxis = useMemo(() => (zoom === 1 ? baseCols : createAxis(baseCols.count, (i) => baseCols.size(i) * zoom)), [baseCols, zoom]);
     const size = { rows: rowAxis.count, cols: colAxis.count };
     const blocks = useMemo(() => wb.merges(sheetId), [wb, sheetId, revision]);
     const layout = layoutOf({ rows: rowAxis, cols: colAxis, freezeRows: props.freezeRows, freezeCols: props.freezeCols,
@@ -225,7 +232,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // the caret goes to the end of what the cell holds when an edit starts
     useEffect(() => {
         const el = sink.current;
-        if (!el || !editing) return;
+        if (!el || !editing || editing.from === 'bar') return;
         if (document.activeElement !== el) el.focus();
         if (el.value !== editing.text) el.value = editing.text;
     }, [editing && editing.r, editing && editing.c, !!editing]);
@@ -263,6 +270,14 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         }
         // the paste itself comes as a paste event right after this key, with the clipboard's content
         if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) { valuesOnly.current = e.shiftKey; return; }
+        // the shortcuts of formatting, as in Google Sheets (the code of the key, so they work on any keyboard layout)
+        const ctrl = e.ctrlKey || e.metaKey;
+        const shortcut = ctrl && !e.shiftKey && !e.altKey ? { KeyB: () => toggle(wb, sheetId, sel, 'bold'), KeyI: () => toggle(wb, sheetId, sel, 'italic'), KeyU: () => toggle(wb, sheetId, sel, 'underline'),
+            KeyK: () => onLink && onLink(), Backslash: () => clearFormatting(wb, sheetId, sel) }[e.code]
+            : ctrl && e.shiftKey && !e.altKey ? { Digit1: () => setFormat(wb, sheetId, sel, 'number'), Digit2: () => setFormat(wb, sheetId, sel, 'time'), Digit3: () => setFormat(wb, sheetId, sel, 'date'),
+                Digit4: () => setFormat(wb, sheetId, sel, 'money'), Digit5: () => setFormat(wb, sheetId, sel, 'percent') }[e.code]
+            : !ctrl && e.shiftKey && e.altKey ? { Digit5: () => toggle(wb, sheetId, sel, 'strike') }[e.code] : undefined;
+        if (shortcut) { e.preventDefault(); shortcut(); return; }
         const answer = keyAction(e, {
             sel, size,
             filled: (r, c) => wb.raw(sheetId, r, c) !== undefined,
@@ -294,7 +309,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         e.preventDefault();
         const clip = copyBlock(wb, sheetId, rects[0], cut);
         e.clipboardData.setData('text/plain', clipText(clip));
-        lastCopy = clip;
+        rememberCopy(clip);
         e.clipboardData.setData('text/html', clipHtml(clip));
         setClipMark({ sheetId, rect: rects[0], cut });
     }
@@ -313,7 +328,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             if (!text) return;
             landed = pasteText(wb, sheetId, target, text);
         }
-        if (clip && clip.cut) setClipMark(null);
+        if (clip && clip.cut) { setClipMark(null); forgetCut(); }
         setSel({ ranges: [{ anchor: { r: landed.r1, c: landed.c1 }, focus: { r: landed.r2, c: landed.c2 } }], active: { r: landed.r1, c: landed.c1 } });
     }
 
@@ -387,8 +402,10 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             setGuide(null);
             if (current === startSize) return;
             const targets = resizeTargets(kind, i);
-            if (kind === 'col') wb.setColProps(sheetId, targets, { width: current }, { source: 'user' });
-            else wb.setRowProps(sheetId, targets, { height: current }, { source: 'user' });
+            // the size is kept at 100%: at another zoom it is what was dragged, shrunk or grown back
+            const kept = Math.max(MIN_SIZE, Math.round(current / zoom));
+            if (kind === 'col') wb.setColProps(sheetId, targets, { width: kept }, { source: 'user' });
+            else wb.setRowProps(sheetId, targets, { height: kept }, { source: 'user' });
         };
         window.addEventListener('mousemove', move);
         window.addEventListener('mouseup', up);
@@ -399,7 +416,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const targets = resizeTargets(kind, i);
         if (kind === 'row') { wb.setRowProps(sheetId, targets, { height: null }, { source: 'user' }); return; }
         const each = (fn) => wb.forEachFilledRow(sheetId, fn);
-        wb.setColProps(sheetId, targets, (c) => ({ width: columnNeed(each, wb.colId(sheetId, c), (r) => wb.value(sheetId, r, c)) }), { source: 'user' });
+        wb.setColProps(sheetId, targets, (c) => ({ width: columnNeed(each, wb.colId(sheetId, c), (r) => wb.display(sheetId, r, c).text) }), { source: 'user' });
     }
 
     function onMouseDown(e) {
@@ -424,6 +441,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         }
         const { x, y } = pointIn(e);
         const target = hit(x, y);
+        // Ctrl+click on a link opens it, in a new tab (a plain click selects the cell, as in Google Sheets)
+        if ((e.ctrlKey || e.metaKey) && target.kind === 'cell') {
+            const st = wb.style(sheetId, target.r, target.c);
+            if (st && st.link) { e.preventDefault(); window.open(st.link, '_blank', 'noopener,noreferrer'); return; }
+        }
         // the editor keeps the focus and the text: a click elsewhere ends the edit with what was typed
         if (editing) commit(null);
         e.preventDefault();
@@ -458,7 +480,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             else current = extendTo(current, at.r, at.c);
             setSel(current);
         };
-        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); if (onSelectEnd) onSelectEnd(current); };
         window.addEventListener('mousemove', move);
         window.addEventListener('mouseup', up);
     }
@@ -554,16 +576,15 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
 
     const range = (a, z) => { const out = []; for (let i = a; i <= z; i++) out.push(i); return out; };
 
-    // The menu's Paste reads the clipboard's text (the browser asks the person the first time). A page cannot read the formulas a copy put in the
-    // clipboard, so when the text is the one the last copy here made, that copy is pasted whole.
+    // the menu's Paste (see commands.js: the clipboard's text, or the last copy made here when the text is its own)
     async function pasteFromMenu(only) {
-        const target = rects[rects.length - 1];
-        let text;
-        try { text = await navigator.clipboard.readText(); } catch { if (onError) onError('The browser does not let the page read the clipboard: use Ctrl+V to paste.'); return; }
-        let landed;
-        if (lastCopy && text === clipText(lastCopy)) { landed = pasteClip(wb, sheetId, target, lastCopy, only); if (lastCopy.cut) { setClipMark(null); lastCopy = null; } }
-        else if (text) landed = pasteText(wb, sheetId, target, text);
-        if (landed) setSel({ ranges: [{ anchor: { r: landed.r1, c: landed.c1 }, focus: { r: landed.r2, c: landed.c2 } }], active: { r: landed.r1, c: landed.c1 } });
+        try {
+            const { landed, cut } = await pasteFromClipboard(wb, sheetId, rects[rects.length - 1], only);
+            if (cut) setClipMark(null);
+            setSel({ ranges: [{ anchor: { r: landed.r1, c: landed.c1 }, focus: { r: landed.r2, c: landed.c2 } }], active: { r: landed.r1, c: landed.c1 } });
+        } catch (err) {
+            if (onError) onError(err.message);
+        }
     }
 
     function onDoubleClick(e) {
@@ -624,8 +645,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         // the grid lines first, under the cells: one along the bottom of each row, one along the right of each column
         const x0 = colAxis.start(cols.from) - xBase, x1 = colAxis.start(cols.to + 1) - xBase;
         const y0 = rowAxis.start(rows.from) - yBase, y1 = rowAxis.start(rows.to + 1) - yBase;
-        for (let r = rows.from; r <= rows.to; r++) if (rowAxis.size(r)) out.push(<div key={'h' + r} className="ks-line-h" style={{ top: rowAxis.start(r + 1) - yBase - 1, left: x0, width: x1 - x0 }} />);
-        for (let c = cols.from; c <= cols.to; c++) if (colAxis.size(c)) out.push(<div key={'v' + c} className="ks-line-v" style={{ left: colAxis.start(c + 1) - xBase - 1, top: y0, height: y1 - y0 }} />);
+        // a sheet can hide its grid lines (View, Show, Gridlines)
+        if (!props.hideGridlines) for (let r = rows.from; r <= rows.to; r++) if (rowAxis.size(r)) out.push(<div key={'h' + r} className="ks-line-h" style={{ top: rowAxis.start(r + 1) - yBase - 1, left: x0, width: x1 - x0 }} />);
+        if (!props.hideGridlines) for (let c = cols.from; c <= cols.to; c++) if (colAxis.size(c)) out.push(<div key={'v' + c} className="ks-line-v" style={{ left: colAxis.start(c + 1) - xBase - 1, top: y0, height: y1 - y0 }} />);
         for (let r = rows.from; r <= rows.to; r++) {
             const h = rowAxis.size(r);
             if (!h) continue;
@@ -637,7 +659,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             if (b.r1 > rows.to || b.r2 < rows.from || b.c1 > cols.to || b.c2 < cols.from) continue;
             out.push(<Cell key={'m' + b.r1 + ':' + b.c1} r={b.r1} c={b.c1} merged x={colAxis.start(b.c1) - xBase} y={rowAxis.start(b.r1) - yBase}
                 w={colAxis.start(b.c2 + 1) - colAxis.start(b.c1)} h={rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1)}
-                display={displayOf(wb.value(sheetId, b.r1, b.c1))} style={wb.style(sheetId, b.r1, b.c1)} />);
+                display={wb.display(sheetId, b.r1, b.c1)} style={wb.style(sheetId, b.r1, b.c1)} />);
         }
         // the selection over them: each rectangle tinted, and the active cell framed
         rects.forEach((b, i) => {
@@ -722,7 +744,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     return (
         <div className="ks-grid" ref={scroller} onScroll={onScroll}>
             <div className="ks-spacer" style={{ width: layout.contentWidth, height: layout.contentHeight }} />
-            <div className="ks-view" ref={view} style={{ width: box.width, height: box.height }} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick} onContextMenu={onContextMenu}>
+            <div className={'ks-view' + (painting ? ' ks-painting' : '')} ref={view} style={{ width: box.width, height: box.height, '--ks-zoom': zoom }} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick} onContextMenu={onContextMenu}>
                 {box.width > 0 ? (
                     <>
                         <Pane className="ks-main" left={left + fw} top={top + fh} width={layout.mainWidth} height={layout.mainHeight} shiftX={sx} shiftY={sy}>{paneCells(R.scrolling, C.scrolling, true, true)}</Pane>
@@ -741,7 +763,12 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 ) : null}
                 <textarea ref={sink} className={'ks-input' + (editing ? ' ks-editing' : '')} style={sinkStyle} spellCheck={false} autoComplete="off"
                     aria-label={'Cell ' + colName(sel.active.c) + (sel.active.r + 1)} onKeyDown={onSinkKeyDown} onInput={onSinkInput}
-                    onCompositionStart={onCompositionStart} onBlur={() => { if (editing) commit(null); }}
+                    onCompositionStart={onCompositionStart} onBlur={(e) => {
+                        if (!editing) return;
+                        // going to the formula bar goes on with the same edit there; going anywhere else ends it with what was typed
+                        if (e.relatedTarget && e.relatedTarget.dataset && e.relatedTarget.dataset.formulaBar !== undefined) setEditing({ ...editing, from: 'bar' });
+                        else commit(null);
+                    }}
                     onCopy={(e) => onCopyOrCut(e, false)} onCut={(e) => onCopyOrCut(e, true)} onPaste={onPaste} />
                 {menu ? <Menu at={{ x: menu.x, y: menu.y }} items={menuItems(menu)} onSelect={onMenuSelect} onClose={() => setMenu(null)} container={container} label="Cell" /> : null}
                 <span ref={mirror} className="ks-mirror" style={editStyle ? { fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily } : undefined} />

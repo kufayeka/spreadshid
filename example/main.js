@@ -7,6 +7,8 @@ import { createWorkbook } from '../src/core/index.js';
 const LINES = 100000;
 const wb = createWorkbook();
 const [boq] = wb.sheetIds();
+// an Indonesian workbook: separators, dates and the rupiah as Indonesia writes them
+wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
 wb.setSheetProps(boq, { name: 'BOQ', freezeRows: 3, freezeCols: 1 });
 wb.insertRows(boq, 1000, LINES + 10 - 1000);
 

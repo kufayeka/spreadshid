@@ -45,6 +45,7 @@
   "dependencies": {
     "@zag-js/dialog": "^1.46.0",
     "@zag-js/menu": "^1.46.0",
+    "@zag-js/popover": "^1.46.0",
     "@zag-js/react": "^1.46.0"
   }
 }

@@ -12,6 +12,8 @@ import { keyBetween, keysBetween, compareKeys } from './order.js';
 import { createEngine } from './calc.js';
 import { storeFormula, formulaText, isStoredFormula } from './refs.js';
 import { colName } from './formula/address.js';
+import { formatDate, formatValue, localeInfo } from './format.js';
+import { displayOf } from './display.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
 
@@ -159,14 +161,24 @@ export function createWorkbook(doc, options) {
             const v = row.cells[cid];
             return isStoredFormula(v) ? undefined : v;
         },
-        decimalsFor(s, cid) {
-            const sheet = sheets.get(s);
-            const col = sheet && sheet.cols.get(cid);
-            const fmt = col && col.props.format;
+        // a formula in a money cell (the cell's format, or its column's) is rounded to the decimals of the money
+        decimalsFor(s, rid, cid) {
+            const fmt = formatOfIds(s, rid, cid);
             return fmt && fmt.type === 'money' ? (fmt.decimals === undefined ? 2 : fmt.decimals) : null;
         },
         now: () => (opt.now ? opt.now() : new Date())
     };
+    /** The format of a cell: its own (its style's), else its column's, else none. */
+    function formatOfIds(s, rid, cid) {
+        const sheet = sheets.get(s);
+        if (!sheet) return null;
+        const row = sheet.rows.get(rid);
+        const own = row && row.style[cid] && row.style[cid].format;
+        if (own) return own;
+        const col = sheet.cols.get(cid);
+        return (col && col.props.format) || null;
+    }
+
     const engine = createEngine(grid);
 
     // every formula of a sheet into the engine (when a workbook is opened, and when a sheet comes back by undo)
@@ -240,6 +252,9 @@ export function createWorkbook(doc, options) {
                 if (ch.after === undefined || ch.after === null || !Object.keys(ch.after).length) delete row.style[ch.col];
                 else row.style[ch.col] = clone(ch.after);
                 touchRow(ch.row);
+                const formatChanged = JSON.stringify((ch.before && ch.before.format) || null) !== JSON.stringify((ch.after && ch.after.format) || null);
+                const formula = formatChanged && engine.formulaOf(sheet.id, ch.row, ch.col);
+                if (formula) engine.setFormula(sheet.id, ch.row, ch.col, formula);
             }
         },
         insertRows(op) {
@@ -513,13 +528,19 @@ export function createWorkbook(doc, options) {
     // the stored blocks that stand and do not overlap `range` (a block that lost a corner is dropped on the way)
     const mergesApartFrom = (s, range) => (sheetOf(s).props.merges || []).filter((m) => { const at = resolveMerge(s, m); return at && !overlaps(at, range); });
 
-    /** Merges a rectangle into one cell (blocks it overlaps are taken apart first). The cells under it keep their content, unseen, as undo needs. */
-    function mergeCells(s, range, how) {
+    /**
+     * Merges a rectangle into one cell, or several rectangles each into one (merging a selection row by row, or column by column), as one change; blocks
+     * they overlap are taken apart first. The cells under a block keep their content, unseen, as undo needs.
+     */
+    function mergeCells(s, ranges, how) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
-        if (range.r1 === range.r2 && range.c1 === range.c2) return [];
-        const block = { r1: sheet.rowOrder[range.r1], c1: sheet.colOrder[range.c1], r2: sheet.rowOrder[range.r2], c2: sheet.colOrder[range.c2] };
-        return setSheetProps(s, { merges: mergesApartFrom(s, range).concat([block]) }, how);
+        const list = (Array.isArray(ranges) ? ranges : [ranges]).filter((range) => range.r1 !== range.r2 || range.c1 !== range.c2);
+        if (!list.length) return [];
+        let kept = sheet.props.merges || [];
+        for (const range of list) kept = kept.filter((m) => { const at = resolveMerge(s, m); return at && !overlaps(at, range); });
+        const blocks = list.map((range) => ({ r1: sheet.rowOrder[range.r1], c1: sheet.colOrder[range.c1], r2: sheet.rowOrder[range.r2], c2: sheet.colOrder[range.c2] }));
+        return setSheetProps(s, { merges: kept.concat(blocks) }, how);
     }
 
     /** Takes apart every merged block that overlaps the rectangle. */
@@ -597,11 +618,18 @@ export function createWorkbook(doc, options) {
      * What a cell holds once `input` is written in it: a formula kept by ids, a number, a boolean, or a text (see input.js).
      * Values that are not text (a number from code) are kept as they are.
      */
-    function contentFor(s, input) {
-        if (typeof input !== 'string') return input === null ? undefined : input;
-        const parsed = parseInput(input);
-        if (parsed && parsed.formula !== undefined) return storeFormula(parsed.formula, s, grid);
-        return parsed.value;
+    function contentFor(s, input, rid, cid) { return typed(s, input, rid, cid).content; }
+
+    /**
+     * What a cell holds once `input` is written in it, and the format it was written in: "26/10/2026" is a date (a number) written as a date, "Rp 1.250.000"
+     * money. The format is only given when the cell has none yet (its own or its column's): a cell already formatted keeps its format.
+     */
+    function typed(s, input, rid, cid) {
+        if (typeof input !== 'string') return { content: input === null ? undefined : input };
+        const current = rid && cid ? formatOfIds(s, rid, cid) : null;
+        const parsed = parseInput(input, settings, current);
+        if (parsed && parsed.formula !== undefined) return { content: storeFormula(parsed.formula, s, grid) };
+        return { content: parsed.value, format: !current && parsed.format ? parsed.format : undefined };
     }
 
     /**
@@ -613,15 +641,19 @@ export function createWorkbook(doc, options) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
         const matrix = Array.isArray(values) ? values.map((row) => (Array.isArray(row) ? row : [row])) : [[values]];
-        const changes = [];
+        const changes = [], styles = [];
         matrix.forEach((row, i) => row.forEach((v, j) => {
             const rid = sheet.rowOrder[r + i], cid = sheet.colOrder[c + j];
             if (rid === undefined || cid === undefined) return;
             const before = sheet.rows.get(rid).cells[cid];
-            const after = contentFor(s, v);
-            if (!sameValue(before, after)) changes.push({ row: rid, col: cid, before: clone(before), after });
+            const got = typed(s, v, rid, cid);
+            if (!sameValue(before, got.content)) changes.push({ row: rid, col: cid, before: clone(before), after: got.content });
+            if (got.format) { const st = sheet.rows.get(rid).style[cid]; styles.push({ row: rid, col: cid, before: clone(st), after: Object.assign({}, st, { format: got.format }) }); }
         }));
-        return changes.length ? apply([{ t: 'cells', sheet: s, changes }], how) : [];
+        const ops = [];
+        if (changes.length) ops.push({ t: 'cells', sheet: s, changes });
+        if (styles.length) ops.push({ t: 'styles', sheet: s, changes: styles });
+        return ops.length ? apply(ops, how) : [];
     }
 
     /**
@@ -671,8 +703,10 @@ export function createWorkbook(doc, options) {
             const row = sheet.rows.get(x.rid);
             if (x.hasValue) {
                 const before = row.cells[x.cid];
-                const after = x.value === null || x.value === undefined ? undefined : contentFor(s, x.value);
-                if (!sameValue(before, after)) cells.push({ row: x.rid, col: x.cid, before: clone(before), after });
+                const got = x.value === null || x.value === undefined ? { content: undefined } : typed(s, x.value, x.rid, x.cid);
+                if (!sameValue(before, got.content)) cells.push({ row: x.rid, col: x.cid, before: clone(before), after: got.content });
+                // the format a value was written in, when the entry brings no style of its own (a paste brings the copied cell's style)
+                if (got.format && !x.hasStyle) { const st = row.style[x.cid]; styles.push({ row: x.rid, col: x.cid, before: clone(st), after: Object.assign({}, st, { format: got.format }) }); }
             }
             if (x.hasStyle) {
                 const before = row.style[x.cid];
@@ -698,22 +732,32 @@ export function createWorkbook(doc, options) {
         return { r, c };
     }
 
-    /** Merges a style patch into every cell of a rectangle (a key set to null takes that part of the style away). */
-    function setStyle(s, range, patch, how) {
+    /**
+     * Merges a style patch into every cell of a rectangle, or of several (a selection made with Ctrl): one change, undone at once. A key set to null takes
+     * that part of the style away. `patch` is one object for every cell, or a function of the cell (r, c, its style now) that gives each its own (outer
+     * borders give the top cells a top line, the left cells a left line ...), or null for a cell to leave alone.
+     */
+    function setStyle(s, ranges, patch, how) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
         const changes = [];
-        for (let r = range.r1; r <= range.r2; r++) {
-            const rid = sheet.rowOrder[r];
-            if (rid === undefined) continue;
-            const row = sheet.rows.get(rid);
-            for (let c = range.c1; c <= range.c2; c++) {
-                const cid = sheet.colOrder[c];
-                if (cid === undefined) continue;
-                const before = row.style[cid];
-                const after = Object.assign({}, before || {}, patch);
-                for (const k of Object.keys(after)) if (after[k] === null || after[k] === undefined) delete after[k];
-                if (!sameValue(before || {}, after)) changes.push({ row: rid, col: cid, before: clone(before), after });
+        const seen = new Set();
+        for (const range of Array.isArray(ranges) ? ranges : [ranges]) {
+            for (let r = range.r1; r <= range.r2; r++) {
+                const rid = sheet.rowOrder[r];
+                if (rid === undefined) continue;
+                const row = sheet.rows.get(rid);
+                for (let c = range.c1; c <= range.c2; c++) {
+                    const cid = sheet.colOrder[c];
+                    if (cid === undefined || seen.has(rid + cid)) continue;
+                    seen.add(rid + cid);
+                    const before = row.style[cid];
+                    const own = typeof patch === 'function' ? patch(r, c, before || {}) : patch;
+                    if (!own) continue;
+                    const after = Object.assign({}, before || {}, own);
+                    for (const k of Object.keys(after)) if (after[k] === null || after[k] === undefined) delete after[k];
+                    if (!sameValue(before || {}, after)) changes.push({ row: rid, col: cid, before: clone(before), after });
+                }
             }
         }
         return changes.length ? apply([{ t: 'styles', sheet: s, changes }], how) : [];
@@ -1001,8 +1045,19 @@ export function createWorkbook(doc, options) {
             if (v === undefined || v === null) return '';
             if (isStoredFormula(v)) return formulaText(v, s, grid);
             if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+            const sheet = sheetOf(s);
+            const fmt = formatOfIds(s, sheet.rowOrder[r], sheet.colOrder[c]);
             // a text that would read as something else when typed again keeps the apostrophe it was typed with
-            if (typeof v === 'string') { const again = parseInput(v); return again.formula !== undefined || again.value !== v ? "'" + v : v; }
+            if (typeof v === 'string') { if (fmt && fmt.type === 'text') return v; const again = parseInput(v, settings); return again.formula !== undefined || again.value !== v ? "'" + v : v; }
+            if (typeof v === 'number') {
+                // dates and times are edited as they are written; a percent as a percent; other numbers plainly, with the locale's decimal sign
+                const info = localeInfo(settings.locale);
+                if (fmt && fmt.type === 'date') return formatDate(v, info.datePattern, info.locale);
+                if (fmt && fmt.type === 'time') return formatDate(v, 'HH:mm:ss', info.locale);
+                if (fmt && fmt.type === 'datetime') return formatDate(v, info.datePattern + ' HH:mm:ss', info.locale);
+                if (fmt && fmt.type === 'percent') return formatValue(v * 100, { type: 'general' }, settings).text + '%';
+                return formatValue(v, { type: 'general' }, settings).text;
+            }
             return String(v);
         },
         /** The style kept on one cell (not counting the rules of ranges, which come with formatting). */
@@ -1011,6 +1066,28 @@ export function createWorkbook(doc, options) {
             const sheet = sheetOf(s);
             const rid = sheet.rowOrder[r], cid = sheet.colOrder[c];
             return rid && cid ? clone(sheet.rows.get(rid).style[cid]) : undefined;
+        },
+        /**
+         * What a cell shows: its value through its format, in the workbook's locale ({ text, align, kind, color }). A format whose suffix comes from another
+         * column (the unit of a quantity) takes that column's text from the same row.
+         */
+        display(s, r, c) {
+            s = sheetIdOf(s);
+            const value = api.value(s, r, c);
+            const fmt = api.cellFormat(s, r, c);
+            let extra;
+            if (fmt && fmt.suffixFrom !== undefined) {
+                const ci = grid.colIndexOf(s, fmt.suffixFrom);
+                if (ci >= 0) { const u = api.value(s, r, ci); extra = { suffixText: u === null || u === undefined ? '' : String(u) }; }
+            }
+            return displayOf(value, fmt, settings, extra);
+        },
+        /** The format of a cell (its own, else its column's), or null: the workbook's own object, only to be read. */
+        cellFormat(s, r, c) {
+            s = sheetIdOf(s);
+            const sheet = sheetOf(s);
+            const rid = sheet.rowOrder[r], cid = sheet.colOrder[c];
+            return rid && cid ? formatOfIds(s, rid, cid) : null;
         },
         /** The address of a cell as a person reads it: "B7". */
         address: (r, c) => colName(c) + (r + 1),

@@ -25,7 +25,7 @@ import { resolveRef } from './refs.js';
  *   content: (sheetId: string, rowId: string, colId: string) => any,
  *   rowOrder: (sheetId: string) => string[],
  *   colOrder: (sheetId: string) => string[],
- *   decimalsFor: (sheetId: string, colId: string) => number|null,
+ *   decimalsFor: (sheetId: string, rowId: string, colId: string) => number|null,
  *   now: () => Date
  * }} EngineHost
  */
@@ -250,7 +250,7 @@ export function createEngine(host) {
         let result = evaluate(e.ast, envOf(e));
         if (isRange(result)) result = result.rows === 1 && result.cols === 1 ? result.at(0, 0) : ERR.VALUE;
         if (result === undefined) result = null;
-        const decimals = host.decimalsFor(e.s, e.col);
+        const decimals = host.decimalsFor(e.s, e.row, e.col);
         if (decimals !== null && typeof result === 'number') result = roundTo(result, decimals);
         return result;
     }

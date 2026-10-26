@@ -6,7 +6,6 @@
 // (a sum over the column, a cell elsewhere that reads one of these cells) keeps pointing at the same place, as in Google Sheets; a formula that moves to
 // another row is moved like a paste (its relative references follow it).
 
-import { displayOf } from './display.js';
 import { sortPerm } from './sort.js';
 import { shiftFormula } from './formula/formula.js';
 
@@ -32,7 +31,7 @@ function matcher(query, o) {
 
 /** The text find looks at in a cell. */
 function textOf(wb, s, r, c, o) {
-    return o.inFormulas ? wb.input(s, r, c) : displayOf(wb.value(s, r, c)).text;
+    return o.inFormulas ? wb.input(s, r, c) : wb.display(s, r, c).text;
 }
 
 /**
@@ -92,7 +91,7 @@ export function sortRange(wb, s, rect, by, dir) {
     if (n < 2) return [];
     const perm = sortPerm(n, (i) => {
         const v = wb.value(s, rect.r1 + i, by);
-        return v && typeof v === 'object' ? displayOf(v).text : v;
+        return v && typeof v === 'object' ? wb.display(s, rect.r1 + i, by).text : v;
     }, dir);
     if (perm.every((from, to) => from === to)) return [];
     // what every cell of the range holds, read before anything moves

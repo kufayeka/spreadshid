@@ -15,7 +15,7 @@ export function useAutoHeights(wb, sheetId) {
     useEffect(() => {
         if (typeof document === 'undefined') return undefined;
         const colAxis = () => wb.colAxis(sheetId);
-        const measure = (r, cells, styles) => rowNeed(cells, styles, (c) => colAxis().size(c), (cid) => wb.colIndex(sheetId, cid), (c) => wb.value(sheetId, r, c));
+        const measure = (r, cells, styles) => rowNeed(cells, styles, (c) => colAxis().size(c), (cid) => wb.colIndex(sheetId, cid), (c) => wb.display(sheetId, r, c).text);
         let grown = new Set();   // the rows that have a measured height now (they go back to 0 when they no longer need one)
 
         function measureAll() {

@@ -28,7 +28,7 @@ export function copyBlock(wb, s, rect, cut) {
         for (let c = rect.c1; c <= rect.c2; c++) {
             const v = wb.value(s, r, c);
             // an error value goes out as its text; the input brings the formula back anyway
-            row.push({ input: wb.input(s, r, c), value: v && typeof v === 'object' ? displayOf(v).text : v, style: wb.style(s, r, c) });
+            row.push({ input: wb.input(s, r, c), value: v && typeof v === 'object' ? displayOf(v).text : v, text: wb.display(s, r, c).text, style: wb.style(s, r, c) });
         }
         cells.push(row);
     }
@@ -37,14 +37,14 @@ export function copyBlock(wb, s, rect, cut) {
 
 /** The copy as tab-separated text: what each cell shows. */
 export function clipText(clip) {
-    return formatTsv(clip.cells.map((row) => row.map((cell) => displayOf(cell.value).text)));
+    return formatTsv(clip.cells.map((row) => row.map((cell) => (cell.text !== undefined ? cell.text : displayOf(cell.value).text))));
 }
 
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** The copy as an HTML table: other programs read the table, this sheet reads the copy kept in an attribute of it. */
 export function clipHtml(clip) {
-    const body = clip.cells.map((row) => '<tr>' + row.map((cell) => '<td>' + escapeHtml(displayOf(cell.value).text) + '</td>').join('') + '</tr>').join('');
+    const body = clip.cells.map((row) => '<tr>' + row.map((cell) => '<td>' + escapeHtml(cell.text !== undefined ? cell.text : displayOf(cell.value).text) + '</td>').join('') + '</tr>').join('');
     return '<table data-ks-clip="' + escapeHtml(encodeURIComponent(JSON.stringify(clip))) + '">' + body + '</table>';
 }
 
@@ -82,7 +82,8 @@ export function pastePlaces(rect, h, w, size) {
 
 /**
  * Pastes a copy on the selection `rect` of sheet `s`.
- * @param {'all'|'values'} [only]  "values": the values as they were worked out, no formula and no style (Ctrl+Shift+V).
+ * @param {'all'|'values'|'styles'} [only]  "values": the values as they were worked out, no formula and no style (Ctrl+Shift+V); "styles": the styles
+ *   alone, the values stay (the paint format).
  * @returns {{ r1: number, c1: number, r2: number, c2: number }}  the cells that were pasted on (the grid selects them).
  */
 export function pasteClip(wb, s, rect, clip, only) {
@@ -95,6 +96,7 @@ export function pasteClip(wb, s, rect, clip, only) {
     for (const p of places) {
         const cell = clip.cells[p.i][p.j];
         if (only === 'values') { entries.push({ r: p.r, c: p.c, value: cell.value === '' ? null : cell.value }); continue; }
+        if (only === 'styles') { entries.push({ r: p.r, c: p.c, style: cell.style || null }); continue; }
         let input = cell.input;
         if (typeof input === 'string' && input.length > 1 && input[0] === '=') input = shiftFormula(input, p.r - (clip.origin.r + p.i), p.c - (clip.origin.c + p.j));
         entries.push({ r: p.r, c: p.c, value: input === '' ? null : input, style: cell.style || null });

@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createWorkbook, VERSION } from '../core/index.js';
-import { selectCell } from '../core/selection.js';
+import { selectCell, stepActive, rectsOf } from '../core/selection.js';
 import { findAll, replaceIn } from '../core/search.js';
 import { Grid } from './Grid.js';
 import { Tabs } from './Tabs.js';
 import { FindBar, ReplaceDialog } from './FindBar.js';
+import { FormulaBar, rectText } from './FormulaBar.js';
+import { Toolbar } from './Toolbar.js';
+import { LinkDialog } from './LinkDialog.js';
+import { Menubar } from './Menubar.js';
+import { SettingsDialog } from './SettingsDialog.js';
+import { copyBlock, pasteClip } from '../core/transfer.js';
 import { useAutoHeights } from './autoHeights.js';
 
 /**
@@ -55,6 +61,33 @@ export function Sheet(props) {
     const setSel = (next) => setSelections((m) => new Map(m).set(sheetId, typeof next === 'function' ? next(m.get(sheetId) || selectCell(0, 0)) : next));
     const [editing, setEditing] = useState(null);
     useEffect(() => { setEditing(null); }, [sheetId]);
+    // the grid's keyboard sink, so the formula bar can give the keyboard back to the grid when its edit ends
+    const sinkRef = useRef(null);
+    const toGrid = () => { if (sinkRef.current) sinkRef.current.focus({ preventScroll: true }); };
+
+    // the zoom of the grid, and the paint format (the styles copied from the selection, waiting for the cells to paint them on)
+    const [zoom, setZoom] = useState(1);
+    const [paint, setPaint] = useState(null);
+    const onPaint = () => setPaint((p) => (p ? null : copyBlock(wb, sheetId, rectsOf(sel)[rectsOf(sel).length - 1])));
+    const onSelectEnd = (picked) => {
+        if (!paint) return;
+        const rects = rectsOf(picked);
+        pasteClip(wb, sheetId, rects[rects.length - 1], paint, 'styles');
+        setPaint(null);
+    };
+    useEffect(() => { setPaint(null); }, [sheetId]);
+
+    // the link of the active cell (Ctrl+K, the toolbar)
+    const [linking, setLinking] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
+    // the formula bar's edit ends as the cell's does: the text is written, and Enter, Tab move on
+    function commitFromBar(move) {
+        if (editing) wb.setValues(sheetId, editing.r, editing.c, editing.text, { source: 'user' });
+        setEditing(null);
+        if (move) { setSel(stepActive(sel, move.dr, move.dc, wb.size(sheetId))); setRevealTick((t) => t + 1); }
+        toGrid();
+    }
     useAutoHeights(wb, sheetId);
 
     // a short message when something is refused (a name taken, the last sheet ...)
@@ -113,8 +146,27 @@ export function Sheet(props) {
     // Nothing here may touch window or document while rendering: Next.js renders this on the server first, where neither exists.
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
+            <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
+                onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice}
+                onStartEdit={(text) => setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' })}
+                onReveal={() => setRevealTick((t) => t + 1)} container={root} />
+            <Toolbar workbook={wb} sheetId={sheetId} sel={sel} revision={revision} zoom={zoom} onZoom={setZoom} painting={!!paint} onPaint={onPaint}
+                onStartEdit={(text) => { setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' }); }}
+                onLink={() => setLinking(true)} onDone={toGrid} container={root} />
+            <FormulaBar address={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
+                onStartEdit={(text) => setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' })}
+                onText={(text) => setEditing((e) => (e ? { ...e, text } : { r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' }))}
+                onCommit={commitFromBar}
+                onCancel={() => { setEditing(null); toGrid(); }}
+                onGo={(b) => {
+                    const size = wb.size(sheetId);
+                    const r2 = Math.min(b.r2, size.rows - 1), c2 = Math.min(b.c2, size.cols - 1);
+                    setSel({ ranges: [{ anchor: { r: Math.min(b.r1, r2), c: Math.min(b.c1, c2) }, focus: { r: r2, c: c2 } }], active: { r: Math.min(b.r1, r2), c: Math.min(b.c1, c2) } });
+                    setRevealTick((t) => t + 1);
+                    toGrid();
+                }} />
             <div className="ks-body">
-                <Grid key={sheetId} scrollMemory={scrollMemory} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
+                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
@@ -126,6 +178,19 @@ export function Sheet(props) {
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
             </div>
             <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} />
+            {settingsOpen ? <SettingsDialog settings={wb.settings()} container={root} onClose={() => { setSettingsOpen(false); toGrid(); }}
+                onApply={(patch) => wb.setSettings(patch, { source: 'user' })} /> : null}
+            {linking ? (
+                <LinkDialog container={root} text={wb.display(sheetId, sel.active.r, sel.active.c).text} link={(wb.style(sheetId, sel.active.r, sel.active.c) || {}).link || ''}
+                    onClose={() => { setLinking(false); toGrid(); }}
+                    onApply={(text, link) => {
+                        // the text and the link are one change; an empty link takes it away
+                        const st = { ...(wb.style(sheetId, sel.active.r, sel.active.c) || {}) };
+                        if (link) st.link = link; else delete st.link;
+                        const now = wb.display(sheetId, sel.active.r, sel.active.c).text;
+                        wb.setBlock(sheetId, [{ r: sel.active.r, c: sel.active.c, style: Object.keys(st).length ? st : null, ...(text !== now ? { value: text || link || null } : {}) }], { source: 'user' });
+                    }} />
+            ) : null}
             {find.dialog ? (
                 <ReplaceDialog find={find} count={matches.length} status={find.status} container={root}
                     onChange={(patch) => setFind((f) => ({ ...f, ...patch, index: -1, status: '' }))}

@@ -2,8 +2,6 @@
 // in a width, how high a row must be for its texts, how wide a column must be for its texts. Used for rows that grow (wrapped text, several lines, a big
 // font) and for the double click on a header's edge (fit to the content).
 
-import { displayOf } from '../core/display.js';
-
 // The font of the cells: the same as .ks-cell in sheet.css (10pt Arial), and the room a cell keeps around its text.
 const BASE_SIZE_PT = 10;
 const FAMILY = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
@@ -70,9 +68,9 @@ export function wrappedLines(text, font, width) {
  * ones with several lines, the ones in a bigger font.
  * @param {(c: number) => number} widthOf  The width of column c.
  * @param {(cid: string) => number} colIndexOf
- * @param {(c: number) => any} valueOf  The value of the cell in column c (a formula worked out).
+ * @param {(c: number) => string} textOf  The text the cell in column c shows (its value through its format).
  */
-export function rowNeed(cells, styles, widthOf, colIndexOf, valueOf) {
+export function rowNeed(cells, styles, widthOf, colIndexOf, textOf) {
     let need = 0;
     const seen = new Set();
     const consider = (cid) => {
@@ -87,7 +85,7 @@ export function rowNeed(cells, styles, widthOf, colIndexOf, valueOf) {
         const lines = typeof raw === 'string' && raw.indexOf('\n') !== -1;
         // a cell in the default font, on one line, never needs more than the default height
         if (!big && !wrap && !lines) return;
-        const text = displayOf(valueOf(c)).text;
+        const text = textOf(c);
         if (!text) return;
         const font = fontOf(style);
         const count = wrap ? wrappedLines(text, font, widthOf(c) - PAD_X) : text.split('\n').length;
@@ -102,15 +100,15 @@ export function rowNeed(cells, styles, widthOf, colIndexOf, valueOf) {
  * The width a column needs for its texts (the double click on its edge), at least 20 pixels.
  * @param {(fn: (r: number, cells: object, styles: object) => void) => void} eachRow
  * @param {string} colId
- * @param {(r: number) => any} valueOf
+ * @param {(r: number) => string} textOf  The text the cell of row r shows.
  */
-export function columnNeed(eachRow, colId, valueOf) {
+export function columnNeed(eachRow, colId, textOf) {
     let need = 20;
     eachRow((r, cells, styles) => {
         if (cells[colId] === undefined) return;
         const style = styles[colId];
         if (style && style.wrap === 'wrap') return;
-        const text = displayOf(valueOf(r)).text;
+        const text = textOf(r);
         if (text) need = Math.max(need, Math.ceil(textWidth(text, fontOf(style))) + PAD_X + 4);
     });
     return need;

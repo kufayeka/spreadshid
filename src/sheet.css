@@ -176,3 +176,52 @@
 /* a short message, at the bottom of the grid */
 .ks-notice { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30; padding: 10px 16px; background: #323232; color: #fff;
     border-radius: 4px; font: var(--ks-ui-font); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+
+/* the name box and the formula bar */
+.ks-formulabar { flex: none; display: flex; align-items: center; height: 30px; border-bottom: 1px solid var(--ks-head-line); background: var(--ks-bg); }
+.ks-namebox { width: 96px; height: 100%; border: 0; border-right: 1px solid var(--ks-head-line); padding: 0 8px; font: var(--ks-ui-font); outline: none; }
+.ks-namebox:focus { box-shadow: inset 0 0 0 2px var(--ks-accent); }
+.ks-fx { padding: 0 10px; color: #5f6368; font-style: italic; font-family: Georgia, serif; border-right: 1px solid var(--ks-head-line); }
+.ks-formula { flex: 1 1 auto; min-width: 0; height: 100%; border: 0; padding: 0 8px; font: var(--ks-font); outline: none; }
+
+/* the zoom: the cells' text grows with it (sizes are scaled by the grid) */
+.ks-cell, .ks-input, .ks-mirror { font-size: calc(10pt * var(--ks-zoom, 1)); }
+.ks-text { display: inline-block; }
+.ks-link { color: #1155cc; text-decoration: underline; }
+.ks-view.ks-painting { cursor: copy; }
+
+/* the toolbar */
+.ks-toolbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 1px; min-height: 40px; padding: 4px 8px; background: #f9fbfd; border-bottom: 1px solid var(--ks-head-line); }
+.ks-tool { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 4px; border: 0; border-radius: 4px; background: transparent; color: #444746; cursor: pointer; font: var(--ks-ui-font); }
+.ks-tool:hover:not(:disabled) { background: #e9eef6; }
+.ks-tool:disabled { color: #bdc1c6; cursor: default; }
+.ks-tool.ks-pressed { background: #d3e3fd; color: #0b57d0; }
+.ks-tool-text { font-weight: 600; font-size: 13px; }
+.ks-tool-sep { width: 1px; height: 20px; margin: 0 6px; background: #c7c7c7; }
+.ks-tool-select { height: 28px; border: 0; border-radius: 4px; background: transparent; color: #444746; font: var(--ks-ui-font); padding: 0 4px; cursor: pointer; }
+.ks-tool-select:hover { background: #e9eef6; }
+.ks-font { width: 120px; }
+.ks-size { width: 52px; }
+.ks-zoom { width: 64px; }
+.ks-icon { display: block; }
+.ks-border-swatch { display: block; width: 14px; height: 14px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.2); }
+
+/* the colour palette */
+.ks-pop-positioner { z-index: 50; }
+.ks-palette { display: flex; flex-direction: column; gap: 2px; padding: 10px; background: var(--ks-bg); border-radius: 6px; box-shadow: 0 2px 6px rgba(60, 64, 67, 0.15), 0 1px 2px rgba(60, 64, 67, 0.3); outline: none; }
+.ks-palette-reset { align-self: stretch; margin-bottom: 6px; padding: 4px; border: 0; border-radius: 4px; background: #f1f3f4; font: var(--ks-ui-font); cursor: pointer; }
+.ks-palette-row { display: flex; gap: 2px; }
+.ks-palette-row.ks-gap { margin-top: 6px; }
+.ks-swatch { width: 18px; height: 18px; padding: 0; border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 50%; cursor: pointer; }
+.ks-swatch:hover { transform: scale(1.15); }
+.ks-swatch.ks-picked { box-shadow: 0 0 0 2px var(--ks-bg), 0 0 0 3px var(--ks-accent); }
+.ks-palette-custom { display: flex; align-items: center; gap: 6px; margin-top: 8px; font: var(--ks-ui-font); color: #5f6368; }
+.ks-palette-custom input { width: 90px; padding: 3px 6px; border: 1px solid #dadce0; border-radius: 4px; font: inherit; }
+.ks-dialog-small { width: 380px; }
+
+/* the menu bar */
+.ks-menubar { flex: none; display: flex; align-items: center; gap: 2px; height: 30px; padding: 0 8px; background: #f9fbfd; }
+.ks-menubar-item { height: 24px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #1f1f1f; font: var(--ks-ui-font); cursor: pointer; }
+.ks-menubar-item:hover, .ks-menubar-item.ks-open { background: #e9eef6; }
+.ks-menu-check { display: inline-block; width: 18px; color: var(--ks-accent); }
+.ks-menu-parent .ks-menu-hint { color: #5f6368; }
