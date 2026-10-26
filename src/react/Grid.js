@@ -5,6 +5,8 @@ import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectA
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
 import { keyAction } from './keys.js';
 import { columnNeed } from './measure.js';
+import { copyBlock, clipText, clipHtml, clipFromHtml, pasteClip, pasteText, fillBlock } from '../core/transfer.js';
+import { fillTarget } from '../core/fill.js';
 
 // the smallest a column or a row can be dragged to
 const MIN_SIZE = 4;
@@ -128,6 +130,12 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const reveal = useRef(false);
     // the line that shows where a dragged edge of a column or a row will be
     const [guide, setGuide] = useState(null);
+    // the cells last copied or cut, framed with a moving dashed line until Escape (or until a cut is pasted)
+    const [clipMark, setClipMark] = useState(null);
+    // the cells the fill handle is being dragged over
+    const [fillPreview, setFillPreview] = useState(null);
+    // Ctrl+Shift+V was pressed: the paste that follows takes the values only
+    const valuesOnly = useRef(false);
     const moveTo = (next) => { reveal.current = true; setSel(next); };
 
     // the grid fills its box: measured once on screen and whenever the box changes size
@@ -228,6 +236,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             }
             return;
         }
+        if (e.key === 'Escape' && clipMark) { setClipMark(null); return; }
+        // the paste itself comes as a paste event right after this key, with the clipboard's content
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) { valuesOnly.current = e.shiftKey; return; }
         const answer = keyAction(e, {
             sel, size,
             filled: (r, c) => wb.raw(sheetId, r, c) !== undefined,
@@ -249,6 +260,63 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (editing) setEditing({ ...editing, text });
         // a character typed on a selected cell starts the edit, replacing what the cell held
         else if (text) setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'type' });
+    }
+
+    // ---- the clipboard: the browser's own copy, cut and paste events, so Ctrl+C, Ctrl+X, Ctrl+V and the browser's menu all work --------------
+
+    function onCopyOrCut(e, cut) {
+        if (editing) return; // the editor copies its own text
+        if (rects.length !== 1) { e.preventDefault(); return; } // as in Google Sheets: a copy is one rectangle
+        e.preventDefault();
+        const clip = copyBlock(wb, sheetId, rects[0], cut);
+        e.clipboardData.setData('text/plain', clipText(clip));
+        e.clipboardData.setData('text/html', clipHtml(clip));
+        setClipMark({ sheetId, rect: rects[0], cut });
+    }
+
+    function onPaste(e) {
+        if (editing) return; // the editor pastes into its text
+        e.preventDefault();
+        const only = valuesOnly.current ? 'values' : 'all';
+        valuesOnly.current = false;
+        const target = rects[rects.length - 1];
+        const clip = clipFromHtml(e.clipboardData.getData('text/html'));
+        let landed;
+        if (clip) landed = pasteClip(wb, sheetId, target, clip, only);
+        else {
+            const text = e.clipboardData.getData('text/plain');
+            if (!text) return;
+            landed = pasteText(wb, sheetId, target, text);
+        }
+        if (clip && clip.cut) setClipMark(null);
+        setSel({ ranges: [{ anchor: { r: landed.r1, c: landed.c1 }, focus: { r: landed.r2, c: landed.c2 } }], active: { r: landed.r1, c: landed.c1 } });
+    }
+
+    // ---- the fill handle: the small square at the corner of the selection, dragged over the cells to fill ---------------------------------------
+
+    function startFill() {
+        const source = rects[0];
+        let found = null;
+        const move = (ev) => {
+            const { x, y, rect } = pointIn(ev);
+            const el = scroller.current;
+            if (y > rect.height) el.scrollTop += Math.min(60, y - rect.height);
+            if (x > rect.width) el.scrollLeft += Math.min(60, x - rect.width);
+            const at = hit(Math.max(left + 1, Math.min(rect.width - 1, x)), Math.max(top + 1, Math.min(rect.height - 1, y)));
+            found = at.kind === 'cell' ? fillTarget(source, at, size) : null;
+            setFillPreview(found ? { r1: Math.min(source.r1, found.target.r1), c1: Math.min(source.c1, found.target.c1), r2: Math.max(source.r2, found.target.r2), c2: Math.max(source.c2, found.target.c2) } : null);
+        };
+        const up = (ev) => {
+            window.removeEventListener('mousemove', move);
+            window.removeEventListener('mouseup', up);
+            setFillPreview(null);
+            if (!found) return;
+            fillBlock(wb, sheetId, source, found.target, found.dir, ev.ctrlKey || ev.metaKey);
+            const all = { r1: Math.min(source.r1, found.target.r1), c1: Math.min(source.c1, found.target.c1), r2: Math.max(source.r2, found.target.r2), c2: Math.max(source.c2, found.target.c2) };
+            setSel({ ranges: [{ anchor: { r: all.r1, c: all.c1 }, focus: { r: all.r2, c: all.c2 } }], active: sel.active });
+        };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
     }
 
     // an input method (Chinese, Japanese ...) starts composing: the editor shows at once, so the composition is seen where it goes
@@ -312,6 +380,13 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     function onMouseDown(e) {
         if (e.button !== 0) return;
         const edge = e.target && e.target.dataset;
+        if (edge && edge.fill !== undefined) {
+            e.preventDefault();
+            if (editing) commit(null);
+            if (sink.current) sink.current.focus({ preventScroll: true });
+            startFill();
+            return;
+        }
         if (edge && (edge.resizeCol !== undefined || edge.resizeRow !== undefined)) {
             e.preventDefault();
             if (editing) commit(null);
@@ -430,6 +505,21 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             out.push(<div key={'s' + i} className="ks-sel" style={{ left: colAxis.start(b.c1) - xBase, top: rowAxis.start(b.r1) - yBase,
                 width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) }} />);
         });
+        // a frame over a rectangle of cells, against the sheet like everything in the pane
+        const frame = (key, cls, b) => {
+            if (b.r1 > rows.to || b.r2 < rows.from || b.c1 > cols.to || b.c2 < cols.from) return;
+            out.push(<div key={key} className={cls} style={{ left: colAxis.start(b.c1) - xBase, top: rowAxis.start(b.r1) - yBase,
+                width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) }} />);
+        };
+        if (clipMark && clipMark.sheetId === sheetId) frame('clip', 'ks-clipmark', clipMark.rect);
+        if (fillPreview) frame('fill', 'ks-fillpreview', fillPreview);
+        // the fill handle, at the corner of the selection when it is one rectangle
+        if (rects.length === 1 && !editing) {
+            const b = rects[0];
+            if (b.r2 >= rows.from && b.r2 <= rows.to && b.c2 >= cols.from && b.c2 <= cols.to) {
+                out.push(<div key="handle" className="ks-fill" data-fill="" style={{ left: colAxis.start(b.c2 + 1) - xBase - 4, top: rowAxis.start(b.r2 + 1) - yBase - 4 }} />);
+            }
+        }
         const a = blockAt(sel.active.r, sel.active.c) || { r1: sel.active.r, c1: sel.active.c, r2: sel.active.r, c2: sel.active.c };
         if (!(a.r1 > rows.to || a.r2 < rows.from || a.c1 > cols.to || a.c2 < cols.from)) {
             out.push(<div key="active" className="ks-active" style={{ left: colAxis.start(a.c1) - xBase, top: rowAxis.start(a.r1) - yBase,
@@ -503,7 +593,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 ) : null}
                 <textarea ref={sink} className={'ks-input' + (editing ? ' ks-editing' : '')} style={sinkStyle} spellCheck={false} autoComplete="off"
                     aria-label={'Cell ' + colName(sel.active.c) + (sel.active.r + 1)} onKeyDown={onSinkKeyDown} onInput={onSinkInput}
-                    onCompositionStart={onCompositionStart} onBlur={() => { if (editing) commit(null); }} />
+                    onCompositionStart={onCompositionStart} onBlur={() => { if (editing) commit(null); }}
+                    onCopy={(e) => onCopyOrCut(e, false)} onCut={(e) => onCopyOrCut(e, true)} onPaste={onPaste} />
                 <span ref={mirror} className="ks-mirror" style={editStyle ? { fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily } : undefined} />
             </div>
         </div>

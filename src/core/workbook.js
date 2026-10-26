@@ -649,6 +649,43 @@ export function createWorkbook(doc, options) {
         return changes.length ? apply([{ t: 'cells', sheet: s, changes }], how) : [];
     }
 
+    /**
+     * Writes the content and the style of many cells as one change (a paste, a cut, a fill): one undo takes it all back.
+     * Each entry is { r, c, value, style }: `value` is read as typed when it is a text ("=A1*2", "12", "TRUE"), kept as it is otherwise, and left alone when
+     * it is absent; `style` replaces the whole style of the cell (null takes it away) and is left alone when absent. A later entry for the same cell wins.
+     * @param {string} s
+     * @param {{ r: number, c: number, value?: any, style?: object|null }[]} entries
+     */
+    function setBlock(s, entries, how) {
+        s = sheetIdOf(s);
+        const sheet = sheetOf(s);
+        const last = new Map();
+        for (const e of entries) {
+            const rid = sheet.rowOrder[e.r], cid = sheet.colOrder[e.c];
+            if (rid === undefined || cid === undefined) continue;
+            const k = rid + '|' + cid;
+            last.set(k, Object.assign({}, last.get(k), { rid, cid }, 'value' in e ? { hasValue: true, value: e.value } : null, 'style' in e ? { hasStyle: true, style: e.style } : null));
+        }
+        const cells = [], styles = [];
+        for (const x of last.values()) {
+            const row = sheet.rows.get(x.rid);
+            if (x.hasValue) {
+                const before = row.cells[x.cid];
+                const after = x.value === null || x.value === undefined ? undefined : contentFor(s, x.value);
+                if (!sameValue(before, after)) cells.push({ row: x.rid, col: x.cid, before: clone(before), after });
+            }
+            if (x.hasStyle) {
+                const before = row.style[x.cid];
+                const after = x.style && Object.keys(x.style).length ? clone(x.style) : undefined;
+                if (!sameValue(before, after)) styles.push({ row: x.rid, col: x.cid, before: clone(before), after });
+            }
+        }
+        const ops = [];
+        if (cells.length) ops.push({ t: 'cells', sheet: s, changes: cells });
+        if (styles.length) ops.push({ t: 'styles', sheet: s, changes: styles });
+        return ops.length ? apply(ops, how) : [];
+    }
+
     /** The last row and the last column that hold anything, as Ctrl+End finds them; { r: -1, c: -1 } in an empty sheet. */
     function lastFilled(s) {
         const sheet = sheetOf(sheetIdOf(s));
@@ -937,7 +974,7 @@ export function createWorkbook(doc, options) {
         apply, undo, redo,
         canUndo: () => undoStack.length > 0,
         canRedo: () => redoStack.length > 0,
-        setValues, clear, setStyle, lastFilled,
+        setValues, clear, setStyle, setBlock, lastFilled,
         insertRows, deleteRows, insertCols, deleteCols, moveRows, moveCols,
         setRowProps, setColProps, setSheetProps, setSettings,
         addSheet, removeSheet, moveSheet,
