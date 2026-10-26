@@ -342,6 +342,19 @@ export function createEngine(host) {
         formulaOf(s, row, col) { const e = entryAt(row, col); return e ? e.formula : undefined; },
         /** The row ids of a column that hold formulas (for the workbook, when a column is deleted or changes its format). */
         formulaRowsOf(s, col) { return [...(inColumn.get(col) || [])].map((e) => e.row); },
+        /**
+         * Works out a formula that is in no cell (the condition of a rule, worked out for one row), as if it were in the cell (s, row, col): it reads the
+         * sheet as the cell's own formula would, and is not kept (nothing reads it, so no change has to reach it).
+         * @param {import('./refs.js').StoredFormula} formula
+         */
+        evaluateDetached(s, row, col, formula) {
+            const e = { s, row, col, formula, ast: treeOf(formula.f), has: false, value: undefined, busy: false, rects: null, rectsAt: -1, env: null };
+            // what it reads that has no value yet is worked out first, as for any formula
+            const inputs = [];
+            pendingInputs(e, inputs);
+            for (const p of inputs) compute(p);
+            return evaluateEntry(e);
+        },
         /** How many formulas there are, and how many have a value (for the tests). */
         stats() { let worked = 0; for (const m of entries.values()) for (const e of m.values()) if (e.has) worked++; return { formulas: count, worked }; }
     };

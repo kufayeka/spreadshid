@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createWorkbook, VERSION } from '../core/index.js';
 import { selectCell, stepActive, rectsOf } from '../core/selection.js';
+import { parseAddressText } from './FormulaBar.js';
 import { findAll, replaceIn } from '../core/search.js';
 import { Grid } from './Grid.js';
 import { Tabs } from './Tabs.js';
@@ -35,10 +36,17 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  *   The host keeps it: it gives it the rules (beforeOp), listens to its changes and saves its patches. Without one the sheet makes an empty workbook.
  * @param {string} [props.sheet]  The id of the sheet to show (the host controls it then, with onSheetChange); without it the tabs change it.
  * @param {(sheetId: string) => void} [props.onSheetChange]  A tab was clicked (or a sheet was added, duplicated, found ...).
+ * @param {(event: { ops: object[], source: string }) => void} [props.onOp]  Every change applied (by a person, by code, by undo), as ops: what the host
+ *   saves, sends to others, or keeps as history.
+ * @param {(event: { reason: string, op: object, source: string }) => void} [props.onReject]  A change was refused (by the rules, the types, or beforeOp).
+ * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
+ * @param {(sel: { ranges: object[], active: { r: number, c: number } }) => void} [props.onSelectionChange]
+ * @param {boolean} [props.showProtected]  Draw the protected cells striped (the rules are the workbook's: setRules).
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
  * @param {import('react').CSSProperties} [props.style]  Inline style of the outer element (its height above all: the grid fills it).
+ * @param {import('react').Ref<SheetHandle>} [ref]  What the host's code can ask of the sheet (see SheetHandle).
  */
-export function Sheet(props) {
+export const Sheet = forwardRef(function Sheet(props, ref) {
     // a workbook of its own when the host gives none (made once, on the first render)
     const [own] = useState(() => (props.workbook ? null : createWorkbook()));
     const wb = props.workbook || own;
@@ -90,8 +98,19 @@ export function Sheet(props) {
     }
     useAutoHeights(wb, sheetId);
 
-    // a short message when something is refused (a name taken, the last sheet ...)
+    // a short message when something is refused (a name taken, the last sheet, a protected cell, a value of the wrong type ...)
     const [notice, setNotice] = useState(null);
+    const latest = useRef(props);
+    latest.current = props;
+    useEffect(() => {
+        const offs = [
+            wb.on('op', (e) => { if (latest.current.onOp) latest.current.onOp(e); }),
+            wb.on('reject', (e) => { setNotice(e.reason); if (latest.current.onReject) latest.current.onReject(e); }),
+            wb.on('cellError', (e) => { if (latest.current.onCellError) latest.current.onCellError(e); })
+        ];
+        return () => offs.forEach((off) => off());
+    }, [wb]);
+    useEffect(() => { if (props.onSelectionChange) props.onSelectionChange(sel); }, [sel]);
     useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), 4000); return () => clearTimeout(t); }, [notice]);
 
     // ---- find and replace --------------------------------------------------------------------------------------------------------------------------
@@ -139,6 +158,36 @@ export function Sheet(props) {
         setFind((f) => ({ ...f, index: -1, status: 'Replaced ' + changed + (changed === 1 ? ' cell' : ' cells') }));
     }
 
+    /**
+     * @typedef {object} SheetHandle
+     * @property {ReturnType<typeof createWorkbook>} workbook  The workbook shown.
+     * @property {(target: string|{ r1: number, c1: number, r2?: number, c2?: number }) => void} select  Select "B7", "A1:C3" or a rectangle, and show it.
+     * @property {(address: string) => void} scrollTo  Show a cell without selecting it.
+     * @property {(text?: string) => void} startEdit  Start editing the active cell (with a text, or what it holds).
+     * @property {() => void} focus  Give the keyboard to the grid.
+     * @property {(sheetId: string) => void} showSheet
+     * @property {() => object} getSelection
+     */
+    useImperativeHandle(ref, () => ({
+        workbook: wb,
+        select(target) {
+            const b = typeof target === 'string' ? parseAddressText(target) : { r1: target.r1, c1: target.c1, r2: target.r2 === undefined ? target.r1 : target.r2, c2: target.c2 === undefined ? target.c1 : target.c2 };
+            if (!b) throw new Error('select: "' + target + '" is not an address');
+            setSel({ ranges: [{ anchor: { r: b.r1, c: b.c1 }, focus: { r: b.r2, c: b.c2 } }], active: { r: b.r1, c: b.c1 } });
+            setRevealTick((t) => t + 1);
+        },
+        scrollTo(address) {
+            const b = parseAddressText(address);
+            if (!b) throw new Error('scrollTo: "' + address + '" is not an address');
+            setSel(selectCell(b.r1, b.c1));
+            setRevealTick((t) => t + 1);
+        },
+        startEdit(text) { setEditing({ r: sel.active.r, c: sel.active.c, text: text === undefined ? wb.input(sheetId, sel.active.r, sel.active.c) : text, mode: 'edit' }); },
+        focus() { toGrid(); },
+        showSheet(id) { show(id); },
+        getSelection() { return sel; }
+    }), [wb, sel, sheetId]);
+
     const onFind = (kind) => setFind((f) => (kind === 'find' ? { ...f, open: true, index: -1 } : { ...f, dialog: true, index: -1, status: '' }));
     const marks = matches.filter((m) => m.sheet === sheetId);
     const current = matches[find.index];
@@ -154,7 +203,11 @@ export function Sheet(props) {
                 onStartEdit={(text) => { setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' }); }}
                 onLink={() => setLinking(true)} onDone={toGrid} container={root} />
             <FormulaBar address={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
-                onStartEdit={(text) => setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' })}
+                onStartEdit={(text) => {
+                    const m = wb.modeAt(sheetId, sel.active.r, sel.active.c);
+                    if (m) { setNotice(m.message || 'This cell is protected: it cannot be changed here'); toGrid(); return; }
+                    setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' });
+                }}
                 onText={(text) => setEditing((e) => (e ? { ...e, text } : { r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' }))}
                 onCommit={commitFromBar}
                 onCancel={() => { setEditing(null); toGrid(); }}
@@ -166,7 +219,7 @@ export function Sheet(props) {
                     toGrid();
                 }} />
             <div className="ks-body">
-                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
+                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
@@ -199,4 +252,4 @@ export function Sheet(props) {
             ) : null}
         </div>
     );
-}
+});

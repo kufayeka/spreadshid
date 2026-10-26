@@ -186,7 +186,7 @@
 
 /* the zoom: the cells' text grows with it (sizes are scaled by the grid) */
 .ks-cell, .ks-input, .ks-mirror { font-size: calc(10pt * var(--ks-zoom, 1)); }
-.ks-text { display: inline-block; }
+.ks-text { display: inline-block; position: relative; }
 .ks-link { color: #1155cc; text-decoration: underline; }
 .ks-view.ks-painting { cursor: copy; }
 
@@ -225,3 +225,7 @@
 .ks-menubar-item:hover, .ks-menubar-item.ks-open { background: #e9eef6; }
 .ks-menu-check { display: inline-block; width: 18px; color: var(--ks-accent); }
 .ks-menu-parent .ks-menu-hint { color: #5f6368; }
+
+/* a protected cell, when the host asks to see them */
+.ks-cell.ks-guarded { background-image: repeating-linear-gradient(-45deg, rgba(95, 99, 104, 0.10) 0 2px, transparent 2px 6px); }
+.ks-own { position: absolute; top: 0; left: 0; bottom: 0; pointer-events: none; }

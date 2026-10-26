@@ -13,22 +13,50 @@ import { localeInfo, currencySymbol, dateToSerial } from './format.js';
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// The no-break spaces some locales group thousands with (French, for one): a person types a plain space for them.
+const NBSP = String.fromCharCode(0xa0), NNBSP = String.fromCharCode(0x202f);
+const SPACES = new RegExp('[' + NBSP + NNBSP + ']', 'g');
+const PLAIN = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
+
+// The pattern of a number in a locale, made once per locale (a sheet reads every typed and pasted cell with it: making it again for each cell was
+// garbage enough to stop a paste of 400 000 cells).
+const numberPatterns = new Map();
+function numberPattern(info) {
+    let p = numberPatterns.get(info.locale);
+    if (!p) {
+        const group = info.group === NBSP || info.group === NNBSP ? ' ' : info.group;
+        p = { group, local: new RegExp('^[-+]?(?:\\d{1,3}(?:' + esc(group) + '\\d{3})+|\\d+)(?:' + esc(info.decimal) + '\\d*)?(?:[eE][-+]?\\d+)?$') };
+        numberPatterns.set(info.locale, p);
+    }
+    return p;
+}
+
 // a number written with the locale's separators (groups of three, or none), or the plain way with a point
 function readNumber(t, info) {
-    const g = esc(info.group === ' ' || info.group === ' ' ? ' ' : info.group), d = esc(info.decimal);
-    const local = new RegExp('^[-+]?(?:\\d{1,3}(?:' + g + '\\d{3})+|\\d+)(?:' + d + '\\d*)?(?:[eE][-+]?\\d+)?$');
-    const plain = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
-    const s = t.replace(/[  ]/g, ' ');
+    const { group, local } = numberPattern(info);
+    const s = t.replace(SPACES, ' ');
     if (local.test(s)) {
-        const norm = s.split(info.group === ' ' || info.group === ' ' ? ' ' : info.group).join('').replace(info.decimal, '.');
+        const norm = s.split(group).join('').replace(info.decimal, '.');
         const n = Number(norm);
-        if (isFinite(n)) return { n, decimals: (norm.split('.')[1] || '').replace(/[eE].*$/, '').length, grouped: s !== norm.replace('.', info.decimal) && s.includes(info.group === ' ' ? ' ' : info.group) };
+        if (isFinite(n)) return { n, decimals: (norm.split('.')[1] || '').replace(/[eE].*$/, '').length, grouped: s.includes(group) };
     }
     // a point as the decimal sign is read only where it cannot be a group separator
     if (info.decimal === '.' || !s.includes('.')) {
-        if (plain.test(s)) { const n = Number(s); if (isFinite(n)) return { n, decimals: (s.split('.')[1] || '').replace(/[eE].*$/, '').length, grouped: false }; }
+        if (PLAIN.test(s)) { const n = Number(s); if (isFinite(n)) return { n, decimals: (s.split('.')[1] || '').replace(/[eE].*$/, '').length, grouped: false }; }
     }
     return null;
+}
+
+// the pattern of an amount with a currency symbol before or after it, made once per symbol
+const moneyPatterns = new Map();
+function moneyPattern(sym) {
+    let re = moneyPatterns.get(sym);
+    if (!re) {
+        const num = '(-?[\\d.,\\s' + NBSP + NNBSP + ']+)';
+        re = new RegExp('^(-)?\\s*' + esc(sym) + '\\s*' + num + '$|^' + num + '\\s*' + esc(sym) + '$');
+        moneyPatterns.set(sym, re);
+    }
+    return re;
 }
 
 const MONTH_WORDS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -89,7 +117,7 @@ export function parseInput(text, settings, format) {
     const symbols = new Set(['$', '€', '£', '¥', 'Rp', 'US$']);
     if (settings && settings.currency) symbols.add(currencySymbol(settings.currency, info.locale));
     for (const sym of symbols) {
-        const re = new RegExp('^(-)?\\s*' + esc(sym) + '\\s*(-?[\\d.,\\s\\u00a0]+)$|^(-?[\\d.,\\s\\u00a0]+)\\s*' + esc(sym) + '$');
+        const re = moneyPattern(sym);
         m = re.exec(t);
         if (!m) continue;
         const p = readNumber((m[2] || m[3]).trim(), info);

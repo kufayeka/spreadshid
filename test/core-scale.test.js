@@ -70,12 +70,15 @@ const patch = time('take the patch of one changed row', () => wb.pendingPatch())
 assert.strictEqual(patch.rows.upsert.length, 1);
 ok('after one change, the patch holds one row, not 100 000');
 
-// opening the whole workbook from what is stored
-const stored = time('the whole workbook as stored (toJSON)', () => wb.toJSON());
-const json = time('to JSON text', () => JSON.stringify(stored));
-const reopened = time('open it again (100 000 rows, 200 000 formulas)', () => createWorkbook(JSON.parse(json)));
-assert.strictEqual(time('after opening: the grand total', () => reopened.value(s, 0, 6)), wb.value(s, 0, 6));
-ok('the stored workbook (' + Math.round(json.length / 1048576) + ' MB of JSON) opens again with the same totals');
+// opening the whole workbook from what is stored (in a block of its own: the copies it makes, a JSON text of 90 MB and a second workbook, are let go
+// before the next part, as a page would let them go)
+{
+    const stored = time('the whole workbook as stored (toJSON)', () => wb.toJSON());
+    const json = time('to JSON text', () => JSON.stringify(stored));
+    const reopened = time('open it again (100 000 rows, 200 000 formulas)', () => createWorkbook(JSON.parse(json)));
+    assert.strictEqual(time('after opening: the grand total', () => reopened.value(s, 0, 6)), wb.value(s, 0, 6));
+    ok('the stored workbook (' + Math.round(json.length / 1048576) + ' MB of JSON) opens again with the same totals');
+}
 
 // a BOQ as it usually is: an amount per row and a grand total, no running total. A keystroke here reaches one amount and the total.
 const boq = wb.addSheet('BOQ');
@@ -85,9 +88,21 @@ time('BOQ: write 400 000 cells (100 000 formulas)', () => wb.setValues(boq, 0, 0
 wb.setValues(boq, 0, 5, '=SUM(D1:D' + ROWS + ')');
 time('BOQ: the grand total the first time', () => wb.value(boq, 0, 5));
 const boqBefore = wb.value(boq, 0, 5);
-time('BOQ: one keystroke (a quantity in row 10)', () => wb.setValues(boq, 9, 1, 999, { source: 'user' }));
-time('BOQ: the screen after it (40 rows x 6 columns, with the total)', () => { for (let r = 0; r < 40; r++) for (let c = 0; c < 6; c++) wb.value(boq, r, c); });
-assert.strictEqual(wb.value(boq, 0, 5), boqBefore + (999 - 10) * (1000 + (9 % 7) * 250));
+// Five keystrokes in five rows, each with the screen after it; the middle one counts. One measure alone can fall on a pause of the garbage collector
+// (this process holds two sheets of 100 000 rows), which says nothing about the sheet.
+const keystrokes = [];
+let expectedTotal = boqBefore;
+for (const row of [9, 20, 30, 40, 50]) {
+    const t0 = performance.now();
+    wb.setValues(boq, row, 1, 999, { source: 'user' });
+    for (let r = row - 20 < 0 ? 0 : row - 20; r < (row - 20 < 0 ? 40 : row + 20); r++) for (let c = 0; c < 6; c++) wb.value(boq, r, c);
+    wb.value(boq, 0, 5);
+    keystrokes.push(performance.now() - t0);
+    expectedTotal += (999 - ((row % 50) + 1)) * (1000 + (row % 7) * 250);
+}
+keystrokes.sort((a, b) => a - b);
+times['BOQ: a keystroke and the screen after it (the middle of five)'] = Math.round(keystrokes[2]);
+assert.strictEqual(wb.value(boq, 0, 5), expectedTotal);
 ok('BOQ: a keystroke reaches its amount and the grand total');
 
 console.log('\ntimes (ms):');
@@ -95,7 +110,7 @@ for (const [label, ms] of Object.entries(times)) console.log('  ' + String(ms).p
 
 // What a person feels must stay quick. A keystroke in a BOQ (with the screen after it) and an insert in a big sheet: under 50 ms and 100 ms.
 // The worst case, a keystroke above a 100 000-long chain of running totals, changes 99 990 values; it is held under 250 ms.
-const feel = times['BOQ: one keystroke (a quantity in row 10)'] + times['BOQ: the screen after it (40 rows x 6 columns, with the total)'];
+const feel = times['BOQ: a keystroke and the screen after it (the middle of five)'];
 assert.ok(feel < 50, 'a keystroke in a BOQ and the screen after it take ' + feel + ' ms');
 const insert = times['insert one row in the middle (row 50 000)'];
 assert.ok(insert < 100, 'an insert takes ' + insert + ' ms');

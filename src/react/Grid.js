@@ -56,11 +56,15 @@ function bordersCss(borders) {
 // A cell is drawn only when it shows something (a value, a fill, a border). It leaves the last pixel on its right and at its bottom to the grid lines,
 // which are drawn once per row and once per column under the cells; a cell that must hide the lines inside it (a merged block, a text that runs on over
 // empty cells) covers them with the sheet's colour, as Google Sheets does.
-function Cell({ r, c, x, y, w, h, merged, cover, display, style }) {
+function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded }) {
     const css = cellCss(style, display);
+    // A text that runs on over the empty cells on its right takes only its text there: the cell's own fill (and its stripes when protected) stay
+    // inside the cell itself, as in Google Sheets; the rest of the run is the sheet's colour, which hides the grid lines under the text.
+    const own = cover && (css.background || guarded);
     return (
-        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '')} data-r={r} data-c={c}
-            style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
+        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '')} data-r={r} data-c={c}
+            style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: own ? undefined : css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
+            {own ? <span className={'ks-own' + (guarded ? ' ks-guarded' : '')} style={{ width: Math.max(0, ownWidth - 1), background: css.background }} /> : null}
             <span className={'ks-text' + (style && style.link ? ' ks-link' : '')} title={style && style.link ? style.link + ' (Ctrl+click to open)' : undefined}
                 style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>
             {style && style.borders ? <span className="ks-borders" style={bordersCss(style.borders)} /> : null}
@@ -73,7 +77,7 @@ function Cell({ r, c, x, y, w, h, merged, cover, display, style }) {
  * on screen while scrolling up or down keeps all its props and is not drawn again: a scroll only draws the rows that come in.
  * `revision` is the workbook's: a change anywhere draws the rows again (their values may have changed through formulas).
  */
-const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, colAxis, blocks, revision }) {
+const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, colAxis, blocks, revision, showProtected }) {
     void revision;
     const cells = [];
     // the columns of this row that a merged block covers (the block itself is drawn by the pane)
@@ -85,19 +89,23 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         if (!w) continue;
         const display = wb.display(sheetId, r, c);
         const style = wb.style(sheetId, r, c);
+        // a protected cell, drawn striped when the host asks (showProtected)
+        const guarded = showProtected && wb.modeAt(sheetId, r, c);
         // an empty cell with no style is not drawn: the grid lines are all it shows
-        if (display.kind === 'empty' && !style) continue;
-        // a text that does not wrap runs on into the empty cells on its right, which are then not drawn (their grid lines would cross the text)
+        if (display.kind === 'empty' && !style && !guarded) continue;
+        // A text that does not wrap and sits on the left runs on into the empty cells on its right, which are then not drawn (their grid lines would
+        // cross the text). It stops at a protected cell that is shown striped. A centred text (the dots of a hidden cell) stays in its cell.
         let width = w;
-        if (display.kind === 'text' && (!style || (!style.wrap && (!style.align || style.align === 'left')))) {
+        const align = (style && style.align) || display.align;
+        if (display.kind === 'text' && !(style && style.wrap) && align === 'left') {
             let next = c + 1;
-            while (next <= to && next - c <= OVERFLOW_CELLS && !covered.has(next) && wb.raw(sheetId, r, next) === undefined) {
+            while (next <= to && next - c <= OVERFLOW_CELLS && !covered.has(next) && wb.raw(sheetId, r, next) === undefined && !(showProtected && wb.modeAt(sheetId, r, next))) {
                 width += colAxis.size(next);
                 covered.add(next);
                 next++;
             }
         }
-        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} display={display} style={style} />);
+        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={!!guarded} />);
     }
     return cells;
 });
@@ -127,7 +135,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected }) {
     const scroller = useRef(null);
     const view = useRef(null);
     // the keyboard sink is the host's when it gives one (the formula bar gives the keyboard back to it)
@@ -217,8 +225,16 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (move) moveTo(stepActive(sel, move.dr, move.dc, size));
     }
 
+    // a protected cell is not edited: the person is told why at once (not after typing a whole text that is then refused)
+    function guard(r, c) {
+        const m = wb.modeAt(sheetId, r, c);
+        if (m && onError) onError(m.message || 'This cell is protected: it cannot be changed here');
+        return !!m;
+    }
+
     function startEdit(mode, text) {
         const { r, c } = sel.active;
+        if (guard(r, c)) return;
         setEditing({ r, c, text: text === undefined ? wb.input(sheetId, r, c) : text, mode });
     }
 
@@ -298,7 +314,10 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const text = e.currentTarget.value;
         if (editing) setEditing({ ...editing, text });
         // a character typed on a selected cell starts the edit, replacing what the cell held
-        else if (text) setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'type' });
+        else if (text) {
+            if (guard(sel.active.r, sel.active.c)) { e.currentTarget.value = ''; return; }
+            setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'type' });
+        }
     }
 
     // ---- the clipboard: the browser's own copy, cut and paste events, so Ctrl+C, Ctrl+X, Ctrl+V and the browser's menu all work --------------
@@ -595,6 +614,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const target = hit(x, y);
         if (target.kind !== 'cell') return;
         setSel(selectCell(target.r, target.c));
+        if (guard(target.r, target.c)) return;
         setEditing({ r: target.r, c: target.c, text: wb.input(sheetId, target.r, target.c), mode: 'edit' });
     }
 
@@ -652,7 +672,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             const h = rowAxis.size(r);
             if (!h) continue;
             out.push(<Row key={r} wb={wb} sheetId={sheetId} r={r} top={rowAxis.start(r) - yBase} height={h} from={cols.from} to={cols.to} xBase={xBase}
-                colAxis={colAxis} blocks={blocks} revision={revision} />);
+                colAxis={colAxis} blocks={blocks} revision={revision} showProtected={showProtected} />);
         }
         // the merged blocks that reach into the pane, each drawn whole (the pane cuts what is outside it)
         for (const b of blocks) {

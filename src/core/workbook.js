@@ -14,6 +14,7 @@ import { storeFormula, formulaText, isStoredFormula } from './refs.js';
 import { colName } from './formula/address.js';
 import { formatDate, formatValue, localeInfo } from './format.js';
 import { displayOf } from './display.js';
+import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
 
@@ -551,6 +552,79 @@ export function createWorkbook(doc, options) {
         return kept.length === all.length ? [] : setSheetProps(s, { merges: kept.length ? kept : null }, how);
     }
 
+    // ---- the host's rules and the types of columns (see access.js and types.js): not part of the workbook, never saved or undone -----------------
+
+    let rules = [];
+    const types = new Map(); // sheet id -> Map(column id -> type)
+
+    /**
+     * The rules a person must keep here (read-only and hidden cells), as the host's backend gives them for this person. They replace the ones before.
+     * @param {object[]} list
+     */
+    function setRules(list) {
+        rules = resolveRules(api, list || []);
+        revision++;
+        emit('layout', {});
+    }
+
+    /** The types of the columns of a sheet ({ headerRow, fields } or { columns }), or null to take them away. */
+    function setTypes(s, spec) {
+        s = sheetIdOf(s);
+        if (spec) types.set(s, resolveTypes(api, s, spec)); else types.delete(s);
+    }
+
+    /** What the rules make of a cell: { mode: 'readonly'|'hidden', message } or null. */
+    const modeAt = (s, r, c) => (rules.length ? modeOf(api, rules, sheetIdOf(s), r, c, revision) : null);
+
+    /** The type of a cell's column, or null (the header row of a typed sheet has none). */
+    function typeAt(s, r, c) {
+        s = sheetIdOf(s);
+        const map = types.get(s);
+        if (!map) return null;
+        const sheet = sheetOf(s);
+        if (map.headerRowId && sheet.rowOrder[r] === map.headerRowId) return null;
+        return map.get(sheet.colOrder[c]) || null;
+    }
+
+    const PROTECTED = 'This cell is protected: it cannot be changed here';
+
+    // the first op of a change that breaks a rule, with the rule's message, or null
+    function brokenRule(ops) {
+        for (const op of ops) {
+            const s = typeof op.sheet === 'string' ? op.sheet : op.sheet && op.sheet.id;
+            if (!s || !sheets.has(s)) continue;
+            const sheet = sheets.get(s);
+            const at = (rid, cid) => { const r = grid.rowIndexOf(s, rid), c = grid.colIndexOf(s, cid); return r < 0 || c < 0 ? null : modeOf(api, rules, s, r, c, revision); };
+            if (op.t === 'cells' || op.t === 'styles') {
+                for (const ch of op.changes) { const m = at(ch.row, ch.col); if (m) return { op, message: m.message || PROTECTED }; }
+            } else if (op.t === 'deleteRows') {
+                for (const row of op.rows) for (const cid of sheet.colOrder) { const m = at(row.id, cid); if (m) return { op, message: m.message || 'These rows hold protected cells: they cannot be deleted here' }; }
+            } else if (op.t === 'deleteCols') {
+                for (const col of op.cols) for (const rid of sheet.rowOrder) { const m = at(rid, col.id); if (m) return { op, message: m.message || 'These columns hold protected cells: they cannot be deleted here' }; }
+            } else if (op.t === 'removeSheet') {
+                if (rules.some((rule) => rule.s === op.sheet.id)) return { op, message: 'This sheet holds protected cells: it cannot be deleted here' };
+            }
+        }
+        return null;
+    }
+
+    // the cells of a change (already applied) whose value is not of their column's type
+    function wrongTypes(ops) {
+        const out = [];
+        for (const op of ops) {
+            if (op.t !== 'cells' || !types.has(op.sheet)) continue;
+            for (const ch of op.changes) {
+                const r = grid.rowIndexOf(op.sheet, ch.row), c = grid.colIndexOf(op.sheet, ch.col);
+                const t = r < 0 || c < 0 ? null : typeAt(op.sheet, r, c);
+                if (!t) continue;
+                const value = engine.value(op.sheet, ch.row, ch.col);
+                const expected = checkValue(t, value);
+                if (expected) out.push({ op, sheet: op.sheet, r, c, address: colName(c) + (r + 1), field: t.field, value, expected });
+            }
+        }
+        return out;
+    }
+
     /**
      * Applies a change: a list of ops that belong together (one paste, one insert, one undo). The host's beforeOp sees each op first; if it refuses one,
      * nothing of the change is applied. Returns the ops that were applied (after beforeOp), or null when the change was refused.
@@ -570,6 +644,11 @@ export function createWorkbook(doc, options) {
             if (answer) accepted.push(answer);
         }
         if (!accepted.length) return [];
+        // a person's change must keep the host's rules (read-only and hidden cells); the host's own code is not stopped by them
+        if (source === 'user' && rules.length) {
+            const broken = brokenRule(accepted);
+            if (broken) { emit('reject', { op: broken.op, reason: broken.message, source }); return null; }
+        }
         changeNo++;
         const at = new Date().toISOString();
         const done = [];
@@ -579,6 +658,17 @@ export function createWorkbook(doc, options) {
             // an op that cannot be applied (it names a row that is not there) takes back the ones of the same change before it: a change is whole or nothing
             for (const op of done.reverse()) APPLY[invert(op).t](invert(op));
             throw error;
+        }
+        // a value a person wrote in a typed column must be of its type; a formula is judged by what it works out to, so this is looked at once applied,
+        // and a change with a value of the wrong type is taken back whole
+        if (source === 'user' && types.size) {
+            const wrong = wrongTypes(accepted);
+            if (wrong.length) {
+                for (const op of done.reverse()) APPLY[invert(op).t](invert(op));
+                for (const w of wrong) emit('cellError', w);
+                emit('reject', { op: wrong[0].op, reason: 'Expected ' + wrong[0].expected + ' in ' + wrong[0].address + (wrong[0].field ? ' (' + wrong[0].field + ')' : ''), source });
+                return null;
+            }
         }
         if (source === 'user' || source === 'code') {
             undoStack.push(accepted);
@@ -626,6 +716,9 @@ export function createWorkbook(doc, options) {
      */
     function typed(s, input, rid, cid) {
         if (typeof input !== 'string') return { content: input === null ? undefined : input };
+        // a column typed as text keeps what is typed as text ("00123" stays "00123"), as a text format does
+        const columnType = types.get(s) && types.get(s).get(cid);
+        if (columnType && columnType.kind === 'string' && !(input.length > 1 && input[0] === '=')) return { content: input[0] === "'" ? input.slice(1) : input };
         const current = rid && cid ? formatOfIds(s, rid, cid) : null;
         const parsed = parseInput(input, settings, current);
         if (parsed && parsed.formula !== undefined) return { content: storeFormula(parsed.formula, s, grid) };
@@ -1012,6 +1105,8 @@ export function createWorkbook(doc, options) {
         get revision() { return revision; },
         // the layout
         rowAxis, colAxis, merges, mergeCells, unmergeCells, setAutoHeights, forEachFilledRow, rowContent,
+        // the host's rules and types
+        setRules, setTypes, modeAt, typeAt,
         // reading
         sheetIds: () => [...sheetOrder],
         sheetProps: (s) => clone(sheetOf(sheetIdOf(s)).props),
@@ -1043,6 +1138,7 @@ export function createWorkbook(doc, options) {
             s = sheetIdOf(s);
             const v = api.raw(s, r, c);
             if (v === undefined || v === null) return '';
+            if (rules.length) { const m = modeOf(api, rules, s, r, c, revision); if (m && m.mode === 'hidden') return ''; }
             if (isStoredFormula(v)) return formulaText(v, s, grid);
             if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
             const sheet = sheetOf(s);
@@ -1073,6 +1169,8 @@ export function createWorkbook(doc, options) {
          */
         display(s, r, c) {
             s = sheetIdOf(s);
+            // a hidden cell shows dots: its content is not read, copied or found (see access.js)
+            if (rules.length) { const m = modeOf(api, rules, s, r, c, revision); if (m && m.mode === 'hidden' && api.raw(s, r, c) !== undefined) return { text: '•••', align: 'center', kind: 'text' }; }
             const value = api.value(s, r, c);
             const fmt = api.cellFormat(s, r, c);
             let extra;
@@ -1108,7 +1206,9 @@ export function createWorkbook(doc, options) {
         // events: "op" ({ ops, source }), "reject" ({ op, reason, source }), "saved" ({ version })
         on,
         /** @internal for the tests */
-        _engine: engine
+        _engine: engine,
+        /** @internal for access.js */
+        _grid: grid
     };
     return api;
 }
