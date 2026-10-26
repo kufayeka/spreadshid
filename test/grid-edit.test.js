@@ -31,7 +31,8 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     await wait(400);
     const q = (expr) => js(expr);
     const SHIFT = 8, CTRL = 2;
-    const center = async (r, c) => q(`(function(){ var e = document.querySelector('.ks-cell[data-r="${r}"][data-c="${c}"]'); if (!e) return null; var b = e.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+    // the middle of a cell, from its column letter and its row number (an empty cell has no element of its own: only the grid lines show it)
+    const center = async (r, c) => q(`(function(){ var h = document.querySelector('.ks-colhead[data-c="${c}"]'), v = document.querySelector('.ks-rowhead[data-r="${r}"]'); if (!h || !v) return null; var a = h.getBoundingClientRect(), b = v.getBoundingClientRect(); return { x: Math.round(a.left + a.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
     const clickCell = async (r, c, mods) => { const p = await center(r, c); if (!p) return false; await click(p.x, p.y, mods ? { modifiers: mods } : undefined); await wait(80); return true; };
     const value = (r, c) => q(`window.__workbook.value(undefined, ${r}, ${c})`);
     // the active cell as the grid says it (the label of its keyboard sink: "Cell H5"), turned into "row,column" counted from 0
