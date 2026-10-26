@@ -3,3 +3,12 @@
 
 /** The version of the package, so that a saved workbook can say which sheet made it. */
 export const VERSION = '0.1.0';
+
+export { createWorkbook } from './workbook.js';
+export { newId } from './ids.js';
+export { keyBetween, keysBetween, compareKeys } from './order.js';
+export { storeFormula, formulaText, resolveRef, isStoredFormula } from './refs.js';
+export { parseInput } from './input.js';
+export { roundTo } from './calc.js';
+export { colName, colIndex } from './formula/address.js';
+export { ERR, isError } from './formula/xlvalue.js';
