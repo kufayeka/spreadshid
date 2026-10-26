@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import { createWorkbook, VERSION } from '../core/index.js';
+import { selectCell } from '../core/selection.js';
 import { Grid } from './Grid.js';
 
 /**
@@ -29,15 +30,15 @@ export function Sheet(props) {
     const [own] = useState(() => (props.workbook ? null : createWorkbook()));
     const wb = props.workbook || own;
     const revision = useWorkbookRevision(wb);
-    const [shown, setShown] = useState(null);
     const ids = wb.sheetIds();
-    const sheetId = props.sheet && ids.includes(props.sheet) ? props.sheet : shown && ids.includes(shown) ? shown : ids[0];
-    void setShown;
+    const sheetId = props.sheet && ids.includes(props.sheet) ? props.sheet : ids[0];
+    const [sel, setSel] = useState(() => selectCell(0, 0));
+    const [editing, setEditing] = useState(null);
 
     // Nothing here may touch window or document while rendering: Next.js renders this on the server first, where neither exists.
     return (
         <div className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
-            <Grid workbook={wb} sheetId={sheetId} revision={revision} />
+            <Grid workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing} />
         </div>
     );
 }

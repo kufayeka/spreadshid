@@ -1,7 +1,9 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { colName } from '../core/formula/address.js';
 import { displayOf } from '../core/display.js';
+import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
+import { keyAction } from './keys.js';
 
 // useLayoutEffect warns when React renders on a server (Next.js); there is nothing to measure there anyway
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -93,13 +95,29 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
 }
 
 /**
- * The grid of one sheet: the scroller, the headers and the four panes.
- * @param {{ workbook: any, sheetId: string, revision: number }} props
+ * The grid of one sheet: the scroller, the headers, the four panes, the selection, and the cell editor.
+ *
+ * @param {object} props
+ * @param {any} props.workbook
+ * @param {string} props.sheetId
+ * @param {number} props.revision
+ * @param {import('../core/selection.js').Selection} props.sel
+ * @param {(sel: import('../core/selection.js').Selection) => void} props.setSel
+ * @param {{ r: number, c: number, text: string, mode: 'type'|'edit' }|null} props.editing  The cell being edited: "type" when typing started it (the
+ *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
+ * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing }) {
     const scroller = useRef(null);
+    const view = useRef(null);
+    const sink = useRef(null);
+    const mirror = useRef(null);
     const [box, setBox] = useState({ width: 0, height: 0 });
     const [scroll, setScroll] = useState({ top: 0, left: 0 });
+    const [editorSize, setEditorSize] = useState(null);
+    // the grid scrolls to the cell the keyboard moved to; a selection made with the mouse (a whole column above all) is where the person is looking already
+    const reveal = useRef(false);
+    const moveTo = (next) => { reveal.current = true; setSel(next); };
 
     // the grid fills its box: measured once on screen and whenever the box changes size
     useIsoLayoutEffect(() => {
@@ -116,14 +134,199 @@ export function Grid({ workbook: wb, sheetId, revision }) {
     const props = useMemo(() => wb.sheetProps(sheetId), [wb, sheetId, revision]);
     const rowAxis = wb.rowAxis(sheetId);
     const colAxis = wb.colAxis(sheetId);
+    const size = { rows: rowAxis.count, cols: colAxis.count };
     const blocks = useMemo(() => wb.merges(sheetId), [wb, sheetId, revision]);
     const layout = layoutOf({ rows: rowAxis, cols: colAxis, freezeRows: props.freezeRows, freezeCols: props.freezeCols,
         scrollTop: scroll.top, scrollLeft: scroll.left, width: box.width, height: box.height });
 
-    const onScroll = (e) => setScroll({ top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft });
-
     const fw = layout.frozenWidth, fh = layout.frozenHeight;
     const R = layout.rows, C = layout.cols;
+    const top = HEADER_HEIGHT, left = ROW_HEADER_WIDTH;
+
+    const blockAt = (r, c) => blocks.find((b) => r >= b.r1 && r <= b.r2 && c >= b.c1 && c <= b.c2);
+
+    /** Where a cell is in the view (a merged block: all of it), in pixels of the view. */
+    function cellBox(r, c) {
+        const b = blockAt(r, c) || { r1: r, c1: c, r2: r, c2: c };
+        const x = left + colAxis.start(b.c1) - (b.c1 >= layout.fc ? scroll.left : 0);
+        const y = top + rowAxis.start(b.r1) - (b.r1 >= layout.fr ? scroll.top : 0);
+        return { x, y, w: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), h: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) };
+    }
+
+    /** What is under a point of the view: a cell, a column letter, a row number, or the corner (everything). */
+    function hit(x, y) {
+        if (x < left && y < top) return { kind: 'all' };
+        const col = () => colAxis.indexAt(x - left < fw ? x - left : x - left + scroll.left);
+        const row = () => rowAxis.indexAt(y - top < fh ? y - top : y - top + scroll.top);
+        if (y < top) return { kind: 'col', c: col() };
+        if (x < left) return { kind: 'row', r: row() };
+        return { kind: 'cell', r: row(), c: col() };
+    }
+
+    // ---- editing --------------------------------------------------------------------------------------------------------------------------------------
+
+    function commit(move) {
+        if (editing) wb.setValues(sheetId, editing.r, editing.c, editing.text, { source: 'user' });
+        setEditing(null);
+        if (sink.current) sink.current.value = '';
+        if (move) moveTo(stepActive(sel, move.dr, move.dc, size));
+    }
+
+    function startEdit(mode, text) {
+        const { r, c } = sel.active;
+        setEditing({ r, c, text: text === undefined ? wb.input(sheetId, r, c) : text, mode });
+    }
+
+    // the editor grows with its text, to the right and down, as in Google Sheets (measured on a hidden copy of the text with the same font)
+    useIsoLayoutEffect(() => {
+        if (!editing || !mirror.current) { setEditorSize(null); return; }
+        mirror.current.textContent = editing.text + '​';
+        setEditorSize({ w: mirror.current.scrollWidth + 12, h: mirror.current.scrollHeight + 4 });
+    }, [editing && editing.text, editing && editing.r, editing && editing.c]);
+
+    // the caret goes to the end of what the cell holds when an edit starts
+    useEffect(() => {
+        const el = sink.current;
+        if (!el || !editing) return;
+        if (document.activeElement !== el) el.focus();
+        if (el.value !== editing.text) el.value = editing.text;
+    }, [editing && editing.r, editing && editing.c, !!editing]);
+
+    function onSinkKeyDown(e) {
+        if (e.nativeEvent.isComposing) return;
+        if (editing) {
+            if (e.key === 'Escape') { e.preventDefault(); setEditing(null); e.currentTarget.value = ''; return; }
+            if (e.key === 'Enter' && (e.altKey || e.ctrlKey || e.metaKey)) {
+                // a new line inside the cell
+                e.preventDefault();
+                const el = e.currentTarget, at = el.selectionStart;
+                el.value = el.value.slice(0, at) + '\n' + el.value.slice(el.selectionEnd);
+                el.selectionStart = el.selectionEnd = at + 1;
+                setEditing({ ...editing, text: el.value });
+                return;
+            }
+            if (e.key === 'Enter') { e.preventDefault(); commit({ dr: e.shiftKey ? -1 : 1, dc: 0 }); return; }
+            if (e.key === 'Tab') { e.preventDefault(); commit({ dr: 0, dc: e.shiftKey ? -1 : 1 }); return; }
+            if (editing.mode === 'type' && e.key.startsWith('Arrow')) {
+                e.preventDefault();
+                const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+                wb.setValues(sheetId, editing.r, editing.c, editing.text, { source: 'user' });
+                setEditing(null);
+                e.currentTarget.value = '';
+                moveTo(selectCell(Math.max(0, Math.min(size.rows - 1, sel.active.r + d[0])), Math.max(0, Math.min(size.cols - 1, sel.active.c + d[1]))));
+            }
+            return;
+        }
+        const answer = keyAction(e, {
+            sel, size,
+            filled: (r, c) => wb.raw(sheetId, r, c) !== undefined,
+            rowShown: (r) => rowAxis.size(r) > 0,
+            colShown: (c) => colAxis.size(c) > 0,
+            pageRows: Math.max(1, Math.floor(layout.mainHeight / (props.rowHeight || 21)) - 1),
+            lastFilled: () => wb.lastFilled(sheetId)
+        });
+        if (!answer) return;
+        e.preventDefault();
+        if (answer.sel) moveTo(answer.sel);
+        if (answer.start) startEdit('edit');
+        if (answer.clear) wb.clear(sheetId, rectsOf(sel), { source: 'user' });
+        if (answer.history) wb[answer.history]();
+    }
+
+    function onSinkInput(e) {
+        const text = e.currentTarget.value;
+        if (editing) setEditing({ ...editing, text });
+        // a character typed on a selected cell starts the edit, replacing what the cell held
+        else if (text) setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'type' });
+    }
+
+    // an input method (Chinese, Japanese ...) starts composing: the editor shows at once, so the composition is seen where it goes
+    function onCompositionStart() {
+        if (!editing) setEditing({ r: sel.active.r, c: sel.active.c, text: '', mode: 'type' });
+    }
+
+    // ---- the mouse ------------------------------------------------------------------------------------------------------------------------------------
+
+    function pointIn(e) {
+        const rect = view.current.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top, rect };
+    }
+
+    function onMouseDown(e) {
+        if (e.button !== 0) return;
+        const { x, y } = pointIn(e);
+        const target = hit(x, y);
+        // the editor keeps the focus and the text: a click elsewhere ends the edit with what was typed
+        if (editing) commit(null);
+        e.preventDefault();
+        if (sink.current) sink.current.focus({ preventScroll: true });
+        const add = e.ctrlKey || e.metaKey;
+        let next;
+        if (target.kind === 'all') next = selectAll(size.rows, size.cols);
+        else if (target.kind === 'col') next = e.shiftKey ? selectCols(Math.min(sel.active.c, target.c), Math.max(sel.active.c, target.c), size.rows) : selectCols(target.c, target.c, size.rows);
+        else if (target.kind === 'row') next = e.shiftKey ? selectRows(Math.min(sel.active.r, target.r), Math.max(sel.active.r, target.r), size.cols) : selectRows(target.r, target.r, size.cols);
+        else if (e.shiftKey) next = extendTo(sel, target.r, target.c);
+        else if (add) next = addCell(sel, target.r, target.c);
+        else next = selectCell(target.r, target.c);
+        setSel(next);
+        drag(target, next);
+    }
+
+    // a drag from where the mouse went down: the rectangle (or the rows, or the columns) follows the mouse, and the grid scrolls when it leaves the edge
+    function drag(start, first) {
+        if (start.kind === 'all') return;
+        let current = first;
+        const move = (ev) => {
+            const { x, y, rect } = pointIn(ev);
+            const el = scroller.current;
+            if (y > rect.height) el.scrollTop += Math.min(60, y - rect.height);
+            if (y < top && start.kind !== 'col') el.scrollTop -= Math.min(60, top - y);
+            if (x > rect.width) el.scrollLeft += Math.min(60, x - rect.width);
+            if (x < left && start.kind !== 'row') el.scrollLeft -= Math.min(60, left - x);
+            const cx = Math.max(left + 1, Math.min(rect.width - 1, x)), cy = Math.max(top + 1, Math.min(rect.height - 1, y));
+            const at = hit(cx, cy);
+            if (start.kind === 'col') current = selectCols(Math.min(start.c, at.c), Math.max(start.c, at.c), size.rows);
+            else if (start.kind === 'row') current = selectRows(Math.min(start.r, at.r), Math.max(start.r, at.r), size.cols);
+            else current = extendTo(current, at.r, at.c);
+            setSel(current);
+        };
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+    }
+
+    function onDoubleClick(e) {
+        const { x, y } = pointIn(e);
+        const target = hit(x, y);
+        if (target.kind !== 'cell') return;
+        setSel(selectCell(target.r, target.c));
+        setEditing({ r: target.r, c: target.c, text: wb.input(sheetId, target.r, target.c), mode: 'edit' });
+    }
+
+    // ---- the active cell stays on screen ------------------------------------------------------------------------------------------------------------
+
+    const focus = focusOf(sel);
+    useEffect(() => {
+        const el = scroller.current;
+        if (!el || !box.width || !reveal.current) return;
+        reveal.current = false;
+        const p = focus;
+        if (p.r >= layout.fr) {
+            const y = rowAxis.start(p.r) - fh, h = rowAxis.size(p.r);
+            if (y < el.scrollTop) el.scrollTop = y;
+            else if (y + h > el.scrollTop + layout.mainHeight) el.scrollTop = y + h - layout.mainHeight;
+        }
+        if (p.c >= layout.fc) {
+            const x = colAxis.start(p.c) - fw, w = colAxis.size(p.c);
+            if (x < el.scrollLeft) el.scrollLeft = x;
+            else if (x + w > el.scrollLeft + layout.mainWidth) el.scrollLeft = x + w - layout.mainWidth;
+        }
+    }, [focus.r, focus.c, box.width]);
+
+    // ---- drawing --------------------------------------------------------------------------------------------------------------------------------------
+
+    const onScroll = (e) => setScroll({ top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft });
+    const rects = rectsOf(sel);
 
     // The cells of a pane, against the sheet: a scrolling direction counts from the end of the frozen part, and the pane's layer moves by the scroll.
     const paneCells = (rows, cols, rowsScroll, colsScroll) => {
@@ -143,15 +346,39 @@ export function Grid({ workbook: wb, sheetId, revision }) {
                 w={colAxis.start(b.c2 + 1) - colAxis.start(b.c1)} h={rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1)}
                 display={displayOf(wb.value(sheetId, b.r1, b.c1))} style={wb.style(sheetId, b.r1, b.c1)} />);
         }
+        // the selection over them: each rectangle tinted, and the active cell framed
+        rects.forEach((b, i) => {
+            if (b.r1 > rows.to || b.r2 < rows.from || b.c1 > cols.to || b.c2 < cols.from) return;
+            const single = b.r1 === b.r2 && b.c1 === b.c2;
+            if (single && rects.length === 1) return;
+            out.push(<div key={'s' + i} className="ks-sel" style={{ left: colAxis.start(b.c1) - xBase, top: rowAxis.start(b.r1) - yBase,
+                width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) }} />);
+        });
+        const a = blockAt(sel.active.r, sel.active.c) || { r1: sel.active.r, c1: sel.active.c, r2: sel.active.r, c2: sel.active.c };
+        if (!(a.r1 > rows.to || a.r2 < rows.from || a.c1 > cols.to || a.c2 < cols.from)) {
+            out.push(<div key="active" className="ks-active" style={{ left: colAxis.start(a.c1) - xBase, top: rowAxis.start(a.r1) - yBase,
+                width: colAxis.start(a.c2 + 1) - colAxis.start(a.c1), height: rowAxis.start(a.r2 + 1) - rowAxis.start(a.r1) }} />);
+        }
         return out;
     };
 
+    // a header is marked when its row or column is in the selection, and marked strongly when all of it is
+    const colState = (c) => {
+        let on = false;
+        for (const b of rects) if (c >= b.c1 && c <= b.c2) { if (b.r1 === 0 && b.r2 === size.rows - 1) return ' ks-on ks-full'; on = true; }
+        return on ? ' ks-on' : '';
+    };
+    const rowState = (r) => {
+        let on = false;
+        for (const b of rects) if (r >= b.r1 && r <= b.r2) { if (b.c1 === 0 && b.c2 === size.cols - 1) return ' ks-on ks-full'; on = true; }
+        return on ? ' ks-on' : '';
+    };
     const colHeads = (cols, scrolling) => {
         const out = [];
         const base = scrolling ? fw : 0;
         for (let c = cols.from; c <= cols.to; c++) {
             const w = colAxis.size(c);
-            if (w) out.push(<div key={c} className="ks-colhead" data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HEADER_HEIGHT }}>{colName(c)}</div>);
+            if (w) out.push(<div key={c} className={'ks-colhead' + colState(c)} data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HEADER_HEIGHT }}>{colName(c)}</div>);
         }
         return out;
     };
@@ -160,17 +387,24 @@ export function Grid({ workbook: wb, sheetId, revision }) {
         const base = scrolling ? fh : 0;
         for (let r = rows.from; r <= rows.to; r++) {
             const h = rowAxis.size(r);
-            if (h) out.push(<div key={r} className="ks-rowhead" data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: ROW_HEADER_WIDTH }}>{r + 1}</div>);
+            if (h) out.push(<div key={r} className={'ks-rowhead' + rowState(r)} data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: ROW_HEADER_WIDTH }}>{r + 1}</div>);
         }
         return out;
     };
 
-    const top = HEADER_HEIGHT, left = ROW_HEADER_WIDTH;
+    // the keyboard sink sits on the active cell; while a cell is edited it is the editor, with the cell's font, as big as its text needs
+    const at = editing ? cellBox(editing.r, editing.c) : cellBox(sel.active.r, sel.active.c);
+    const editStyle = editing ? cellCss(wb.style(sheetId, editing.r, editing.c), { align: 'left', kind: 'text' }) : null;
+    const sinkStyle = editing
+        ? { left: at.x, top: at.y, width: Math.max(at.w, editorSize ? editorSize.w : 0), height: Math.max(at.h, editorSize ? editorSize.h : 0),
+            fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily, color: editStyle.color, background: editStyle.background }
+        : { left: at.x, top: at.y, width: Math.max(1, at.w), height: Math.max(1, at.h) };
+
     const sx = scroll.left, sy = scroll.top;
     return (
         <div className="ks-grid" ref={scroller} onScroll={onScroll}>
             <div className="ks-spacer" style={{ width: layout.contentWidth, height: layout.contentHeight }} />
-            <div className="ks-view" style={{ width: box.width, height: box.height }}>
+            <div className="ks-view" ref={view} style={{ width: box.width, height: box.height }} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick}>
                 {box.width > 0 ? (
                     <>
                         <Pane className="ks-main" left={left + fw} top={top + fh} width={layout.mainWidth} height={layout.mainHeight} shiftX={sx} shiftY={sy}>{paneCells(R.scrolling, C.scrolling, true, true)}</Pane>
@@ -186,6 +420,10 @@ export function Grid({ workbook: wb, sheetId, revision }) {
                         {fw > 0 ? <div className="ks-freeze-line ks-v" style={{ left: left + fw - 1, height: box.height }} /> : null}
                     </>
                 ) : null}
+                <textarea ref={sink} className={'ks-input' + (editing ? ' ks-editing' : '')} style={sinkStyle} spellCheck={false} autoComplete="off"
+                    aria-label={'Cell ' + colName(sel.active.c) + (sel.active.r + 1)} onKeyDown={onSinkKeyDown} onInput={onSinkInput}
+                    onCompositionStart={onCompositionStart} onBlur={() => { if (editing) commit(null); }} />
+                <span ref={mirror} className="ks-mirror" style={editStyle ? { fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily } : undefined} />
             </div>
         </div>
     );

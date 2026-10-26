@@ -580,21 +580,41 @@ export function createWorkbook(doc, options) {
         return changes.length ? apply([{ t: 'cells', sheet: s, changes }], how) : [];
     }
 
-    /** Empties the cells of a rectangle (their style stays, as the Delete key in Google Sheets). */
-    function clear(s, range, how) {
+    /**
+     * Empties the cells of a rectangle, or of several (a selection made with Ctrl): their style stays, as with the Delete key in Google Sheets.
+     * Several rectangles are one change, so one undo brings them all back.
+     */
+    function clear(s, ranges, how) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
         const changes = [];
-        for (let r = range.r1; r <= range.r2; r++) {
-            const rid = sheet.rowOrder[r];
-            if (rid === undefined) continue;
-            const row = sheet.rows.get(rid);
-            for (let c = range.c1; c <= range.c2; c++) {
-                const cid = sheet.colOrder[c];
-                if (cid !== undefined && row.cells[cid] !== undefined) changes.push({ row: rid, col: cid, before: clone(row.cells[cid]), after: undefined });
+        const seen = new Set();
+        for (const range of Array.isArray(ranges) ? ranges : [ranges]) {
+            for (let r = range.r1; r <= range.r2; r++) {
+                const rid = sheet.rowOrder[r];
+                if (rid === undefined) continue;
+                const row = sheet.rows.get(rid);
+                for (let c = range.c1; c <= range.c2; c++) {
+                    const cid = sheet.colOrder[c];
+                    if (cid === undefined || row.cells[cid] === undefined || seen.has(rid + cid)) continue;
+                    seen.add(rid + cid);
+                    changes.push({ row: rid, col: cid, before: clone(row.cells[cid]), after: undefined });
+                }
             }
         }
         return changes.length ? apply([{ t: 'cells', sheet: s, changes }], how) : [];
+    }
+
+    /** The last row and the last column that hold anything, as Ctrl+End finds them; { r: -1, c: -1 } in an empty sheet. */
+    function lastFilled(s) {
+        const sheet = sheetOf(sheetIdOf(s));
+        let r = -1, c = -1;
+        const order = new Map(sheet.colOrder.map((cid, i) => [cid, i]));
+        for (let i = sheet.rowOrder.length - 1; i >= 0; i--) {
+            const cells = sheet.rows.get(sheet.rowOrder[i]).cells;
+            for (const cid in cells) { const ci = order.get(cid); if (ci !== undefined) { if (r < 0) r = i; if (ci > c) c = ci; } }
+        }
+        return { r, c };
     }
 
     /** Merges a style patch into every cell of a rectangle (a key set to null takes that part of the style away). */
@@ -850,7 +870,7 @@ export function createWorkbook(doc, options) {
         apply, undo, redo,
         canUndo: () => undoStack.length > 0,
         canRedo: () => redoStack.length > 0,
-        setValues, clear, setStyle,
+        setValues, clear, setStyle, lastFilled,
         insertRows, deleteRows, insertCols, deleteCols, moveRows, moveCols,
         setRowProps, setColProps, setSheetProps, setSettings,
         addSheet, removeSheet, moveSheet,
