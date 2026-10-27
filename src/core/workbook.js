@@ -854,6 +854,8 @@ export function createWorkbook(doc, options) {
     //   comments: [{ id, row, col, resolved, items: [{ id, by: { id, name }, text, at }] }]
 
     const threadsOf = (s) => sheetOf(s).props.comments || [];
+    // the comments a person may not read are not there for them (the server does not send them either: viewFor)
+    const readable = () => access.can('comment.read');
     // who writes: the person the workbook is open for (createWorkbook's user, or setUser)
     const author = () => { const u = opt.user; return u && typeof u === 'object' ? { id: u.id === undefined ? null : u.id, name: u.name || String(u.id || '') } : u ? { id: String(u), name: String(u) } : { id: null, name: 'Anonymous' }; };
     const putThreads = (s, list, how) => setSheetProps(s, { comments: list.length ? list : null }, how);
@@ -885,12 +887,12 @@ export function createWorkbook(doc, options) {
         return item.id;
     }
 
-    // only the one who wrote a comment changes or takes it away (and the owner of an access policy, when there is one)
+    // only the one who wrote a comment changes or takes it away (and, when there is an access policy, whom it lets moderate)
     function ownItem(thread, itemId) {
         const item = thread && thread.items.find((x) => x.id === itemId);
         if (!item) throw new Error('there is no such comment');
         const me = author();
-        if (!(hasPolicy && access.owner) && !(me.id !== null && item.by && item.by.id === me.id)) throw new Error('only the one who wrote a comment can change it');
+        if (!(hasPolicy && access.can('comment.moderate')) && !(me.id !== null && item.by && item.by.id === me.id)) throw new Error('only the one who wrote a comment can change it');
         return item;
     }
 
@@ -934,12 +936,12 @@ export function createWorkbook(doc, options) {
 
     /** The open thread of a cell, or null. */
     /** True when a cell has an open thread (quick: for drawing its mark). */
-    const hasComment = (s, r, c) => { s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); return !!rid && !!cid && openThreads(s).has(rid + ':' + cid); };
+    const hasComment = (s, r, c) => { if (!readable()) return false; s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); return !!rid && !!cid && openThreads(s).has(rid + ':' + cid); };
 
-    const commentAt = (s, r, c) => { s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); const x = rid && cid ? openThreads(s).get(rid + ':' + cid) : null; return x ? clone(x) : null; };
+    const commentAt = (s, r, c) => { if (!readable()) return null; s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); const x = rid && cid ? openThreads(s).get(rid + ':' + cid) : null; return x ? clone(x) : null; };
 
     /** Every thread of a sheet (open and resolved), with where its cell stands now ({ r, c }, or null when its row or column was deleted). */
-    const comments = (s) => { s = sheetIdOf(s); return threadsOf(s).map((x) => { const r = api.rowIndex(s, x.row), c = api.colIndex(s, x.col); return { ...clone(x), at: r >= 0 && c >= 0 ? { r, c } : null }; }); };
+    const comments = (s) => { if (!readable()) return []; s = sheetIdOf(s); return threadsOf(s).map((x) => { const r = api.rowIndex(s, x.row), c = api.colIndex(s, x.col); return { ...clone(x), at: r >= 0 && c >= 0 ? { r, c } : null }; }); };
 
     // ---- named ranges: a name for a range ("Budget" for BOQ!D2:D200) that formulas use (=SUM(Budget)) and the name box goes to ---------------------
 
@@ -1119,7 +1121,7 @@ export function createWorkbook(doc, options) {
             if (how && how.action) asked.add(how.action);
             for (const op of accepted) {
                 if (how && how.action && (op.t === 'cells' || op.t === 'styles')) continue;
-                for (const a of actionsOfOp(op)) asked.add(a);
+                for (const a of actionsOfOp(op, author().id)) asked.add(a);
             }
             // writing cells is decided per cell (an 'edit' range opens cells to a person who may not edit elsewhere): see cellMode
             asked.delete('edit');

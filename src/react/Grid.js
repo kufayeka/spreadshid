@@ -2,7 +2,6 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { colName } from '../core/formula/address.js';
 import { Icon } from './icons.js';
 import { Gutter, gutterSize } from './Outline.js';
-import { CommentCard } from './CommentCard.js';
 import { parseAddressText } from './FormulaBar.js';
 import { refusalOf } from '../core/policy.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
@@ -150,7 +149,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui, commenting, onCommenting }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui, onComment }) {
     // what the access policy lets this person see (policy.js): no headers, no grid lines, only an area of the sheet
     const seen = ui || {};
     const HW = seen.headers === false ? 0 : ROW_HEADER_WIDTH, HH = seen.headers === false ? 0 : HEADER_HEIGHT;
@@ -317,7 +316,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             : !ctrl && e.shiftKey && e.altKey ? { Digit5: () => toggle(wb, sheetId, sel, 'strike') }[e.code] : undefined;
         if (shortcut) { e.preventDefault(); shortcut(); return; }
         // Ctrl+Alt+M comments on the active cell, as in Google Sheets
-        if (ctrl && e.altKey && e.code === 'KeyM') { e.preventDefault(); if (onCommenting) onCommenting(true); return; }
+        if (ctrl && e.altKey && e.code === 'KeyM') { e.preventDefault(); if (onComment) onComment(); return; }
         if (e.altKey && e.shiftKey && !ctrl && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
             e.preventDefault();
             try { groupSelection(wb, sheetId, sel, e.key === 'ArrowRight'); } catch (err) { if (onError) onError(err.message); }
@@ -712,8 +711,6 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const focus = focusOf(sel);
     // the host (the find bar) asks for the active cell to be shown
     useEffect(() => { if (revealTick) { reveal.current = true; showCell(sel.active); } }, [revealTick]);
-    // a comment started on one cell ends when another cell is selected
-    useEffect(() => { if (commenting && onCommenting) onCommenting(false); }, [sel.active.r, sel.active.c]);
     useEffect(() => {
         if (!reveal.current) return;
         showCell(focus);
@@ -912,14 +909,6 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                         else commit(null);
                     }}
                     onCopy={(e) => onCopyOrCut(e, false)} onCut={(e) => onCopyOrCut(e, true)} onPaste={onPaste} />
-                {!editing && box.width > 0 && (commenting || wb.hasComment(sheetId, sel.active.r, sel.active.c)) ? (() => {
-                    // the card of comments sits on the right of the active cell (on its left when there is no room)
-                    const b = cellBox(sel.active.r, sel.active.c);
-                    const left = b.x + b.w + 8 + 280 <= box.width ? b.x + b.w + 8 : Math.max(0, b.x - 288);
-                    return <CommentCard key={sel.active.r + ':' + sel.active.c} workbook={wb} sheetId={sheetId} r={sel.active.r} c={sel.active.c} at={{ left, top: Math.max(0, b.y) }}
-                        start={!!commenting} onError={(m) => onError && onError(m)}
-                        onDone={() => { if (onCommenting) onCommenting(false); if (sink.current) sink.current.focus({ preventScroll: true }); }} />;
-                })() : null}
                 {(() => {
                     const rule = !editing && wb.validationAt(sheetId, sel.active.r, sel.active.c);
                     if (!rule || !rule.help) return null;

@@ -314,31 +314,8 @@
 .ks-outline-toggle { border: 1px solid #80868b; border-radius: 2px; background: var(--ks-bg); }
 .ks-outline-toggle:hover, .ks-outline-level:hover { background: #e8eaed; }
 .ks-outline-level { border: 0; border-radius: 2px; background: none; color: #5f6368; }
-/* access and roles: the panel, and the bar that says the sheet is seen as a role */
-.ks-viewas { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #fef7e0; color: #3c4043; border-bottom: 1px solid #f9d77e; font: var(--ks-ui-font); }
-.ks-viewas .ks-button { margin-left: auto; }
-.ks-access { width: 360px; }
-.ks-access-section { display: flex; flex-direction: column; gap: 8px; }
-.ks-access-section h3 { margin: 4px 0 0; font-size: 13px; font-weight: 500; }
-.ks-access-roles { display: flex; flex-wrap: wrap; gap: 6px; }
-.ks-chip { font: inherit; padding: 4px 10px; border: 1px solid #dadce0; border-radius: 16px; background: var(--ks-bg); color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; }
-.ks-chip.ks-on { background: #e8f0fe; border-color: var(--ks-accent); color: var(--ks-accent); }
-.ks-chip-add .ks-icon { width: 14px; height: 14px; }
-.ks-access-role { display: flex; flex-direction: column; gap: 8px; }
-.ks-access-row { display: flex; align-items: center; gap: 6px; }
-.ks-access-row input { flex: 1; min-width: 0; }
-.ks-access-group { border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px 10px 8px; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
-.ks-access-group legend { font-size: 12px; color: #5f6368; padding: 0 4px; }
-.ks-access-group .ks-field, .ks-access-group .ks-rule-list, .ks-access-group .ks-add-rule { grid-column: 1 / -1; }
-.ks-check { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
-.ks-check.ks-implied { color: #80868b; }
-.ks-access-range, .ks-access-member { gap: 6px; padding: 4px 6px; }
-.ks-access-range .ks-rule-text, .ks-access-member .ks-rule-says { flex: 1; min-width: 0; }
-/* comments: a mark in the corner of a cell with an open thread, and the card beside the active cell */
+/* comments: a mark in the corner of a cell with an open thread, and the panel of the sheet's comments */
 .ks-cell.ks-noted::after { content: ''; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent #f9ab00 transparent transparent; z-index: 1; }
-.ks-comment-card { position: absolute; z-index: 25; width: 280px; max-height: 360px; overflow: auto; padding: 10px 12px; background: var(--ks-bg); color: var(--ks-fg);
-    border-radius: 8px; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15); font: var(--ks-ui-font); display: flex; flex-direction: column; gap: 8px; }
-.ks-comment-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #5f6368; }
 .ks-comment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .ks-comment-by { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
 .ks-comment-by span { color: #80868b; font-size: 11px; }
@@ -348,5 +325,11 @@
 .ks-comment-tools .ks-icon { width: 14px; height: 14px; }
 .ks-comment-text { margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
 .ks-comment-new, .ks-comment-edit { display: flex; flex-direction: column; gap: 6px; }
-.ks-comment-card textarea { font: inherit; min-height: 52px; resize: vertical; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; outline: none; }
-.ks-comment-card textarea:focus { border-color: var(--ks-accent); }
+.ks-comments textarea { font: inherit; min-height: 52px; resize: vertical; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; outline: none; }
+.ks-comments textarea:focus { border-color: var(--ks-accent); }
+.ks-comments { width: 320px; }
+.ks-thread-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ks-thread { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 8px; }
+.ks-thread.ks-current { border-color: var(--ks-accent); box-shadow: 0 0 0 1px var(--ks-accent); }
+.ks-thread-head { display: flex; align-items: center; justify-content: space-between; }
+.ks-thread-cell { font: inherit; font-size: 12px; padding: 1px 8px; border: 1px solid #dadce0; border-radius: 10px; background: #f1f3f4; color: #3c4043; cursor: pointer; }

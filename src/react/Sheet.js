@@ -14,7 +14,7 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
 import { ConditionalPanel } from './ConditionalPanel.js';
 import { NamesPanel } from './NamesPanel.js';
-import { AccessPanel } from './AccessPanel.js';
+import { CommentsPanel } from './CommentsPanel.js';
 import { FilterMenu } from './FilterMenu.js';
 import { sortRange } from '../core/search.js';
 import { parseRangeText } from '../core/validation.js';
@@ -49,9 +49,8 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
  * @param {(sel: { ranges: object[], active: { r: number, c: number } }) => void} [props.onSelectionChange]
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
- * @param {{ policy: object|null, who: any }} [props.access]  The access policy of the workbook and the person who has it open (policy.js), as the host
- *   keeps it: the sheet applies it, and an owner changes it in Data > Access and roles.
- * @param {(policy: object) => void} [props.onAccessChange]  An owner changed the policy: the host keeps it (and gives it back in access).
+ * @param {{ policy: object|null, who: any }} [props.access]  The access policy of the workbook and the person who has it open (policy.js). It is the
+ *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
  * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments.
  * @param {boolean} [props.showProtected]  Draw the protected cells striped (the rules are the workbook's: setRules).
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
@@ -104,22 +103,12 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const [validating, setValidating] = useState(null);
     // the panel on the right of the grid (conditional formatting, named ranges), and the selection it opened on (where a new rule or name goes)
     const [panel, setPanel] = useState(null); // { kind: 'conditional' | 'names', range }
-    // the access policy (the host's, changed here by an owner), and the role an owner looks at the sheet as (View as): applied to the workbook
-    const [policy, setPolicy] = useState(() => (props.access ? props.access.policy : null));
-    const hostPolicy = props.access ? props.access.policy : null;
-    useEffect(() => { setPolicy(hostPolicy); }, [hostPolicy]);
-    const [viewAs, setViewAs] = useState(null);
-    // a comment being started on the active cell (Insert > Comment, Ctrl+Alt+M); a new cell selected ends it
-    const [commenting, setCommenting] = useState(false);
     // the person who writes (their name on their comments)
     useEffect(() => { if (props.user) wb.setUser(props.user); }, [wb, props.user && props.user.id, props.user && props.user.name]);
+    // the host's access policy for the person who has the sheet open, applied to the workbook whenever the host gives another
+    const policy = props.access ? props.access.policy : null;
     const who = props.access ? props.access.who : null;
-    useEffect(() => {
-        if (!props.access) return;
-        // viewing as a role: the policy with no owner and one made-up person who has that role only
-        if (viewAs && policy) wb.setAccess({ ...policy, owners: [], members: { 'user:\u0000preview': viewAs }, default: undefined }, 'user:\u0000preview');
-        else wb.setAccess(policy, who);
-    }, [wb, policy, viewAs, JSON.stringify(who), !!props.access]);
+    useEffect(() => { if (props.access) wb.setAccess(policy, who); }, [wb, policy, JSON.stringify(who), !!props.access]);
     // the menu of a column of the filter: { c, x, y } (the column, and where its button is)
     const [filterMenu, setFilterMenu] = useState(null);
     useEffect(() => { setFilterMenu(null); }, [sheetId]);
@@ -262,13 +251,12 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const ui = wb.access().ui;
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
-            {viewAs ? <div className="ks-viewas" role="status">Viewing as <b>{viewAs}</b><button type="button" className="ks-button" onClick={() => setViewAs(null)}>Exit</button></div> : null}
             {ui.menubar ? <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
-                onComment={() => setCommenting(true)}
-                onAccess={props.access && !viewAs && wb.can('access') ? () => setPanel({ kind: 'access' }) : null}
+                onComment={() => setPanel({ kind: 'comments', start: Date.now() })}
+                onComments={() => setPanel(panel && panel.kind === 'comments' ? null : { kind: 'comments', start: 0 })}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
                     const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);
@@ -297,7 +285,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} commenting={commenting} onCommenting={setCommenting} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} onComment={() => setPanel({ kind: 'comments', start: Date.now() })} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}
@@ -308,9 +296,8 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
                 {panel && panel.kind === 'conditional' ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
                     key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
-                {panel && panel.kind === 'access' && !viewAs ? <AccessPanel policy={policy} range={(/^[A-Za-z_][A-Za-z0-9_.]*$/.test(wb.sheetProps(sheetId).name) ? wb.sheetProps(sheetId).name : "'" + wb.sheetProps(sheetId).name.replace(/'/g, "''") + "'") + '!' + rectText(rectsOf(sel)[rectsOf(sel).length - 1])}
-                    onChange={(next) => { setPolicy(next); if (props.onAccessChange) props.onAccessChange(next); }}
-                    onViewAs={(role) => { setViewAs(role); setPanel(null); }} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'comments' && wb.can('comment.read') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision} start={panel.start}
+                    onGo={(r, c) => goToRange(sheetId, { r1: r, c1: c, r2: r, c2: c })} onError={setNotice} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'names' ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
                     onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>

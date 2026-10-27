@@ -40,7 +40,7 @@ export const ACTIONS = [
     'view.freeze', 'view.gridlines',
     'sort', 'filter', 'validation', 'names', 'settings',
     'copy', 'paste', 'download', 'import',
-    'comment',
+    'comment.read', 'comment.create', 'comment.reply', 'comment.resolve', 'comment.edit', 'comment.delete', 'comment.moderate',
     'access'
 ];
 
@@ -98,15 +98,43 @@ const STYLE_ACTION = { bold: 'format.bold', italic: 'format.italic', underline: 
 const ROW_ACTION = { height: 'rows.resize', hidden: 'rows.hide', level: 'rows.group', fold: 'rows.group' };
 const COL_ACTION = { width: 'cols.resize', hidden: 'cols.hide', level: 'cols.group', fold: 'cols.group', format: 'format.number' };
 const SHEET_ACTION = { name: 'sheets.rename', hidden: 'sheets.hide', freezeRows: 'view.freeze', freezeCols: 'view.freeze', hideGridlines: 'view.gridlines', filter: 'filter',
-    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize', comments: 'comment' };
+    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize' };
 const OP_ACTION = { insertRows: 'rows.insert', deleteRows: 'rows.delete', insertCols: 'cols.insert', deleteCols: 'cols.delete', moveRows: 'sort', moveCols: 'cols.insert',
     addSheet: 'sheets.add', removeSheet: 'sheets.delete', moveSheet: 'sheets.move' };
 
 // the keys whose value is not the same in two objects
 const changedKeys = (a, b) => { const out = new Set(); for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) if (JSON.stringify((a || {})[k]) !== JSON.stringify((b || {})[k])) out.add(k); return out; };
 
-/** The actions a change (an op) asks for. A cell written is 'edit' (whether it may be written there is the ranges' to say, not this). */
-export function actionsOfOp(op) {
+/**
+ * What a change to the comments of a sheet asks for: a new thread is comment.create, a new item in a thread comment.reply, a thread resolved or opened
+ * comment.resolve; a comment changed or taken away is comment.edit / comment.delete when it is the person's own (`me`, their id), comment.moderate when
+ * it is someone else's.
+ */
+export function commentActions(before, after, me) {
+    const out = new Set();
+    const was = new Map((before || []).map((t) => [t.id, t])), now = new Map((after || []).map((t) => [t.id, t]));
+    const own = (item) => me !== null && me !== undefined && item.by && item.by.id === me;
+    for (const [id, t] of now) {
+        const old = was.get(id);
+        if (!old) { out.add('comment.create'); continue; }
+        if (!!old.resolved !== !!t.resolved) out.add('comment.resolve');
+        const oldItems = new Map(old.items.map((i) => [i.id, i]));
+        for (const item of t.items) {
+            const o = oldItems.get(item.id);
+            if (!o) out.add('comment.reply');
+            else if (o.text !== item.text) out.add(own(o) ? 'comment.edit' : 'comment.moderate');
+        }
+        const kept = new Set(t.items.map((i) => i.id));
+        for (const o of old.items) if (!kept.has(o.id)) out.add(own(o) ? 'comment.delete' : 'comment.moderate');
+    }
+    // a thread taken away whole: its first comment was deleted (the person's own, or moderated)
+    for (const [id, t] of was) if (!now.has(id)) out.add(t.items.every(own) ? 'comment.delete' : 'comment.moderate');
+    return out;
+}
+
+/** The actions a change (an op) asks for. A cell written is 'edit' (whether it may be written there is the ranges' to say, not this). `me` is the id of
+ * the person (for their own comments). */
+export function actionsOfOp(op, me) {
     const out = new Set();
     switch (op.t) {
         case 'cells': out.add('edit'); break;
@@ -117,7 +145,12 @@ export function actionsOfOp(op) {
             break;
         case 'rowProps': for (const ch of op.changes) for (const k of changedKeys(ch.before, ch.after)) out.add(ROW_ACTION[k] || 'rows.resize'); break;
         case 'colProps': for (const ch of op.changes) for (const k of changedKeys(ch.before, ch.after)) out.add(COL_ACTION[k] || 'cols.resize'); break;
-        case 'sheetProps': for (const k of changedKeys(op.before, op.after)) out.add(SHEET_ACTION[k] || 'settings'); break;
+        case 'sheetProps':
+            for (const k of changedKeys(op.before, op.after)) {
+                if (k === 'comments') for (const a of commentActions((op.before || {}).comments, (op.after || {}).comments, me)) out.add(a);
+                else out.add(SHEET_ACTION[k] || 'settings');
+            }
+            break;
         case 'settings': for (const k of changedKeys(op.before, op.after)) out.add(k === 'names' ? 'names' : 'settings'); break;
         default: if (OP_ACTION[op.t]) out.add(OP_ACTION[op.t]);
     }
@@ -126,7 +159,8 @@ export function actionsOfOp(op) {
 
 // what a person is told, by the action that was refused
 const SAY = { edit: 'change cells', sort: 'sort', filter: 'change the filter', names: 'change named ranges', validation: 'change data validation', settings: 'change the settings',
-    copy: 'copy from this sheet', paste: 'paste here', comment: 'comment', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
+    copy: 'copy from this sheet', paste: 'paste here', 'comment.read': 'see the comments', 'comment.create': 'comment', 'comment.reply': 'reply to comments',
+    'comment.resolve': 'resolve comments', 'comment.edit': 'change comments', 'comment.delete': 'delete comments', 'comment.moderate': 'change the comments of others', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
 /** A sentence for an action a person may not do ("You cannot change cells here"). */
 export function refusalOf(action, message) {
     if (message) return message;

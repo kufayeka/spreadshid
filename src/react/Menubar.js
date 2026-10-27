@@ -21,8 +21,8 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {(kind: 'find'|'replace') => void} props.onFind
  * @param {() => void} props.onLink @param {() => void} props.onSettings @param {() => void} props.onConditional  Opens the panel of conditional formatting.
  * @param {() => void} props.onNames  Opens the panel of named ranges.
- * @param {() => void} props.onComment  Starts a comment on the active cell.
- * @param {(() => void)|null} [props.onAccess]  Opens the panel of access and roles (an owner of a workbook with a policy only).
+ * @param {() => void} props.onComment  Opens the comments to write one on the active cell.
+ * @param {() => void} props.onComments  Shows or hides the panel of comments.
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
  * @param {(message: string) => void} props.onError  Also how what an import left out is told.
@@ -35,8 +35,8 @@ function actionOfMenu(value) {
     const BY = {
         file: { import: 'import', download: 'download', settings: 'settings' },
         edit: { cut: 'copy', copy: 'copy', paste: 'paste', pasteValues: 'paste', pasteStyles: 'paste', clear: 'edit', deleteRows: 'rows.delete', deleteCols: 'cols.delete' },
-        view: { freezeRows: 'view.freeze', freezeCols: 'view.freeze', gridlines: 'view.gridlines', foldRows: 'rows.group', foldCols: 'cols.group' },
-        insert: { comment: 'comment', rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
+        view: { comments: 'comment.read', freezeRows: 'view.freeze', freezeCols: 'view.freeze', gridlines: 'view.gridlines', foldRows: 'rows.group', foldCols: 'cols.group' },
+        insert: { comment: 'comment.create', rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
         data: { sortSheet: 'sort', sortRange: 'sort', filter: 'filter', validation: 'validation', names: 'names' }
     };
     if (area === 'view' && (what === 'group' || what === 'ungroup')) return extra === 'cols' ? 'cols.group' : 'rows.group';
@@ -97,6 +97,7 @@ export function Menubar(props) {
                 { value: 'view:foldRows:0', label: 'Collapse all row groups' }, { value: 'view:foldRows:99', label: 'Expand all row groups' },
                 { value: 'view:foldCols:0', label: 'Collapse all column groups' }, { value: 'view:foldCols:99', label: 'Expand all column groups' }
             ] },
+            { value: 'view:comments', label: 'Comments', hint: 'Ctrl+Alt+M' },
             { label: 'Show', children: [{ value: 'view:gridlines', label: 'Gridlines', checked: !sheet.hideGridlines }] },
             { label: 'Zoom', children: ZOOMS.map((z) => ({ value: 'view:zoom:' + z, label: Math.round(z * 100) + '%', checked: props.zoom === z })) }
         ],
@@ -142,7 +143,6 @@ export function Menubar(props) {
             { value: 'data:filter', label: sheet.filter ? 'Remove filter' : 'Create a filter' },
             { value: 'data:validation', label: 'Data validation' },
             { value: 'data:names', label: 'Named ranges' },
-            ...(props.onAccess ? [{ separator: true }, { value: 'data:access', label: 'Access and roles…' }] : []),
             { separator: true },
             { label: 'Sort range', disabled: nr < 2, children: [{ value: 'data:sortRange:asc', label: 'Sort range by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortRange:desc', label: 'Sort range by column ' + colName(sel.active.c) + ' (Z to A)' }] }
         ]
@@ -219,6 +219,7 @@ export function Menubar(props) {
                 else if (what === 'freezeCols') run(() => wb.setSheetProps(s, { freezeCols: Number(extra) || null }, how));
                 else if (what === 'gridlines') run(() => wb.setSheetProps(s, { hideGridlines: sheet.hideGridlines ? null : true }, how));
                 else if (what === 'zoom') props.onZoom(Number(extra));
+                else if (what === 'comments') props.onComments();
                 else if (what === 'group') run(() => (extra === 'rows' ? wb.groupRows(s, b.r1, b.r2, how) : wb.groupCols(s, b.c1, b.c2, how)));
                 else if (what === 'ungroup') run(() => (extra === 'rows' ? wb.ungroupRows(s, b.r1, b.r2, how) : wb.ungroupCols(s, b.c1, b.c2, how)));
                 else if (what === 'foldRows') run(() => wb.showRowLevel(s, Number(extra), how));
@@ -248,7 +249,6 @@ export function Menubar(props) {
             case 'data': {
                 if (what === 'validation') { props.onValidation(null); break; }
                 if (what === 'names') { props.onNames(); break; }
-                if (what === 'access') { if (props.onAccess) props.onAccess(); break; }
                 // a filter on the selection, or on the block of filled cells around the active cell when one cell is selected (as in Google Sheets)
                 if (what === 'filter') {
                     if (sheet.filter) run(() => wb.removeFilter(s, how));

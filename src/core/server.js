@@ -64,7 +64,7 @@ export function checkPatch(doc, patch, what) {
     patch = keepHeld(doc, patch, what);
     const before = workbookFor(doc, what);
     const after = workbookFor(mergePatch(doc, patch), what);
-    if (what && what.policy !== undefined && !before.access().owner) problems.push(...refusedActions(doc, patch, before));
+    if (what && what.policy !== undefined && !before.access().owner) problems.push(...refusedActions(doc, patch, before, what.who));
     for (const [name, spec] of Object.entries((what && what.types) || {})) {
         const s = after.sheetIds().includes(name) ? name : after.sheetIdByName(name);
         if (s) after.setTypes(s, spec);
@@ -187,6 +187,8 @@ export function viewFor(doc, what) {
     const wb = workbookFor(doc, what);
     const held = heldCells(wb);
     const out = clone(doc);
+    // comments a person may not read are not sent
+    if (!wb.can('comment.read')) for (const sheet of out.sheets || []) if (sheet.props) delete sheet.props.comments;
     for (const sheet of out.sheets || []) for (const row of sheet.rows || []) {
         const cells = held.get(row.id);
         if (!cells) continue;
@@ -202,11 +204,21 @@ export function viewFor(doc, what) {
 // the cells a person was not given, put back from what is stored into the rows a patch writes (the person's browser had them empty, or as answers)
 function keepHeld(doc, patch, what) {
     if (!what || what.policy === undefined) return patch;
-    const held = heldCells(workbookFor(doc, what));
-    if (!held.size) return patch;
+    const wb = workbookFor(doc, what);
+    const out = clone(patch);
+    // the comments of a person who may not read them were not sent: the sheets they save keep the stored ones
+    if (!wb.can('comment.read')) {
+        const storedSheets = new Map((doc.sheets || []).map((s) => [s.id, s]));
+        for (const s of out.sheets.upsert) {
+            const was = storedSheets.get(s.id);
+            s.props = { ...(s.props || {}) };
+            if (was && was.props && was.props.comments) s.props.comments = clone(was.props.comments); else delete s.props.comments;
+        }
+    }
+    const held = heldCells(wb);
+    if (!held.size) return out;
     const stored = new Map();
     for (const sheet of doc.sheets || []) for (const row of sheet.rows || []) stored.set(row.id, row);
-    const out = clone(patch);
     for (const row of out.rows.upsert) {
         const cells = held.get(row.id), was = stored.get(row.id);
         if (!cells || !was) continue;
@@ -244,9 +256,10 @@ function sortedRows(doc, patch) {
 
 // What a patch asks to do that the policy does not let the person do: the changes it makes, as the ops that would make them (policy.js), each asked of
 // the policy. Writing cells is the rules' to judge (per cell); a sort is let through as a sort.
-function refusedActions(doc, patch, wb) {
+function refusedActions(doc, patch, wb, who) {
     const out = [];
-    const ask = (op, sheet) => { for (const a of actionsOfOp(op)) if (a !== 'edit' && !wb.can(a)) out.push({ sheet, address: null, reason: refusalOf(a, wb.access().message) }); };
+    const me = who && typeof who === 'object' ? who.user : typeof who === 'string' ? who.replace(/^user:/, '') : null;
+    const ask = (op, sheet) => { for (const a of actionsOfOp(op, me)) if (a !== 'edit' && !wb.can(a)) out.push({ sheet, address: null, reason: refusalOf(a, wb.access().message) }); };
     const storedSheets = new Map((doc.sheets || []).map((s) => [s.id, s]));
     const storedRows = new Map(), storedCols = new Map();
     for (const sheet of doc.sheets || []) { for (const row of sheet.rows || []) storedRows.set(row.id, row); for (const col of sheet.columns || []) storedCols.set(col.id, col); }

@@ -2,7 +2,7 @@
 // opened again by a reply, following its cell when a row is inserted above, undone, saved; a person who may comment but not edit comments.
 //   node test/comments.test.js
 import assert from 'node:assert';
-import { createWorkbook } from '../src/core/index.js';
+import { createWorkbook, viewFor, mergePatch, checkPatch } from '../src/core/index.js';
 
 let passed = 0;
 const ok = (label) => { passed++; console.log('ok   ' + label); };
@@ -60,6 +60,54 @@ const user = { source: 'user' };
     wb.addComment(s, 2, 2, 'Boleh?', user);
     assert.deepStrictEqual([wb.commentAt(s, 2, 2), said[1]], [null, 'You cannot comment here'], 'a viewer without "comment" cannot');
     ok('access control: a role may comment without editing; one without "comment" may not');
+}
+
+{
+    // comments by CRUD: who may see, start, reply, resolve, change their own, change anyone's
+    const policy = {
+        members: { 'user:a': 'author', 'user:r': 'replier', 'user:m': 'moderator', 'user:x': 'blind' },
+        roles: {
+            author: { can: ['comment.read', 'comment.create', 'comment.edit', 'comment.delete'] },
+            replier: { can: ['comment.read', 'comment.reply'] },
+            moderator: { can: ['comment'] },
+            blind: { can: ['edit'] }
+        }
+    };
+    const wb = createWorkbook();
+    const [s] = wb.sheetIds();
+    const said = [];
+    wb.on('reject', (e) => said.push(e.reason));
+    const as = (id) => { wb.setUser({ id, name: id.toUpperCase() }); wb.setAccess(policy, 'user:' + id); };
+
+    as('a');
+    const { thread, item } = wb.addComment(s, 0, 0, 'Mulai', user);
+    as('r');
+    wb.addComment(s, 1, 1, 'Baru', user);
+    assert.deepStrictEqual([wb.commentAt(s, 1, 1), said.pop()], [null, 'You cannot comment here'], 'a replier cannot start a thread');
+    const reply = wb.replyComment(s, thread, 'Balas', user);
+    assert.strictEqual(wb.commentAt(s, 0, 0).items.length, 2, 'but replies');
+    wb.resolveComment(s, thread, true, user);
+    assert.deepStrictEqual([!!wb.commentAt(s, 0, 0), said.pop()], [true, 'You cannot resolve comments here'], 'and may not resolve');
+    as('a');
+    assert.throws(() => wb.editComment(s, thread, reply, 'ubah', user), /only the one who wrote/, 'an author changes only their own');
+    wb.editComment(s, thread, item, 'Mulai (ubah)', user);
+    as('m');
+    wb.editComment(s, thread, reply, 'Dirapikan moderator', user);
+    assert.strictEqual(wb.commentAt(s, 0, 0).items[1].text, 'Dirapikan moderator', 'a moderator changes anyone\'s');
+    as('x');
+    assert.deepStrictEqual([wb.commentAt(s, 0, 0), wb.hasComment(s, 0, 0), wb.comments(s)], [null, false, []], 'a role without comment.read sees none');
+    const sent = viewFor(wb.toJSON(), { policy, who: 'user:x' });
+    assert.strictEqual(sent.sheets[0].props.comments, undefined, 'and the server does not send them');
+    assert.strictEqual(viewFor(wb.toJSON(), { policy, who: 'user:r' }).sheets[0].props.comments.length, 1, 'one who may read gets them');
+    // the blind one opens what they were sent, freezes a row (a change to the sheet's props) and saves: the comments they never had stay
+    const stored = wb.toJSON();
+    const theirs = createWorkbook(sent);
+    theirs.saved(theirs.pendingPatch());
+    theirs.setSheetProps(theirs.sheetIds()[0], { name: 'Renamed' });
+    const kept = mergePatch(stored, theirs.pendingPatch(), { policy, who: 'user:x' });
+    assert.strictEqual(kept.sheets[0].props.comments.length, 1, 'their save does not take away the comments they were not sent');
+    assert.ok(!checkPatch(stored, theirs.pendingPatch(), { policy, who: 'user:x' }).problems.some((p) => /comment/.test(p.reason)), 'nor is it read as deleting them');
+    ok('comments by CRUD: start, reply, resolve, own edit, moderate, read; the server leaves out what may not be read');
 }
 
 console.log('\n' + passed + ' passed');
