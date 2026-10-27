@@ -27,7 +27,9 @@
     "build": "node build.js",
     "prepare": "node build.js",
     "test": "node test/run-all.js",
-    "example": "node example/serve.js"
+    "example": "node example/serve.js",
+    "docs": "node docs/build.mjs",
+    "docs:shots": "node docs/shots.mjs"
   },
   "peerDependencies": {
     "react": ">=18",
