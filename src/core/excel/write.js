@@ -109,6 +109,14 @@ export function buildXlsxFiles(book) {
             + (rule.operator ? ' operator="' + rule.operator + '"' : '') + (rule.text !== undefined ? ' text="' + xmlEsc(rule.text) + '"' : '') + '>'
             + (rule.formulas || []).map((f) => '<formula>' + xmlEsc(f) + '</formula>').join('') + '</cfRule></conditionalFormatting>';
     }).join('');
+    // the filter of a sheet: the values that show, or Excel's custom filters
+    const autoFilterXml = (af) => {
+        if (!af) return '';
+        const cols = af.columns.map((c) => '<filterColumn colId="' + c.colId + '">' + (c.custom
+            ? '<customFilters' + (c.custom.and ? ' and="1"' : '') + '>' + c.custom.list.map((x) => '<customFilter operator="' + x.operator + '" val="' + xmlEsc(String(x.val)) + '"/>').join('') + '</customFilters>'
+            : '<filters' + (c.blank ? ' blank="1"' : '') + '>' + c.values.map((v) => '<filter val="' + xmlEsc(v) + '"/>').join('') + '</filters>') + '</filterColumn>').join('');
+        return '<autoFilter ref="' + af.ref + '">' + cols + '</autoFilter>';
+    };
     const dxfXml = (s) => {
         const font = (s.bold ? '<b/>' : '') + (s.italic ? '<i/>' : '') + (s.strike ? '<strike/>' : '') + (s.underline ? '<u/>' : '') + (s.color ? '<color rgb="' + cssToArgb(s.color) + '"/>' : '');
         return '<dxf>' + (font ? '<font>' + font + '</font>' : '') + (s.fill ? '<fill><patternFill patternType="solid"><bgColor rgb="' + cssToArgb(s.fill) + '"/></patternFill></fill>' : '') + '</dxf>';
@@ -164,7 +172,7 @@ export function buildXlsxFiles(book) {
         const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + dim
             + '<sheetViews><sheetView' + (model.active ? ' tabSelected="1"' : "") + ' workbookViewId="0">' + pane + "</sheetView></sheetViews>"
             + '<sheetFormatPr defaultRowHeight="' + pxToPoints(model.defaultRow || 28) + '"' + (model.defaultRow ? ' customHeight="1"' : "") + "/>" + colsXml
-            + "<sheetData>" + rowsXml + "</sheetData>" + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + cfXml(model) + "</worksheet>";
+            + "<sheetData>" + rowsXml + "</sheetData>" + autoFilterXml(model.autoFilter) + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + cfXml(model) + "</worksheet>";
         return { sheetName, hidden: !!model.hidden, sheet };
     };
     const rendered = models.map(renderSheet);
@@ -185,7 +193,7 @@ export function buildXlsxFiles(book) {
 
     const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     // the named ranges of the workbook ({ name, ref: "'BOQ'!$D$2:$D$200" }), as Excel keeps them
-    const namesXml = book.names && book.names.length ? '<definedNames>' + book.names.map((n) => '<definedName name="' + xmlEsc(n.name) + '">' + xmlEsc(n.ref) + '</definedName>').join('') + '</definedNames>' : '';
+    const namesXml = book.names && book.names.length ? '<definedNames>' + book.names.map((n) => '<definedName name="' + xmlEsc(n.name) + '"' + (n.localSheetId !== undefined ? ' localSheetId="' + n.localSheetId + '"' : '') + (n.hidden ? ' hidden="1"' : '') + '>' + xmlEsc(n.ref) + '</definedName>').join('') + '</definedNames>' : '';
     const sheetParts = rendered.map((x, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("");
     const sheetRels = rendered.map((x, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join("");
     const activeTab = Math.max(0, Math.min(rendered.length - 1, Number(book.active) || 0));

@@ -14,6 +14,8 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
 import { ConditionalPanel } from './ConditionalPanel.js';
 import { NamesPanel } from './NamesPanel.js';
+import { FilterMenu } from './FilterMenu.js';
+import { sortRange } from '../core/search.js';
 import { parseRangeText } from '../core/validation.js';
 import { copyBlock, pasteClip } from '../core/transfer.js';
 import { useAutoHeights } from './autoHeights.js';
@@ -97,6 +99,9 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const [validating, setValidating] = useState(null);
     // the panel on the right of the grid (conditional formatting, named ranges), and the selection it opened on (where a new rule or name goes)
     const [panel, setPanel] = useState(null); // { kind: 'conditional' | 'names', range }
+    // the menu of a column of the filter: { c, x, y } (the column, and where its button is)
+    const [filterMenu, setFilterMenu] = useState(null);
+    useEffect(() => { setFilterMenu(null); }, [sheetId]);
 
     // the formula bar's edit ends as the cell's does: the text is written, and Enter, Tab move on
     function commitFromBar(move) {
@@ -266,7 +271,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 }} />
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}
@@ -281,6 +286,15 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                     onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>
             <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} />
+            {filterMenu && wb.filterOf(sheetId) ? (
+                <FilterMenu workbook={wb} sheetId={sheetId} c={filterMenu.c} at={filterMenu} container={root} onError={setNotice}
+                    onClose={() => { setFilterMenu(null); toGrid(); }}
+                    onSort={(dir) => {
+                        // the rows under the filter's header, sorted by the column (one change)
+                        const f = wb.filterOf(sheetId).range;
+                        if (f.r2 > f.r1) sortRange(wb, sheetId, { r1: f.r1 + 1, c1: f.c1, r2: f.r2, c2: f.c2 }, filterMenu.c, dir);
+                    }} />
+            ) : null}
             {validating ? (
                 <ValidationDialog container={root} range={validating.range} rule={validating.rule}
                     onClose={() => { setValidating(null); toGrid(); }}

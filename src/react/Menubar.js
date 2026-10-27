@@ -109,6 +109,7 @@ export function Menubar(props) {
         ],
         Data: [
             { label: 'Sort sheet', children: [{ value: 'data:sortSheet:asc', label: 'Sort sheet by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortSheet:desc', label: 'Sort sheet by column ' + colName(sel.active.c) + ' (Z to A)' }] },
+            { value: 'data:filter', label: sheet.filter ? 'Remove filter' : 'Create a filter' },
             { value: 'data:validation', label: 'Data validation' },
             { value: 'data:names', label: 'Named ranges' },
             { separator: true },
@@ -200,6 +201,12 @@ export function Menubar(props) {
             case 'data': {
                 if (what === 'validation') { props.onValidation(null); break; }
                 if (what === 'names') { props.onNames(); break; }
+                // a filter on the selection, or on the block of filled cells around the active cell when one cell is selected (as in Google Sheets)
+                if (what === 'filter') {
+                    if (sheet.filter) run(() => wb.removeFilter(s, how));
+                    else run(() => wb.createFilter(s, rects.length === 1 && nr === 1 && nc === 1 ? wb.dataRegion(s, b.r1, b.c1) : b, how));
+                    break;
+                }
                 const dir = extra;
                 if (what === 'sortRange') run(() => sortRange(wb, s, b, sel.active.c, dir));
                 else {

@@ -4,20 +4,9 @@ import { ColorPicker } from './ColorPicker.js';
 import { rectText } from './FormulaBar.js';
 import { parseRangeText } from '../core/validation.js';
 import { conditionalRects, conditionalFormulaText } from '../core/conditional.js';
-import { parseInput } from '../core/input.js';
+import { OPS, DAYS, DATE_OPS, conditionOf } from './conditions.js';
 import { formatValue } from '../core/format.js';
 
-// the conditions, in the words and order of Google Sheets
-const OPS = [
-    ['empty', 'Is empty'], ['notEmpty', 'Is not empty'],
-    ['textContains', 'Text contains'], ['textNotContains', 'Text does not contain'], ['textStarts', 'Text starts with'], ['textEnds', 'Text ends with'], ['textIs', 'Text is exactly'],
-    ['dateIs', 'Date is'], ['dateBefore', 'Date is before'], ['dateAfter', 'Date is after'],
-    ['gt', 'Greater than'], ['gte', 'Greater than or equal to'], ['lt', 'Less than'], ['lte', 'Less than or equal to'], ['eq', 'Is equal to'], ['ne', 'Is not equal to'],
-    ['between', 'Is between'], ['notBetween', 'Is not between'], ['formula', 'Custom formula is']
-];
-const DAYS = [['today', 'today'], ['yesterday', 'yesterday'], ['tomorrow', 'tomorrow'], ['pastWeek', 'in the past week'], ['pastMonth', 'in the past month'], ['pastYear', 'in the past year'], ['exact', 'exact date']];
-const NUMBER_OPS = new Set(['gt', 'gte', 'lt', 'lte', 'between', 'notBetween']);
-const DATE_OPS = new Set(['dateIs', 'dateBefore', 'dateAfter']);
 // the styles a new rule starts with and the colour scales to start from, as in Google Sheets
 const DEFAULT_STYLE = { fill: '#b7e1cd' };
 const SCALES = [
@@ -86,21 +75,8 @@ export function ConditionalPanel({ workbook: wb, sheetId: s, range, revision, on
             for (const p of [d.min, d.mid, d.max]) if (p && !(p.type === 'min' || p.type === 'max') && !Number.isFinite(Number(String(p.value).replace(',', '.')))) return 'Write a number for each point that is not Min or Max';
             return { kind: 'scale', min: point(d.min), mid: point(d.mid), max: point(d.max) };
         }
-        const spec = { kind: 'single', op: d.op, style: d.style };
-        const number = (text) => { const v = parseInput(String(text).trim(), wb.settings()).value; return typeof v === 'number' ? v : NaN; };
-        if (d.op === 'formula') { if (!d.formula.trim()) return 'Write a custom formula, for example =$C2="Late"'; spec.formula = d.formula.trim(); }
-        else if (DATE_OPS.has(d.op)) {
-            if (d.day === 'exact') { spec.a = number(d.a); if (!Number.isFinite(spec.a)) return 'Write a date, as the sheet shows dates'; } else spec.a = d.day;
-        } else if (NUMBER_OPS.has(d.op)) {
-            spec.a = number(d.a);
-            if (!Number.isFinite(spec.a)) return 'Write a number';
-            if (d.op === 'between' || d.op === 'notBetween') { spec.b = number(d.b); if (!Number.isFinite(spec.b)) return 'Write the second number'; }
-        } else if (d.op !== 'empty' && d.op !== 'notEmpty') {
-            // "Is equal to" takes a number or a text
-            const n = d.op === 'eq' || d.op === 'ne' ? number(d.a) : NaN;
-            spec.a = Number.isFinite(n) ? n : d.a;
-        }
-        return spec;
+        const condition = conditionOf(wb, d);
+        return typeof condition === 'string' ? condition : { kind: 'single', ...condition, style: d.style };
     }
 
     function done() {

@@ -18,6 +18,7 @@ import { buildXlsxFiles, cssToArgb } from './write.js';
 import { zipStore } from './zip.js';
 import { readXlsx } from './read.js';
 import { toExcelRule } from './conditional.js';
+import { toExcelFilter, applyExcelFilter } from './filter.js';
 import { conditionalRects, conditionalFormulaText } from '../conditional.js';
 import { formulaProblem } from '../formula/formula.js';
 import { colName } from '../formula/address.js';
@@ -108,12 +109,13 @@ export function exportXlsx(wb) {
                 if (cell) cells.push(cell);
             }
         });
-        for (let r = 0; r < size.rows; r++) { const p = wb.rowProps(s, r); if (p && p.height) rows[r] = p.height; if (p && p.hidden) hiddenRows.push(r); }
+        for (let r = 0; r < size.rows; r++) { const p = wb.rowProps(s, r); if (p && p.height) rows[r] = p.height; if ((p && p.hidden) || wb.filteredOut(s, r)) hiddenRows.push(r); }
         for (let c = 0; c < size.cols; c++) { const p = wb.colProps(s, c); if (p && p.width) cols[c] = p.width; if (p && p.hidden) hiddenCols.push(c); }
         return {
             name: props.name, hidden: !!props.hidden, cells, rows, cols, hiddenRows, hiddenCols,
             defaultCol: props.colWidth || 100, defaultRow: props.rowHeight || 21,
             merges: wb.merges(s), freeze: { rows: props.freezeRows || 0, cols: props.freezeCols || 0 },
+            autoFilter: toExcelFilter(wb, s),
             conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean)
         };
     });
@@ -123,6 +125,13 @@ export function exportXlsx(wb) {
         name: n.name,
         ref: "'" + fileName(n.sheetId).replace(/'/g, "''") + "'!$" + colName(n.range.c1) + '$' + (n.range.r1 + 1) + (n.range.r2 > n.range.r1 || n.range.c2 > n.range.c1 ? ':$' + colName(n.range.c2) + '$' + (n.range.r2 + 1) : '')
     }));
+    ids.forEach((s, i) => {
+        const af = sheets[i].autoFilter;
+        if (!af) return;
+        const [x, y] = af.ref.split(':');
+        const abs = (ref) => ref.replace(/^([A-Z]+)(\d+)$/, (m, col, row) => '$' + col + '$' + row);
+        names.push({ name: '_xlnm._FilterDatabase', localSheetId: i, hidden: true, ref: "'" + fileName(s).replace(/'/g, "''") + "'!" + abs(x) + ':' + abs(y) });
+    });
     return zipStore(buildXlsxFiles({ sheets, active: 0, names }));
 }
 
@@ -137,6 +146,11 @@ function addRules(wb, docs, read) {
             try { wb.addConditional(docs[i].id, rects, spec, { source: 'remote' }); } catch (err) { read.warnings.push('"' + sh.name + '": a rule of conditional formatting was not imported (' + err.message + ')'); }
         }
     });
+}
+
+// the filters of a file put on the sheets once their values and formulas are in
+function addFilters(wb, docs, read) {
+    read.sheets.forEach((sh, i) => { if (sh.autoFilter) applyExcelFilter(wb, docs[i].id, sh.autoFilter, read.warnings, sh.name); });
 }
 
 // the named ranges of a file put in a workbook made from its sheets, before their formulas (which then keep them by id)
@@ -163,10 +177,12 @@ function sheetDocs(read) {
             if (hiddenCols.has(c)) props.hidden = true;
             return { id, key: colKeys[c], props };
         });
+        // Excel keeps the rows its filter hid as hidden rows: under a filter's header they are the filter's to hide, not hidden by hand
+        const af = sh.autoFilter && sh.autoFilter.rect;
         const rows = rowIds.map((id, r) => {
             const props = {};
             if (sh.heights[r] !== undefined) props.height = sh.heights[r];
-            if (hiddenRows.has(r)) props.hidden = true;
+            if (hiddenRows.has(r) && !(af && r > af.r1 && r <= af.r2)) props.hidden = true;
             return { id, key: rowKeys[r], cells: {}, style: {}, props };
         });
         const sheetFormulas = [];
@@ -202,6 +218,7 @@ export async function importXlsx(bytes, options) {
     addNames(wb, docs, read);
     docs.forEach((d, i) => { if (formulas[i].length) wb.setBlock(d.id, formulas[i], { source: 'remote' }); });
     addRules(wb, docs, read);
+    addFilters(wb, docs, read);
     return { workbook: wb, warnings: read.warnings, active: docs[read.active] ? docs[read.active].id : docs[0].id };
 }
 
@@ -219,6 +236,7 @@ export async function importXlsxInto(wb, bytes, how) {
     addNames(temp, docs, read);
     docs.forEach((d, i) => { if (formulas[i].length) temp.setBlock(d.id, formulas[i], { source: 'remote' }); });
     addRules(temp, docs, read);
+    addFilters(temp, docs, read);
     // a name the workbook has already stays the workbook's (the file's formulas that use it then read the workbook's range), and it is said
     const fileNames = (temp.settings().names || []).filter((n) => {
         if (!wb.nameRange(n.name)) return true;

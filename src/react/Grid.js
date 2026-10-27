@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { colName } from '../core/formula/address.js';
+import { Icon } from './icons.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
 import { createAxis } from '../core/axis.js';
@@ -142,7 +143,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu }) {
     const scroller = useRef(null);
     const view = useRef(null);
     // the keyboard sink is the host's when it gives one (the formula bar gives the keyboard back to it)
@@ -476,6 +477,16 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     function onMouseDown(e) {
         if (e.button !== 0) return;
         const edge = e.target && e.target.dataset;
+        // a button of the filter's header: its menu opens under it (the selection stays)
+        const filterButton = e.target && e.target.closest && e.target.closest('[data-filter-col]');
+        if (filterButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (editing) commit(null);
+            const box = filterButton.getBoundingClientRect();
+            if (onFilterMenu) onFilterMenu({ c: Number(filterButton.dataset.filterCol), x: box.left, y: box.bottom });
+            return;
+        }
         // a checkbox or a dropdown's arrow: the cell is selected and the control does its part
         if (edge && (edge.check !== undefined || edge.drop !== undefined)) {
             const cell = e.target.closest('.ks-cell');
@@ -654,6 +665,16 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
 
     function onDoubleClick(e) {
         const edge = e.target && e.target.dataset;
+        // a button of the filter's header: its menu opens under it (the selection stays)
+        const filterButton = e.target && e.target.closest && e.target.closest('[data-filter-col]');
+        if (filterButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (editing) commit(null);
+            const box = filterButton.getBoundingClientRect();
+            if (onFilterMenu) onFilterMenu({ c: Number(filterButton.dataset.filterCol), x: box.left, y: box.bottom });
+            return;
+        }
         if (edge && edge.resizeCol !== undefined) { fit('col', Number(edge.resizeCol)); return; }
         if (edge && edge.resizeRow !== undefined) { fit('row', Number(edge.resizeRow)); return; }
         const { x, y } = pointIn(e);
@@ -702,6 +723,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (scrollMemory) scrollMemory.set(sheetId, at);
     };
     const rects = rectsOf(sel);
+    // the filter of the sheet: a frame around its range, and a button in each cell of its header
+    const filter = wb.filterOf(sheetId);
 
     // The cells of a pane, against the sheet: a scrolling direction counts from the end of the frozen part, and the pane's layer moves by the scroll.
     const paneCells = (rows, cols, rowsScroll, colsScroll) => {
@@ -726,6 +749,25 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             out.push(<Cell key={'m' + b.r1 + ':' + b.c1} r={b.r1} c={b.c1} merged x={colAxis.start(b.c1) - xBase} y={rowAxis.start(b.r1) - yBase}
                 w={colAxis.start(b.c2 + 1) - colAxis.start(b.c1)} h={rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1)}
                 display={wb.display(sheetId, b.r1, b.c1)} style={wb.shownStyle(sheetId, b.r1, b.c1)} />);
+        }
+        if (filter) {
+            const f = filter.range;
+            if (!(f.r1 > rows.to || f.r2 < rows.from || f.c1 > cols.to || f.c2 < cols.from)) {
+                out.push(<div key="filter" className="ks-filter-frame" style={{ left: colAxis.start(f.c1) - xBase, top: rowAxis.start(f.r1) - yBase,
+                    width: colAxis.start(f.c2 + 1) - colAxis.start(f.c1), height: rowAxis.start(f.r2 + 1) - rowAxis.start(f.r1) }} />);
+            }
+            const h = rowAxis.size(f.r1);
+            if (h && f.r1 >= rows.from && f.r1 <= rows.to) {
+                for (let c = Math.max(f.c1, cols.from); c <= Math.min(f.c2, cols.to); c++) {
+                    if (!colAxis.size(c)) continue;
+                    const on = !!filter.columns[c];
+                    out.push(<button key={'fb' + c} type="button" className={'ks-filter-button' + (on ? ' ks-on' : '')} data-filter-col={c} tabIndex={-1}
+                        aria-label={'Filter column ' + colName(c) + (on ? ' (filtered)' : '')} title={on ? 'Filtered' : 'Filter'}
+                        style={{ left: colAxis.start(c + 1) - xBase - 22, top: rowAxis.start(f.r1) - yBase + Math.max(0, (h - 20) / 2) }}>
+                        <Icon name={on ? 'funnel' : 'filterList'} />
+                    </button>);
+                }
+            }
         }
         // the selection over them: each rectangle tinted, and the active cell framed
         rects.forEach((b, i) => {

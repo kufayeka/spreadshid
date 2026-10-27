@@ -17,6 +17,7 @@ import { displayOf } from './display.js';
 import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { makeConditional, conditionalStyleOf } from './conditional.js';
+import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
 
@@ -378,6 +379,8 @@ export function createWorkbook(doc, options) {
         },
         sheetProps(op) {
             const sheet = sheetOf(op.sheet);
+            // a filter changed: its rows are filtered again when the rows are next laid out
+            if (JSON.stringify(sheet.props.filter || null) !== JSON.stringify((op.after && op.after.filter) || null)) sheet.rowAxis = null;
             sheet.props = clone(op.after || {});
             dirty.sheets.set(sheet.id, changeNo);
             // a renamed sheet changes no value: the formulas into it keep it by id, and only read with its new name
@@ -462,11 +465,12 @@ export function createWorkbook(doc, options) {
         if (!sheet.rowAxis) {
             const fallback = sheet.props.rowHeight || DEFAULT_ROW_HEIGHT;
             const auto = sheet.autoHeights;
+            const filtered = filteredOf(sheet);
             // a height set by hand wins; else the height the screen measured for the row's text (wrapped, several lines, a big font); else the default
             sheet.rowAxis = createAxis(sheet.rowOrder.length, (i) => {
                 const rid = sheet.rowOrder[i];
                 const p = sheet.rows.get(rid).props;
-                if (p.hidden) return 0;
+                if (p.hidden || filtered.has(rid)) return 0;
                 if (p.height) return p.height;
                 const measured = auto && auto.get(rid);
                 return measured && measured > fallback ? measured : fallback;
@@ -671,6 +675,69 @@ export function createWorkbook(doc, options) {
         setSheetProps(s, { validations: kept.concat([rule]) }, how);
         return rule.id;
     }
+
+    // ---- the filter of a sheet (filter.js): a range with a header, criteria per column, the rows that fail hidden -----------------------------------------
+
+    // The rows a sheet's filter hides, worked out when the filter changed (or the workbook was opened), not when a value does: as in Google Sheets.
+    function filteredOf(sheet) {
+        const key = JSON.stringify(sheet.props.filter || null);
+        if (sheet.filteredKey !== key) {
+            sheet.filteredKey = key;
+            sheet.filtered = sheet.props.filter ? hiddenByFilter(api, sheet.id, sheet.props.filter) : new Set();
+        }
+        return sheet.filtered;
+    }
+
+    /** Puts a filter on a range of a sheet (its first row is the header): one change. A sheet has one filter; one there before is replaced. */
+    function createFilter(s, rect, how) {
+        s = sheetIdOf(s);
+        return setSheetProps(s, { filter: { r1: api.rowId(s, rect.r1), c1: api.colId(s, rect.c1), r2: api.rowId(s, rect.r2), c2: api.colId(s, rect.c2), columns: {} } }, how);
+    }
+
+    /** Takes the filter of a sheet away: every row it hid shows again (one change). */
+    const removeFilter = (s, how) => (sheetOf(sheetIdOf(s)).props.filter ? setSheetProps(sheetIdOf(s), { filter: null }, how) : []);
+
+    /**
+     * Sets what a column of the filter shows (column c by its index): { hidden: ['Draft'] } and/or a condition { op, a, b, formula }, or null for all.
+     * The rows are filtered again (also when the criterion is the same: what was edited since is filtered too). One change.
+     */
+    function setFilterColumn(s, c, crit, how) {
+        s = sheetIdOf(s);
+        const filter = sheetOf(s).props.filter;
+        if (!filter) throw new Error('the sheet has no filter');
+        const at = filterRect(api, s, filter);
+        if (!at || c < at.c1 || c > at.c2) throw new Error('the column is not in the filter');
+        const columns = { ...(filter.columns || {}) };
+        const cid = api.colId(s, c);
+        const clean = crit && ((crit.hidden && crit.hidden.length) || crit.op) ? { ...(crit.hidden && crit.hidden.length ? { hidden: crit.hidden.map(String) } : {}), ...(crit.op ? { op: crit.op, a: crit.a, b: crit.b, formula: crit.formula } : {}) } : null;
+        if (clean) {
+            for (const k of Object.keys(clean)) if (clean[k] === undefined) delete clean[k];
+            // a custom formula is kept by ids, as a cell's formula is (it follows inserted rows)
+            if (clean.op === 'formula' && clean.formula !== undefined) { const text = isStoredFormula(clean.formula) ? formulaText(clean.formula, s, grid) : String(clean.formula).trim(); clean.formula = storeFormula(text.startsWith('=') ? text : '=' + text, s, grid); }
+            columns[cid] = clean;
+        } else delete columns[cid];
+        return setSheetProps(s, { filter: { ...filter, columns, applied: (filter.applied || 0) + 1 } }, how);
+    }
+
+    /** The filter of a sheet: { range, columns: { [column index]: criterion } }, or null. */
+    function filterOf(s) {
+        s = sheetIdOf(s);
+        const filter = sheetOf(s).props.filter;
+        const at = filterRect(api, s, filter);
+        if (!at) return null;
+        const columns = {};
+        for (const [cid, crit] of Object.entries(filter.columns || {})) {
+            const c = api.colIndex(s, cid);
+            if (c < 0) continue;
+            columns[c] = clone(crit);
+            // a custom formula as a person reads it now
+            if (isStoredFormula(crit.formula)) columns[c].formula = formulaText(crit.formula, s, grid);
+        }
+        return { range: at, columns };
+    }
+
+    /** True when the filter of a sheet hides row r. */
+    const filteredOut = (s, r) => { const sheet = sheetOf(sheetIdOf(s)); return filteredOf(sheet).has(sheet.rowOrder[r]); };
 
     // ---- named ranges: a name for a range ("Budget" for BOQ!D2:D200) that formulas use (=SUM(Budget)) and the name box goes to ---------------------
 
@@ -1317,6 +1384,10 @@ export function createWorkbook(doc, options) {
         setRules, setTypes, modeAt, typeAt,
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
+        // the filter
+        createFilter, removeFilter, setFilterColumn, filterOf, filteredOut,
+        filterValues: (s, c) => { const f = sheetOf(sheetIdOf(s)).props.filter; return f ? valuesOfFilter(api, sheetIdOf(s), f, c) : []; },
+        dataRegion: (s, r, c) => regionAround(api, sheetIdOf(s), r, c),
         // named ranges
         addName, setName, removeName, names, nameRange, nameProblem,
         // conditional formatting

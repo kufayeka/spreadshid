@@ -8,6 +8,7 @@ import { unzip, parseXml, kid, kids, BUILTIN_FORMATS } from './read-base.js';
 import { colIndex } from '../formula/address.js';
 import { shiftFormula, formulaProblem } from '../formula/formula.js';
 import { fromExcelRule } from './conditional.js';
+import { readExcelFilter } from './filter.js';
 import { colName } from '../formula/address.js';
 
 const MAX_SHEETS = 100;
@@ -232,6 +233,7 @@ function readSheet(root, shared, styles, info, warnings) {
         if (row.attrs.hidden === '1' || row.attrs.hidden === 'true') hiddenRows.push(r);
         if (row.attrs.ht && row.attrs.customHeight === '1') heights[r] = pointsToPx(row.attrs.ht);
     }
+    const autoFilter = readExcelFilter(kid(sheet, 'autoFilter'), kid, kids, addressOf);
     const merges = kids(kid(sheet, 'mergeCells'), 'mergeCell').map((m) => {
         const [a, b] = String(m.attrs.ref || '').split(':').map(addressOf);
         return a && b ? { r1: Math.min(a.r, b.r), c1: Math.min(a.c, b.c), r2: Math.max(a.r, b.r), c2: Math.max(a.c, b.c) } : null;
@@ -261,7 +263,7 @@ function readSheet(root, shared, styles, info, warnings) {
     }
     if (skipped.size) warnings.push('"' + info.name + '": conditional formatting with ' + [...skipped].join(', ') + ' was not imported');
     if (kid(sheet, 'dataValidations')) warnings.push('"' + info.name + '": data validation was not imported');
-    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals };
+    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals, autoFilter };
 }
 
 /**
