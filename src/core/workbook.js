@@ -199,8 +199,8 @@ export function createWorkbook(doc, options) {
     for (const d of initial) sheets.set(d.id, makeSheet(d));
     sortSheets();
     for (const s of sheetOrder) registerSheet(sheets.get(s));
-    // a new workbook is not stored yet: all of it is in the first patch
-    if (!(doc && doc.sheets && doc.sheets.length)) {
+    // a new workbook is not stored yet (nor one made from a file: options.fresh): all of it is in the first patch
+    if (!(doc && doc.sheets && doc.sheets.length) || opt.fresh) {
         changeNo++;
         for (const sheet of sheets.values()) {
             dirty.sheets.set(sheet.id, changeNo);
@@ -1270,7 +1270,9 @@ export function createWorkbook(doc, options) {
         /** @internal for the tests */
         _engine: engine,
         /** @internal for access.js */
-        _grid: grid
+        _grid: grid,
+        /** @internal the key of a sheet's place (for excel/index.js) */
+        _sheetKey: (s) => sheetOf(s).key
     };
     return api;
 }
