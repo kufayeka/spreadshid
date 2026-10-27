@@ -1514,6 +1514,14 @@ export function createWorkbook(doc, options) {
                     const own = typeof patch === 'function' ? patch(r, c, before || {}) : patch;
                     if (!own) continue;
                     const after = Object.assign({}, before || {}, own);
+                    // borders are merged side by side like the rest of the style: { borders: { top } } keeps the left border a cell already has,
+                    // and { borders: { top: null } } takes only the top away
+                    if (own.borders && before && before.borders) after.borders = Object.assign({}, before.borders, own.borders);
+                    if (after.borders) {
+                        after.borders = { ...after.borders };
+                        for (const k of Object.keys(after.borders)) if (after.borders[k] == null) delete after.borders[k];
+                        if (!Object.keys(after.borders).length) delete after.borders;
+                    }
                     for (const k of Object.keys(after)) if (after[k] === null || after[k] === undefined) delete after[k];
                     if (!sameValue(before || {}, after)) changes.push({ row: rid, col: cid, before: clone(before), after });
                 }
