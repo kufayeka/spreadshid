@@ -3,7 +3,7 @@
 // condition), what they see (ui), groups and several roles together, the host's own code never stopped, the policy taken away.
 //   node test/policy.test.js
 import assert from 'node:assert';
-import { createWorkbook } from '../src/core/index.js';
+import { createWorkbook, viewFor, checkPatch, mergePatch } from '../src/core/index.js';
 import { sortRange } from '../src/core/search.js';
 import { resolveAccess } from '../src/core/policy.js';
 
@@ -123,6 +123,73 @@ const refusals = (wb) => { const out = []; wb.on('reject', (e) => out.push(e.rea
     wb.setValues(s, 1, 2, 1, user);
     assert.strictEqual(wb.value(s, 1, 2), 1, 'no policy any more: everything');
     ok('a role that may sort but not edit sorts; the policy taken away');
+}
+
+// ---- the server: what a person is given, and what their save may do -----------------------------------------------------------------------------
+{
+    const SERVER = {
+        owners: ['user:yeka'], default: 'viewer',
+        members: { 'user:sari': 'clerk', 'group:mandor': 'site', 'user:ali': 'sorter' },
+        roles: {
+            clerk: { can: ['edit'], ranges: [{ sheet: 'BOQ', columns: ['Cost'], mode: 'hidden' }] },
+            site: { can: ['format.bold'], ranges: [{ sheet: 'BOQ', range: 'D2:D20', mode: 'edit' }, { sheet: 'BOQ', columns: ['Cost'], mode: 'invisible' }] },
+            sorter: { can: ['sort'] },
+            viewer: { can: [] }
+        }
+    };
+    const { wb: made, s } = boq();
+    made.setValues(s, 0, 6, 'Margin');
+    made.setValues(s, 1, 6, '=F2*2');
+    made.setValues(s, 2, 6, '=SUM(F2:F4)');
+    made.setValues(s, 3, 6, '=C4*2');
+    const stored = made.toJSON();
+
+    // what Sari (a clerk, the cost hidden) is given: no cost, and the margins that read it as their answers
+    const seen = viewFor(stored, { policy: SERVER, who: 'user:sari' });
+    const opened = createWorkbook(seen);
+    const t = opened.sheetIds()[0];
+    assert.deepStrictEqual([opened.raw(t, 1, 5), opened.raw(t, 3, 5)], [undefined, undefined], 'the cost is not in what she is given');
+    assert.deepStrictEqual([opened.input(t, 1, 6), opened.value(t, 1, 6), opened.input(t, 2, 6), opened.value(t, 2, 6)], ['800', 800, '2100', 2100], 'a formula that reads the cost is given as its answer');
+    assert.strictEqual(opened.input(t, 3, 6), '=C4*2', 'a formula that does not read it stays a formula');
+    assert.strictEqual(createWorkbook(viewFor(stored, { policy: SERVER, who: 'user:yeka' })).raw(t, 1, 5), 400, 'the owner is given everything');
+
+    // she changes a quantity in a row that holds a hidden cost and a margin made of it, and saves: the server keeps both as they were
+    opened.setAccess(SERVER, 'user:sari');
+    opened.saved(opened.pendingPatch());
+    opened.setValues(t, 1, 2, 11, user);
+    const patch = opened.pendingPatch();
+    assert.deepStrictEqual(checkPatch(stored, patch, { policy: SERVER, who: 'user:sari' }), { ok: true, problems: [] }, 'her save is hers to make');
+    const kept = createWorkbook(mergePatch(stored, patch, { policy: SERVER, who: 'user:sari' }));
+    assert.deepStrictEqual([kept.value(s, 1, 2), kept.raw(s, 1, 5), kept.input(s, 1, 6), kept.value(s, 1, 6)], [11, 400, '=F2*2', 800], 'the quantity is in; the cost and the margin\'s formula are as stored');
+
+    // a save made by hand (not by the sheet) that writes the cost is refused
+    const forged = JSON.parse(JSON.stringify(patch));
+    forged.rows.upsert[0].cells[made.colId(s, 5)] = 1;
+    const forgedKept = createWorkbook(mergePatch(stored, forged, { policy: SERVER, who: 'user:sari' }));
+    assert.strictEqual(forgedKept.raw(s, 1, 5), 400, 'a cost she was not given cannot be written by her save');
+
+    // a mandor's save that bolds and italicises in its edit range: the italic is refused
+    const mandor = createWorkbook(viewFor(stored, { policy: SERVER, who: { user: 'budi', groups: ['mandor'] } }));
+    mandor.saved(mandor.pendingPatch());
+    mandor.setStyle(t, { r1: 1, c1: 3, r2: 1, c2: 3 }, { bold: true, italic: true });
+    const italic = checkPatch(stored, mandor.pendingPatch(), { policy: SERVER, who: { user: 'budi', groups: ['mandor'] } });
+    assert.deepStrictEqual([italic.ok, italic.problems.map((p) => p.reason)], [false, ['You cannot change the formatting here']], 'italic is not the mandor\'s');
+    const viewer = createWorkbook(stored);
+    viewer.saved(viewer.pendingPatch());
+    viewer.setValues(s, 1, 0, 'Changed');
+    const viewerCheck = checkPatch(stored, viewer.pendingPatch(), { policy: SERVER, who: 'user:nobody' });
+    assert.deepStrictEqual([viewerCheck.ok, viewerCheck.problems[0].address, viewerCheck.problems[0].reason], [false, 'A2', 'You can only view this sheet'], 'a viewer\'s save that writes a cell');
+    viewer.insertRows(s, 5, 1);
+    assert.ok(checkPatch(stored, viewer.pendingPatch(), { policy: SERVER, who: 'user:nobody' }).problems.some((p) => p.reason === 'You cannot change rows here'), 'or inserts a row');
+
+    // a sorter sorts: the rows only change places among them, and that is let through
+    const sorter = createWorkbook(stored);
+    sorter.setAccess(SERVER, 'user:ali');
+    sorter.saved(sorter.pendingPatch());
+    sortRange(sorter, s, { r1: 1, c1: 0, r2: 3, c2: 5 }, 0, 'desc');
+    assert.strictEqual(sorter.value(s, 1, 0), 'Slab');
+    assert.deepStrictEqual(checkPatch(stored, sorter.pendingPatch(), { policy: SERVER, who: 'user:ali' }), { ok: true, problems: [] }, 'a sort is let through');
+    ok('the server: hidden cells not given, formulas reading them given as answers, a save keeps them as stored, actions refused, a sort let through');
 }
 
 console.log('\n' + passed + ' passed');
