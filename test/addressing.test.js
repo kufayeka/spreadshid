@@ -2,7 +2,7 @@
 // numbers, which keep working; a text that is no address says so.
 //   node test/addressing.test.js
 import assert from 'node:assert';
-import { createWorkbook } from '../src/core/index.js';
+import { createWorkbook, sortRange } from '../src/core/index.js';
 
 let passed = 0;
 const ok = (label) => { passed++; console.log('ok   ' + label); };
@@ -59,6 +59,10 @@ const ok = (label) => { passed++; console.log('ok   ' + label); };
     wb.setSheetProps(boq.id, { name: 'RAB' });
     assert.strictEqual(boq.name, 'RAB', 'its name is the sheet\'s name now');
     assert.throws(() => wb.sheet('Tidak ada'), /there is no sheet "Tidak ada"/);
+    // a sheet by its name in every function, and sortRange by addresses
+    wb.setValues('RAB', 'A5', [[3], [1], [2]]);
+    sortRange(wb, 'RAB', 'A5:A7', 'A', 'asc');
+    assert.deepStrictEqual([wb.value('RAB', 'A5'), wb.value('RAB', 'A6'), wb.value('RAB', 'A7')], [1, 2, 3], 'a sheet by its name, a sort by addresses');
     ok('wb.sheet("BOQ"): bound to one sheet by name or id');
 }
 

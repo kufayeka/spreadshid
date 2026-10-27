@@ -96,6 +96,9 @@ export function addressable(api) {
     api.addName = (name, s, rect, how) => addName(name, s, ranges(rect), how);
     const setName = api.setName;
     api.setName = (id, patch, how) => setName(id, patch && typeof patch.range === 'string' ? { ...patch, range: ranges(patch.range) } : patch, how);
+    // setBlock's entries may say where by address: { at: 'A6', value, style }
+    const setBlock = api.setBlock;
+    api.setBlock = (s, entries, how) => setBlock(s, entries.map((e) => (e && typeof e.at === 'string' ? (({ at, ...rest }) => ({ ...cellOf(at), ...rest }))(e) : e)), how);
     for (const [name, list] of [['setRowProps', rowList], ['setColProps', colList]]) {
         const fn = api[name];
         api[name] = (s, which, patch, how) => fn(s, list(which), patch, how);
@@ -123,6 +126,15 @@ export function addressable(api) {
         const fn = api[name];
         api[name] = (s, c, ...rest) => fn(s, oneCol(c), ...rest);
     }
+
+    // a sheet given by its name ("BOQ") is its id to every function that takes the sheet first (the workbook itself keeps ids only)
+    const idOf = (s) => (typeof s !== 'string' || api.sheetIds().includes(s) ? s : api.sheetIdByName(s) || s);
+    for (const name of SHEET_FNS) {
+        const fn = api[name];
+        if (typeof fn === 'function') api[name] = (s, ...rest) => fn(idOf(s), ...rest);
+    }
+    const addNameById = api.addName;
+    api.addName = (name, s, rect, how) => addNameById(name, idOf(s), rect, how);
 
     /**
      * The workbook's functions bound to one sheet (by its name or id): every function that takes the sheet first, without it.

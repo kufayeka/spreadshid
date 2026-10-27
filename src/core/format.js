@@ -33,16 +33,19 @@ export function localeInfo(locale) {
     const key = locale || 'en-US';
     let info = localeCache.get(key);
     if (info) return info;
-    let decimal = '.', group = ',', order = 'mdy';
+    let decimal = '.', group = ',', order = 'mdy', dateSep = '/';
     try {
         const parts = new Intl.NumberFormat(key).formatToParts(1234567.5);
         decimal = (parts.find((p) => p.type === 'decimal') || {}).value || '.';
         group = (parts.find((p) => p.type === 'group') || {}).value || ',';
         const dparts = new Intl.DateTimeFormat(key, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' }).formatToParts(new Date(Date.UTC(2006, 10, 22)));
         order = dparts.filter((p) => p.type === 'day' || p.type === 'month' || p.type === 'year').map((p) => p.type[0]).join('');
+        // the mark between day, month and year: 26/10/2026 in Indonesia, 26.10.2026 in Germany
+        const lit = dparts.find((p) => p.type === 'literal');
+        if (lit && /^[./-]$/.test(lit.value.trim())) dateSep = lit.value.trim();
     } catch { /* an unknown locale: the English one */ }
     // a group separator that is a no-break space is shown as one, and typed as a plain space too
-    info = { locale: key, decimal, group, order, datePattern: order === 'dmy' ? 'dd/MM/yyyy' : order === 'ymd' ? 'yyyy-MM-dd' : 'M/d/yyyy' };
+    info = { locale: key, decimal, group, order, datePattern: order === 'dmy' ? ['dd', 'MM', 'yyyy'].join(dateSep) : order === 'ymd' ? 'yyyy-MM-dd' : ['M', 'd', 'yyyy'].join(dateSep) };
     localeCache.set(key, info);
     return info;
 }

@@ -8,6 +8,8 @@
 
 import { sortPerm } from './sort.js';
 import { shiftFormula } from './formula/formula.js';
+import { colIndex } from './formula/address.js';
+import { rangeOf } from './addressing.js';
 
 /**
  * @typedef {object} FindOptions

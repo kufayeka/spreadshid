@@ -4,6 +4,7 @@
 /** The version of the package, so that a saved workbook can say which sheet made it. */
 export const VERSION = '0.1.0';
 
+import { FUNCTIONS as ALL_FUNCTIONS } from './formula/xlfuncs.js';
 export { createWorkbook } from './workbook.js';
 export { newId } from './ids.js';
 export { keyBetween, keysBetween, compareKeys } from './order.js';
@@ -21,3 +22,6 @@ export { copyBlock, pasteClip, pasteText, fillBlock } from './transfer.js';
 export { findAll, replaceIn, sortRange } from './search.js';
 export { exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';
 export { resolveAccess, ACTIONS, ACTION_INFO, UI_ITEMS, validatePolicy } from './policy.js';
+
+/** The names of every function a formula can use, in order (for a list of them, or a check). */
+export const FUNCTION_NAMES = Object.keys(ALL_FUNCTIONS).sort();
