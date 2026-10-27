@@ -1858,6 +1858,12 @@ export function createWorkbook(doc, options) {
      * @param {ReturnType<typeof pendingPatch>} patch
      * @param {{ version?: number }} [answer]  The new version the server gave the workbook.
      */
+    /** True when something changed since the last save (cheap: for a "not saved yet" mark; pendingPatch() makes the patch itself). */
+    function unsaved() {
+        return dirty.rows.size > 0 || dirty.columns.size > 0 || dirty.sheets.size > 0 || dirty.settings > 0
+            || gone.rows.size > 0 || gone.columns.size > 0 || gone.sheets.size > 0;
+    }
+
     function saved(patch, answer) {
         revision++;
         const forget = (map) => { for (const [k, n] of [...map]) if (n <= patch.upTo) map.delete(k); };
@@ -2002,7 +2008,7 @@ export function createWorkbook(doc, options) {
         /** NOW() and TODAY() are worked out again (the host calls this on a timer when it wants a live clock). */
         tick: () => engine.tick(),
         // saving
-        pendingPatch, saved,
+        pendingPatch, saved, unsaved,
         // events: "op" ({ ops, source }), "reject" ({ op, reason, source }), "saved" ({ version })
         on,
         /** @internal for the tests */
