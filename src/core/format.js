@@ -45,19 +45,33 @@ export function localeInfo(locale) {
         if (lit && /^[./-]$/.test(lit.value.trim())) dateSep = lit.value.trim();
     } catch { /* an unknown locale: the English one */ }
     // a group separator that is a no-break space is shown as one, and typed as a plain space too
-    info = { locale: key, decimal, group, order, datePattern: order === 'dmy' ? ['dd', 'MM', 'yyyy'].join(dateSep) : order === 'ymd' ? 'yyyy-MM-dd' : ['M', 'd', 'yyyy'].join(dateSep) };
+    info = { locale: key, decimal, group, order, datePattern: order === 'dmy' ? ['dd', 'MM', 'yyyy'].join(dateSep) : order === 'ymd' ? ['yyyy', 'MM', 'dd'].join(dateSep) : ['M', 'd', 'yyyy'].join(dateSep) };
     localeCache.set(key, info);
     return info;
 }
 
 /** The symbol of a currency in a locale: "Rp" for IDR in id-ID, "$" for USD in en-US. */
 export function currencySymbol(currency, locale) {
+    return currencyInfo(currency, locale).symbol;
+}
+
+// the symbol of a currency in a locale and which side of the number it stands on, worked out once from Intl: "Rp 72.000" in Indonesia,
+// "$72,000.00" in the US, "72.000,00 €" in Germany
+const currencyCache = new Map();
+function currencyInfo(currency, locale) {
+    const key = (locale || 'en-US') + '|' + currency;
+    let info = currencyCache.get(key);
+    if (info) return info;
     try {
         const parts = new Intl.NumberFormat(locale || 'en-US', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }).formatToParts(1);
-        return (parts.find((p) => p.type === 'currency') || {}).value || currency;
+        const at = parts.findIndex((p) => p.type === 'currency');
+        const number = parts.findIndex((p) => p.type === 'integer');
+        info = { symbol: at < 0 ? currency : parts[at].value, after: at > number };
     } catch {
-        return currency;
+        info = { symbol: currency, after: false };
     }
+    currencyCache.set(key, info);
+    return info;
 }
 
 /** A number with a number of decimals and, when asked, the thousands grouped, with the locale's separators: 1234.5 -> "1.234,50" in id-ID. */
@@ -227,9 +241,13 @@ export function formatValue(value, format, settings, extra) {
             case 'number': text = groupNumber(abs, f.decimals === undefined ? 2 : f.decimals, f.thousands !== false, info); break;
             case 'money': {
                 const currency = f.currency || (settings && settings.currency) || 'USD';
-                const symbol = f.symbol !== undefined ? f.symbol : currencySymbol(currency, info.locale);
+                const known = currencyInfo(currency, info.locale);
+                const symbol = f.symbol !== undefined ? f.symbol : known.symbol;
                 const decimals = f.decimals === undefined ? 2 : f.decimals;
-                text = symbol + (f.symbolSpace === false ? '' : symbol && /[A-Za-z]$/.test(symbol) ? ' ' : '') + groupNumber(abs, decimals, f.thousands !== false, info);
+                const number = groupNumber(abs, decimals, f.thousands !== false, info);
+                // the symbol stands where the locale puts it; after the number it is always one space away ("72.000,00 €")
+                if (known.after && f.symbol === undefined) text = number + (f.symbolSpace === false ? '' : ' ') + symbol;
+                else text = symbol + (f.symbolSpace === false ? '' : symbol && /[A-Za-z]$/.test(symbol) ? ' ' : '') + number;
                 break;
             }
             case 'percent': text = groupNumber(abs * 100, f.decimals === undefined ? 2 : f.decimals, f.thousands === true, info) + '%'; break;

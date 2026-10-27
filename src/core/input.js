@@ -73,7 +73,9 @@ function readTime(t) {
 
 function readDate(t, info) {
     let y, mo, d;
-    let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+    // a date that starts with a four-digit year is year, month, day in every locale: 2026-10-27, and 2026/10/27 as Japan and China write it
+    let m = /^(\d{4})([/.-])(\d{1,2})\2(\d{1,2})$/.exec(t);
+    if (m) m = [m[0], m[1], m[3], m[4]];
     if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
     else if ((m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/.exec(t))) {
         const a = +m[1], b = +m[2];
