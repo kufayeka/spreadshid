@@ -19,7 +19,7 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {import('react').RefObject<HTMLTextAreaElement>} props.sinkRef  The grid's keyboard sink (the clipboard commands run from it).
  * @param {number} props.zoom @param {(z: number) => void} props.onZoom
  * @param {(kind: 'find'|'replace') => void} props.onFind
- * @param {() => void} props.onLink @param {() => void} props.onSettings
+ * @param {() => void} props.onLink @param {() => void} props.onSettings @param {() => void} props.onConditional  Opens the panel of conditional formatting.
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
  * @param {(message: string) => void} props.onError  Also how what an import left out is told.
@@ -103,6 +103,7 @@ export function Menubar(props) {
             { label: 'Font size', children: SIZES.map((n) => ({ value: 'size:' + n, label: String(n) })) },
             { label: 'Merge cells', children: [{ value: 'merge:all', label: 'Merge all' }, { value: 'merge:horizontal', label: 'Merge horizontally' }, { value: 'merge:vertical', label: 'Merge vertically' }, { value: 'merge:unmerge', label: 'Unmerge' }] },
             { separator: true },
+            { value: 'format:conditional', label: 'Conditional formatting' },
             { value: 'format:clear', label: 'Clear formatting', hint: 'Ctrl+\\' }
         ],
         Data: [
@@ -186,7 +187,7 @@ export function Menubar(props) {
                 else if (what === 'checkbox') run(() => wb.setValidation(s, b, { kind: 'checkbox' }, how));
                 else if (what === 'dropdown') props.onValidation('list');
                 break;
-            case 'format': if (what === 'clear') clearFormatting(wb, s, sel); else setFormat(wb, s, sel, what); break;
+            case 'format': if (what === 'clear') clearFormatting(wb, s, sel); else if (what === 'conditional') props.onConditional(); else setFormat(wb, s, sel, what); break;
             case 'style': toggle(wb, s, sel, what); break;
             case 'align': setPart(wb, s, sel, 'align', what); break;
             case 'valign': setPart(wb, s, sel, 'valign', what); break;

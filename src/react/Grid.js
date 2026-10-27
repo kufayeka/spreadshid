@@ -92,7 +92,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         const w = colAxis.size(c);
         if (!w) continue;
         const display = wb.display(sheetId, r, c);
-        const style = wb.style(sheetId, r, c);
+        const style = wb.shownStyle(sheetId, r, c); // its own style, and over it what the rules of conditional formatting give it
         // a protected cell, drawn striped when the host asks (showProtected)
         const guarded = showProtected && wb.modeAt(sheetId, r, c);
         // a cell under a rule of data validation shows a checkbox or a dropdown's arrow, and a mark when its value breaks a rule that only warns
@@ -725,7 +725,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             if (b.r1 > rows.to || b.r2 < rows.from || b.c1 > cols.to || b.c2 < cols.from) continue;
             out.push(<Cell key={'m' + b.r1 + ':' + b.c1} r={b.r1} c={b.c1} merged x={colAxis.start(b.c1) - xBase} y={rowAxis.start(b.r1) - yBase}
                 w={colAxis.start(b.c2 + 1) - colAxis.start(b.c1)} h={rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1)}
-                display={wb.display(sheetId, b.r1, b.c1)} style={wb.style(sheetId, b.r1, b.c1)} />);
+                display={wb.display(sheetId, b.r1, b.c1)} style={wb.shownStyle(sheetId, b.r1, b.c1)} />);
         }
         // the selection over them: each rectangle tinted, and the active cell framed
         rects.forEach((b, i) => {

@@ -239,3 +239,35 @@
 .ks-invalid { position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent #d93025 transparent transparent; }
 .ks-hint { position: absolute; z-index: 7; max-width: 260px; padding: 6px 10px; background: #fff; color: #3c4043; border-radius: 4px; font: var(--ks-ui-font); font-size: 12px; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px rgba(60, 64, 67, 0.15); pointer-events: none; }
 .ks-problem { color: var(--ks-error); }
+
+/* the panel of conditional formatting, on the right of the grid (the grid gets narrower, as in Google Sheets) */
+.ks-body.ks-with-panel { flex-direction: row; }
+.ks-body.ks-with-panel > .ks-grid { min-width: 0; }
+.ks-panel { flex: none; width: 320px; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: auto; border-left: 1px solid var(--ks-head-line);
+    background: var(--ks-bg); color: var(--ks-fg); font: var(--ks-ui-font); }
+.ks-panel-head { display: flex; align-items: center; justify-content: space-between; }
+.ks-panel-title { margin: 0; font-size: 16px; font-weight: 500; }
+.ks-panel .ks-field-stack { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.ks-panel .ks-field-label, .ks-panel .ks-field-stack > span { font-size: 12px; color: #5f6368; }
+.ks-panel-input, .ks-panel select, .ks-panel input { font: inherit; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; outline: none; min-width: 0; }
+.ks-panel-input:focus, .ks-panel select:focus, .ks-panel input:focus { border-color: var(--ks-accent); }
+.ks-tabs-choice { display: flex; border-bottom: 1px solid #dadce0; }
+.ks-tabs-choice button { flex: 1; font: inherit; padding: 8px; border: 0; border-bottom: 3px solid transparent; background: none; color: #5f6368; cursor: pointer; }
+.ks-tabs-choice button.ks-on { color: var(--ks-accent); border-bottom-color: var(--ks-accent); }
+.ks-rule-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ks-rule-card { display: flex; align-items: center; border: 1px solid #dadce0; border-radius: 4px; }
+.ks-rule-card:hover { background: #f8f9fa; }
+.ks-rule-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ks-rule-sample { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 48px; height: 28px; padding: 0 6px; border: 1px solid #dadce0; border-radius: 2px; }
+.ks-rule-text { display: flex; flex-direction: column; min-width: 0; }
+.ks-rule-says, .ks-rule-ranges { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ks-rule-ranges { font-size: 12px; color: #5f6368; }
+.ks-rule-tools { display: flex; flex: none; }
+.ks-add-rule { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; }
+.ks-style-row { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.ks-style-row .ks-rule-sample { margin-right: 6px; }
+.ks-scale-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ks-scale-preset { height: 22px; border: 1px solid #dadce0; border-radius: 2px; cursor: pointer; }
+.ks-scale-point { display: grid; grid-template-columns: 70px 1fr 70px auto; align-items: center; gap: 6px; }
+.ks-scale-label { font-size: 12px; color: #5f6368; }
+.ks-swatch { display: inline-block; width: 18px; height: 18px; border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 2px; }

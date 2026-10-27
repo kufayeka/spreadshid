@@ -12,6 +12,7 @@ import { LinkDialog } from './LinkDialog.js';
 import { Menubar } from './Menubar.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
+import { ConditionalPanel } from './ConditionalPanel.js';
 import { parseRangeText } from '../core/validation.js';
 import { copyBlock, pasteClip } from '../core/transfer.js';
 import { useAutoHeights } from './autoHeights.js';
@@ -93,6 +94,8 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const [settingsOpen, setSettingsOpen] = useState(false);
     // the data validation dialog: open for the selection, with the rule of the active cell (or a new one of a kind)
     const [validating, setValidating] = useState(null);
+    // the panel of conditional formatting, and the selection it opened on (where a new rule goes)
+    const [conditional, setConditional] = useState(null);
 
     // the formula bar's edit ends as the cell's does: the text is written, and Enter, Tab move on
     function commitFromBar(move) {
@@ -203,6 +206,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
+                onConditional={() => setConditional({ range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
                     const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);
@@ -229,7 +233,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                     setRevealTick((t) => t + 1);
                     toGrid();
                 }} />
-            <div className="ks-body">
+            <div className={'ks-body' + (conditional ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} />
                 {find.open ? (
@@ -240,6 +244,8 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                         onMore={() => setFind((f) => ({ ...f, open: false, dialog: true }))} />
                 ) : null}
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
+                {conditional ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={conditional.range} revision={revision} container={root}
+                    key={sheetId} onClose={() => { setConditional(null); toGrid(); }} /> : null}
             </div>
             <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} />
             {validating ? (

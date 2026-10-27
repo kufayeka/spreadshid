@@ -16,6 +16,7 @@ import { formatDate, formatValue, localeInfo } from './format.js';
 import { displayOf } from './display.js';
 import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
+import { makeConditional, conditionalStyleOf } from './conditional.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
 
@@ -653,6 +654,64 @@ export function createWorkbook(doc, options) {
         return rule.id;
     }
 
+    // ---- conditional formatting (conditional.js): rules a person makes on ranges, kept in the sheet's props, worked out when a cell is drawn -------
+
+    const conditionalCache = new Map();
+    const conditionalsOf = (s) => sheetOf(s).props.conditionals || [];
+
+    /** Adds a rule of conditional formatting on rectangles, after the others (one change). Returns its id. */
+    function addConditional(s, rects, spec, how) {
+        s = sheetIdOf(s);
+        const rule = makeConditional(api, s, Array.isArray(rects) ? rects : [rects], spec);
+        setSheetProps(s, { conditionals: conditionalsOf(s).concat([rule]) }, how);
+        return rule.id;
+    }
+
+    /** Changes a rule of conditional formatting, its ranges too when given (one change). */
+    function setConditional(s, id, rects, spec, how) {
+        s = sheetIdOf(s);
+        const all = conditionalsOf(s);
+        const at = all.findIndex((x) => x.id === id);
+        if (at < 0) throw new Error('there is no rule of conditional formatting ' + id);
+        const rule = rects ? makeConditional(api, s, Array.isArray(rects) ? rects : [rects], { ...all[at], ...spec, id }) : makeConditional(api, s, [], { ...all[at], ...spec, id });
+        if (!rects) rule.ranges = all[at].ranges;
+        setSheetProps(s, { conditionals: all.map((x, i) => (i === at ? rule : x)) }, how);
+        return id;
+    }
+
+    /** Takes a rule of conditional formatting away (one change). */
+    function removeConditional(s, id, how) {
+        s = sheetIdOf(s);
+        const all = conditionalsOf(s);
+        const kept = all.filter((x) => x.id !== id);
+        return kept.length === all.length ? [] : setSheetProps(s, { conditionals: kept.length ? kept : null }, how);
+    }
+
+    /** Moves a rule of conditional formatting to another place in the order (the first rule that styles a cell wins): one change. */
+    function moveConditional(s, id, to, how) {
+        s = sheetIdOf(s);
+        const all = conditionalsOf(s).slice();
+        const from = all.findIndex((x) => x.id === id);
+        if (from < 0) return [];
+        const [rule] = all.splice(from, 1);
+        all.splice(Math.max(0, Math.min(all.length, to)), 0, rule);
+        return setSheetProps(s, { conditionals: all }, how);
+    }
+
+    /** The style the rules of conditional formatting give a cell, or null. */
+    function conditionalStyleAt(s, r, c) {
+        s = sheetIdOf(s);
+        const list = conditionalsOf(s);
+        return list.length ? conditionalStyleOf(api, list, s, r, c, revision, conditionalCache) : null;
+    }
+
+    /** The style a cell is drawn with: its own, and over it what the rules of conditional formatting give it. */
+    function shownStyle(s, r, c) {
+        const own = api.style(s, r, c);
+        const extra = conditionalStyleAt(s, r, c);
+        return extra ? { ...(own || {}), ...extra } : own;
+    }
+
     /** The rule of data validation of a cell, or null. */
     const validationAt = (s, r, c) => ruleAt(api, sheetIdOf(s), r, c);
     /** The choices of a cell's dropdown (empty when it has none). */
@@ -1169,6 +1228,9 @@ export function createWorkbook(doc, options) {
         setRules, setTypes, modeAt, typeAt,
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
+        // conditional formatting
+        addConditional, setConditional, removeConditional, moveConditional, conditionalStyleAt, shownStyle,
+        conditionals: (s) => clone(conditionalsOf(sheetIdOf(s))),
         // reading
         sheetIds: () => [...sheetOrder],
         sheetProps: (s) => clone(sheetOf(sheetIdOf(s)).props),
