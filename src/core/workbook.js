@@ -605,6 +605,7 @@ export function createWorkbook(doc, options) {
     // the host's rules (setRules) and what the access policy gives this person (setAccess): the policy's ranges join the host's rules
     let hostRules = [];
     let access = resolveAccess(null);
+    let hasPolicy = false;
     const types = new Map(); // sheet id -> Map(column id -> type)
 
     /**
@@ -626,6 +627,7 @@ export function createWorkbook(doc, options) {
      */
     function setAccess(policy, who) {
         access = resolveAccess(policy, who);
+        hasPolicy = !!policy;
         rules = resolveRules(api, hostRules.concat(access.ranges));
         revision++;
         emit('access', accessInfo());
@@ -847,6 +849,97 @@ export function createWorkbook(doc, options) {
 
     /** True when the filter of a sheet hides row r. */
     const filteredOut = (s, r) => { const sheet = sheetOf(sheetIdOf(s)); return filteredOf(sheet).has(sheet.rowOrder[r]); };
+
+    // ---- comments, as in Google Sheets: a thread on a cell (a comment and its replies), kept in the sheet's props by the ids of its cell -------------
+    //   comments: [{ id, row, col, resolved, items: [{ id, by: { id, name }, text, at }] }]
+
+    const threadsOf = (s) => sheetOf(s).props.comments || [];
+    // who writes: the person the workbook is open for (createWorkbook's user, or setUser)
+    const author = () => { const u = opt.user; return u && typeof u === 'object' ? { id: u.id === undefined ? null : u.id, name: u.name || String(u.id || '') } : u ? { id: String(u), name: String(u) } : { id: null, name: 'Anonymous' }; };
+    const putThreads = (s, list, how) => setSheetProps(s, { comments: list.length ? list : null }, how);
+
+    /** Comments on a cell: a new thread, or a reply when the cell has an open one (one change). Returns { thread, item } ids. */
+    function addComment(s, r, c, text, how) {
+        s = sheetIdOf(s);
+        const words = String(text || '').trim();
+        if (!words) throw new Error('a comment needs some text');
+        const item = { id: newId(), by: author(), text: words, at: new Date().toISOString() };
+        const all = threadsOf(s);
+        const open = all.find((x) => !x.resolved && x.row === api.rowId(s, r) && x.col === api.colId(s, c));
+        if (open) { putThreads(s, all.map((x) => (x === open ? { ...x, items: x.items.concat([item]) } : x)), how); return { thread: open.id, item: item.id }; }
+        const thread = { id: newId(), row: api.rowId(s, r), col: api.colId(s, c), resolved: false, items: [item] };
+        putThreads(s, all.concat([thread]), how);
+        return { thread: thread.id, item: item.id };
+    }
+
+    /** Replies in a thread (one change). Returns the reply's id. */
+    function replyComment(s, threadId, text, how) {
+        s = sheetIdOf(s);
+        const words = String(text || '').trim();
+        if (!words) throw new Error('a reply needs some text');
+        const item = { id: newId(), by: author(), text: words, at: new Date().toISOString() };
+        const all = threadsOf(s);
+        if (!all.some((x) => x.id === threadId)) throw new Error('there is no comment ' + threadId);
+        // a reply opens a resolved thread again, as in Google Sheets
+        putThreads(s, all.map((x) => (x.id === threadId ? { ...x, resolved: false, items: x.items.concat([item]) } : x)), how);
+        return item.id;
+    }
+
+    // only the one who wrote a comment changes or takes it away (and the owner of an access policy, when there is one)
+    function ownItem(thread, itemId) {
+        const item = thread && thread.items.find((x) => x.id === itemId);
+        if (!item) throw new Error('there is no such comment');
+        const me = author();
+        if (!(hasPolicy && access.owner) && !(me.id !== null && item.by && item.by.id === me.id)) throw new Error('only the one who wrote a comment can change it');
+        return item;
+    }
+
+    /** Changes the text of a comment (its writer only). One change. */
+    function editComment(s, threadId, itemId, text, how) {
+        s = sheetIdOf(s);
+        const all = threadsOf(s);
+        const thread = all.find((x) => x.id === threadId);
+        ownItem(thread, itemId);
+        const words = String(text || '').trim();
+        if (!words) throw new Error('a comment needs some text');
+        putThreads(s, all.map((x) => (x.id === threadId ? { ...x, items: x.items.map((i) => (i.id === itemId ? { ...i, text: words, edited: new Date().toISOString() } : i)) } : x)), how);
+    }
+
+    /** Takes a comment away (its writer only); the first one of a thread takes the whole thread. One change. */
+    function deleteComment(s, threadId, itemId, how) {
+        s = sheetIdOf(s);
+        const all = threadsOf(s);
+        const thread = all.find((x) => x.id === threadId);
+        ownItem(thread, itemId);
+        if (thread.items[0].id === itemId) return putThreads(s, all.filter((x) => x.id !== threadId), how);
+        return putThreads(s, all.map((x) => (x.id === threadId ? { ...x, items: x.items.filter((i) => i.id !== itemId) } : x)), how);
+    }
+
+    /** Resolves a thread (it stays, closed; a reply opens it again), or opens it. One change. */
+    function resolveComment(s, threadId, resolved, how) {
+        s = sheetIdOf(s);
+        return putThreads(s, threadsOf(s).map((x) => (x.id === threadId ? { ...x, resolved: resolved !== false } : x)), how);
+    }
+
+    // the open threads of a sheet by "row:col", made again when the sheet's props change
+    function openThreads(s) {
+        const sheet = sheetOf(s);
+        if (!sheet.threadsByCell || sheet.threadsFor !== sheet.props.comments) {
+            sheet.threadsFor = sheet.props.comments;
+            sheet.threadsByCell = new Map();
+            for (const x of sheet.props.comments || []) if (!x.resolved) sheet.threadsByCell.set(x.row + ':' + x.col, x);
+        }
+        return sheet.threadsByCell;
+    }
+
+    /** The open thread of a cell, or null. */
+    /** True when a cell has an open thread (quick: for drawing its mark). */
+    const hasComment = (s, r, c) => { s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); return !!rid && !!cid && openThreads(s).has(rid + ':' + cid); };
+
+    const commentAt = (s, r, c) => { s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); const x = rid && cid ? openThreads(s).get(rid + ':' + cid) : null; return x ? clone(x) : null; };
+
+    /** Every thread of a sheet (open and resolved), with where its cell stands now ({ r, c }, or null when its row or column was deleted). */
+    const comments = (s) => { s = sheetIdOf(s); return threadsOf(s).map((x) => { const r = api.rowIndex(s, x.row), c = api.colIndex(s, x.col); return { ...clone(x), at: r >= 0 && c >= 0 ? { r, c } : null }; }); };
 
     // ---- named ranges: a name for a range ("Budget" for BOQ!D2:D200) that formulas use (=SUM(Budget)) and the name box goes to ---------------------
 
@@ -1523,6 +1616,10 @@ export function createWorkbook(doc, options) {
         createFilter, removeFilter, setFilterColumn, filterOf, filteredOut,
         filterValues: (s, c) => { const f = sheetOf(sheetIdOf(s)).props.filter; return f ? valuesOfFilter(api, sheetIdOf(s), f, c) : []; },
         dataRegion: (s, r, c) => regionAround(api, sheetIdOf(s), r, c),
+        // comments
+        addComment, replyComment, editComment, deleteComment, resolveComment, commentAt, comments, hasComment,
+        /** The person who writes from now on ({ id, name }): their name goes on their comments, and only they change them. */
+        setUser: (user) => { opt.user = user; },
         // named ranges
         addName, setName, removeName, names, nameRange, nameProblem,
         // conditional formatting

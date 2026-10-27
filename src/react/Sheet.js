@@ -52,6 +52,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {{ policy: object|null, who: any }} [props.access]  The access policy of the workbook and the person who has it open (policy.js), as the host
  *   keeps it: the sheet applies it, and an owner changes it in Data > Access and roles.
  * @param {(policy: object) => void} [props.onAccessChange]  An owner changed the policy: the host keeps it (and gives it back in access).
+ * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments.
  * @param {boolean} [props.showProtected]  Draw the protected cells striped (the rules are the workbook's: setRules).
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
  * @param {import('react').CSSProperties} [props.style]  Inline style of the outer element (its height above all: the grid fills it).
@@ -108,6 +109,10 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const hostPolicy = props.access ? props.access.policy : null;
     useEffect(() => { setPolicy(hostPolicy); }, [hostPolicy]);
     const [viewAs, setViewAs] = useState(null);
+    // a comment being started on the active cell (Insert > Comment, Ctrl+Alt+M); a new cell selected ends it
+    const [commenting, setCommenting] = useState(false);
+    // the person who writes (their name on their comments)
+    useEffect(() => { if (props.user) wb.setUser(props.user); }, [wb, props.user && props.user.id, props.user && props.user.name]);
     const who = props.access ? props.access.who : null;
     useEffect(() => {
         if (!props.access) return;
@@ -262,6 +267,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
+                onComment={() => setCommenting(true)}
                 onAccess={props.access && !viewAs && wb.can('access') ? () => setPanel({ kind: 'access' }) : null}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
@@ -291,7 +297,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} commenting={commenting} onCommenting={setCommenting} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}

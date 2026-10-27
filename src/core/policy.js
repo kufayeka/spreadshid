@@ -40,6 +40,7 @@ export const ACTIONS = [
     'view.freeze', 'view.gridlines',
     'sort', 'filter', 'validation', 'names', 'settings',
     'copy', 'paste', 'download', 'import',
+    'comment',
     'access'
 ];
 
@@ -97,7 +98,7 @@ const STYLE_ACTION = { bold: 'format.bold', italic: 'format.italic', underline: 
 const ROW_ACTION = { height: 'rows.resize', hidden: 'rows.hide', level: 'rows.group', fold: 'rows.group' };
 const COL_ACTION = { width: 'cols.resize', hidden: 'cols.hide', level: 'cols.group', fold: 'cols.group', format: 'format.number' };
 const SHEET_ACTION = { name: 'sheets.rename', hidden: 'sheets.hide', freezeRows: 'view.freeze', freezeCols: 'view.freeze', hideGridlines: 'view.gridlines', filter: 'filter',
-    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize' };
+    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize', comments: 'comment' };
 const OP_ACTION = { insertRows: 'rows.insert', deleteRows: 'rows.delete', insertCols: 'cols.insert', deleteCols: 'cols.delete', moveRows: 'sort', moveCols: 'cols.insert',
     addSheet: 'sheets.add', removeSheet: 'sheets.delete', moveSheet: 'sheets.move' };
 
@@ -125,7 +126,7 @@ export function actionsOfOp(op) {
 
 // what a person is told, by the action that was refused
 const SAY = { edit: 'change cells', sort: 'sort', filter: 'change the filter', names: 'change named ranges', validation: 'change data validation', settings: 'change the settings',
-    copy: 'copy from this sheet', paste: 'paste here', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
+    copy: 'copy from this sheet', paste: 'paste here', comment: 'comment', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
 /** A sentence for an action a person may not do ("You cannot change cells here"). */
 export function refusalOf(action, message) {
     if (message) return message;

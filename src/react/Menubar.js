@@ -21,6 +21,7 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {(kind: 'find'|'replace') => void} props.onFind
  * @param {() => void} props.onLink @param {() => void} props.onSettings @param {() => void} props.onConditional  Opens the panel of conditional formatting.
  * @param {() => void} props.onNames  Opens the panel of named ranges.
+ * @param {() => void} props.onComment  Starts a comment on the active cell.
  * @param {(() => void)|null} [props.onAccess]  Opens the panel of access and roles (an owner of a workbook with a policy only).
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
@@ -35,7 +36,7 @@ function actionOfMenu(value) {
         file: { import: 'import', download: 'download', settings: 'settings' },
         edit: { cut: 'copy', copy: 'copy', paste: 'paste', pasteValues: 'paste', pasteStyles: 'paste', clear: 'edit', deleteRows: 'rows.delete', deleteCols: 'cols.delete' },
         view: { freezeRows: 'view.freeze', freezeCols: 'view.freeze', gridlines: 'view.gridlines', foldRows: 'rows.group', foldCols: 'cols.group' },
-        insert: { rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
+        insert: { comment: 'comment', rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
         data: { sortSheet: 'sort', sortRange: 'sort', filter: 'filter', validation: 'validation', names: 'names' }
     };
     if (area === 'view' && (what === 'group' || what === 'ungroup')) return extra === 'cols' ? 'cols.group' : 'rows.group';
@@ -107,7 +108,8 @@ export function Menubar(props) {
             { value: 'insert:dropdown', label: 'Dropdown' },
             { separator: true },
             { label: 'Function', children: ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN'].map((f) => ({ value: 'insert:fn:' + f, label: f })) },
-            { value: 'insert:link', label: 'Link', hint: 'Ctrl+K' }
+            { value: 'insert:link', label: 'Link', hint: 'Ctrl+K' },
+            { value: 'insert:comment', label: 'Comment', hint: 'Ctrl+Alt+M' }
         ],
         Format: [
             { label: 'Number', children: [
@@ -230,6 +232,7 @@ export function Menubar(props) {
                 else if (what === 'sheet') run(() => { const id = wb.addSheet(undefined, how); if (id) props.onShow(id); });
                 else if (what === 'fn') props.onStartEdit(functionText(wb, s, sel, extra));
                 else if (what === 'link') props.onLink();
+                else if (what === 'comment') props.onComment();
                 // a checkbox in every cell of the selection (an empty one shows unticked): one change
                 else if (what === 'checkbox') run(() => wb.setValidation(s, b, { kind: 'checkbox' }, how));
                 else if (what === 'dropdown') props.onValidation('list');

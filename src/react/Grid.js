@@ -2,6 +2,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { colName } from '../core/formula/address.js';
 import { Icon } from './icons.js';
 import { Gutter, gutterSize } from './Outline.js';
+import { CommentCard } from './CommentCard.js';
 import { parseAddressText } from './FormulaBar.js';
 import { refusalOf } from '../core/policy.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
@@ -61,13 +62,13 @@ function bordersCss(borders) {
 // A cell is drawn only when it shows something (a value, a fill, a border). It leaves the last pixel on its right and at its bottom to the grid lines,
 // which are drawn once per row and once per column under the cells; a cell that must hide the lines inside it (a merged block, a text that runs on over
 // empty cells) covers them with the sheet's colour, as Google Sheets does.
-function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded, rule, invalid }) {
+function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded, rule, invalid, noted }) {
     const css = cellCss(style, display);
     // A text that runs on over the empty cells on its right takes only its text there: the cell's own fill (and its stripes when protected) stay
     // inside the cell itself, as in Google Sheets; the rest of the run is the sheet's colour, which hides the grid lines under the text.
     const own = cover && (css.background || guarded);
     return (
-        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '')} data-r={r} data-c={c}
+        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '') + (noted ? ' ks-noted' : '')} data-r={r} data-c={c}
             style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: own ? undefined : css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
             {own ? <span className={'ks-own' + (guarded ? ' ks-guarded' : '')} style={{ width: Math.max(0, ownWidth - 1), background: css.background }} /> : null}
             {rule && rule.kind === 'checkbox'
@@ -103,8 +104,10 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         // a cell under a rule of data validation shows a checkbox or a dropdown's arrow, and a mark when its value breaks a rule that only warns
         const rule = wb.validationAt(sheetId, r, c);
         const invalid = rule && rule.reject === false ? wb.invalidAt(sheetId, r, c) : null;
+        // a cell with an open thread of comments shows a mark in its corner
+        const noted = wb.hasComment(sheetId, r, c);
         // an empty cell with no style is not drawn: the grid lines are all it shows
-        if (display.kind === 'empty' && !style && !guarded && !rule) continue;
+        if (display.kind === 'empty' && !style && !guarded && !rule && !noted) continue;
         // A text that does not wrap and sits on the left runs on into the empty cells on its right, which are then not drawn (their grid lines would
         // cross the text). It stops at a protected cell that is shown striped. A centred text (the dots of a hidden cell) stays in its cell.
         let width = w;
@@ -117,7 +120,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
                 next++;
             }
         }
-        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={!!guarded} rule={rule} invalid={invalid} />);
+        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={!!guarded} rule={rule} invalid={invalid} noted={noted} />);
     }
     return cells;
 });
@@ -147,7 +150,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui, commenting, onCommenting }) {
     // what the access policy lets this person see (policy.js): no headers, no grid lines, only an area of the sheet
     const seen = ui || {};
     const HW = seen.headers === false ? 0 : ROW_HEADER_WIDTH, HH = seen.headers === false ? 0 : HEADER_HEIGHT;
@@ -313,6 +316,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 Digit4: () => setFormat(wb, sheetId, sel, 'money'), Digit5: () => setFormat(wb, sheetId, sel, 'percent') }[e.code]
             : !ctrl && e.shiftKey && e.altKey ? { Digit5: () => toggle(wb, sheetId, sel, 'strike') }[e.code] : undefined;
         if (shortcut) { e.preventDefault(); shortcut(); return; }
+        // Ctrl+Alt+M comments on the active cell, as in Google Sheets
+        if (ctrl && e.altKey && e.code === 'KeyM') { e.preventDefault(); if (onCommenting) onCommenting(true); return; }
         if (e.altKey && e.shiftKey && !ctrl && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
             e.preventDefault();
             try { groupSelection(wb, sheetId, sel, e.key === 'ArrowRight'); } catch (err) { if (onError) onError(err.message); }
@@ -707,6 +712,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const focus = focusOf(sel);
     // the host (the find bar) asks for the active cell to be shown
     useEffect(() => { if (revealTick) { reveal.current = true; showCell(sel.active); } }, [revealTick]);
+    // a comment started on one cell ends when another cell is selected
+    useEffect(() => { if (commenting && onCommenting) onCommenting(false); }, [sel.active.r, sel.active.c]);
     useEffect(() => {
         if (!reveal.current) return;
         showCell(focus);
@@ -905,6 +912,14 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                         else commit(null);
                     }}
                     onCopy={(e) => onCopyOrCut(e, false)} onCut={(e) => onCopyOrCut(e, true)} onPaste={onPaste} />
+                {!editing && box.width > 0 && (commenting || wb.hasComment(sheetId, sel.active.r, sel.active.c)) ? (() => {
+                    // the card of comments sits on the right of the active cell (on its left when there is no room)
+                    const b = cellBox(sel.active.r, sel.active.c);
+                    const left = b.x + b.w + 8 + 280 <= box.width ? b.x + b.w + 8 : Math.max(0, b.x - 288);
+                    return <CommentCard key={sel.active.r + ':' + sel.active.c} workbook={wb} sheetId={sheetId} r={sel.active.r} c={sel.active.c} at={{ left, top: Math.max(0, b.y) }}
+                        start={!!commenting} onError={(m) => onError && onError(m)}
+                        onDone={() => { if (onCommenting) onCommenting(false); if (sink.current) sink.current.focus({ preventScroll: true }); }} />;
+                })() : null}
                 {(() => {
                     const rule = !editing && wb.validationAt(sheetId, sel.active.r, sel.active.c);
                     if (!rule || !rule.help) return null;
