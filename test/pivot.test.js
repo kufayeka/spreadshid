@@ -161,7 +161,7 @@ sh.setValues('A1', [
     const byMonth = pivot(records, { rows: ['Tanggal'], group: { Tanggal: 'month' }, values: [{ field: 'Total' }], totals: false });
     assert.deepStrictEqual(byMonth.cells.slice(1), [['2026-10', 400], ['2026-11', 350]]);
     const byWeek = pivot(records, { rows: ['Tanggal'], group: { Tanggal: 'week' }, values: [{ field: 'Total' }], totals: false });
-    assert.deepStrictEqual(byWeek.cells.slice(1).map((r) => r[0]), ['2026-W40', '2026-W41', '2026-W44']);
+    assert.deepStrictEqual(byWeek.cells.slice(1).map((r) => r[0]), ['2026-W40', '2026-W41', '2026-W44', '2026-W45']);   // 1 Nov is a Sunday (W44), 2 Nov a Monday (W45)
     const ranked = pivot(records, { rows: ['Produk'], values: [{ field: 'Total', as: 'Omzet' }], sort: { Produk: { by: 'Omzet', dir: 'desc' } }, totals: false });
     assert.deepStrictEqual(ranked.cells.slice(1), [['Besi', 300], ['Cat', 300], ['Semen', 150]]);
     assert.throws(() => pivot(records, { rows: ['Produk'], values: [{ field: 'Total' }], sort: { Produk: { by: 'Qty' } } }), /sorts by a value it has/);
