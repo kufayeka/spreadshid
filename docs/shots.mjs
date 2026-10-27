@@ -48,6 +48,9 @@ export const SHOTS = [
     }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
     { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } },
     { name: 'kondisional', page: '06-kondisional.page.js', clip: { x: 0, y: 110, width: 1000, height: 330 } },
+    { name: 'pivot', page: '08-pivot.page.js', act: async ({ js, click, wait }) => {
+        const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(600);
+    }, clip: { x: 0, y: 110, width: 1366, height: 470 } },
     { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {
         const p = await js(`(function(){ var b = document.querySelector('.ks-filter-button[data-filter-col="2"]').getBoundingClientRect(); return { x: Math.round(b.left + 8), y: Math.round(b.top + 8) }; })()`);

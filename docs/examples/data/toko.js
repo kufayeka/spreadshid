@@ -29,8 +29,9 @@ export function penjualan(n = 300) {
     const out = [];
     for (let i = 0; i < n; i++) {
         const p = PRODUK[(i * 7 + (i >> 3)) % PRODUK.length];
-        const cabang = CABANG[(i * 5 + (i >> 2)) % 3];
-        const sales = SALES[cabang][(i >> 1) % 2];
+        // Jakarta cabang terbesar (3 dari 7 transaksi), Bandung dan Surabaya masing-masing 2; dua sales per cabang bergantian per minggu
+        const cabang = CABANG[[0, 1, 0, 2, 0, 1, 2][i % 7]];
+        const sales = SALES[cabang][Math.floor(i / 7) % 2];
         const qty = 1 + ((i * 13) % 17) + (p[2] === 'Semen' ? 10 : 0);
         const diskon = i % 9 === 0 ? 0.05 : i % 23 === 0 ? 0.1 : 0;
         out.push({ No: i + 1, Tanggal: 46296 + Math.floor(i / 10), Cabang: cabang, Sales: sales, Kode: p[0], Produk: p[1], Kategori: p[2], Qty: qty, Harga: p[5], Diskon: diskon });

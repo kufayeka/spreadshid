@@ -105,20 +105,22 @@ export function PivotPanel({ workbook: wb, sheetId: s, id, revision, onError, on
             {list.map((f) => (
                 <div key={f} className="ks-pivot-item">
                     <b>{f}</b>
-                    <select aria-label={'Order of ' + f} value={dirOf(f)} onChange={(e) => setSort(f, e.target.value, byOf(f))}>
-                        <option value="asc">Ascending</option><option value="desc">Descending</option>
-                    </select>
-                    <select aria-label={'Sort ' + f + ' by'} value={byOf(f)} onChange={(e) => setSort(f, dirOf(f), e.target.value)}>
-                        <option value="">by {f}</option>
-                        {values.map((v) => <option key={v.as || v.field} value={v.as || v.field}>by {String(v.fn || 'SUM').toUpperCase()} of {v.field}</option>)}
-                    </select>
-                    {holdsNumbers(f) || groupOf(f) ? (
-                        <select aria-label={'Group ' + f} value={groupOf(f)} onChange={(e) => setGroup(f, e.target.value)}>
-                            <option value="">No date groups</option><option value="year">Year</option><option value="quarter">Quarter</option>
-                            <option value="month">Month</option><option value="week">Week</option>
-                        </select>
-                    ) : null}
                     <button type="button" className="ks-tool" aria-label={'Remove ' + f + ' from ' + label} title="Remove" onClick={() => change({ [key]: list.filter((x) => x !== f) })}>✕</button>
+                    <div className="ks-pivot-opts">
+                        <select aria-label={'Order of ' + f} value={dirOf(f)} onChange={(e) => setSort(f, e.target.value, byOf(f))}>
+                            <option value="asc">Ascending</option><option value="desc">Descending</option>
+                        </select>
+                        <select aria-label={'Sort ' + f + ' by'} value={byOf(f)} onChange={(e) => setSort(f, dirOf(f), e.target.value)}>
+                            <option value="">by {f}</option>
+                            {values.map((v) => <option key={v.as || v.field} value={v.as || v.field}>by {v.as || String(v.fn || 'SUM').toUpperCase() + ' of ' + v.field}</option>)}
+                        </select>
+                        {holdsNumbers(f) || groupOf(f) ? (
+                            <select aria-label={'Group ' + f} value={groupOf(f)} onChange={(e) => setGroup(f, e.target.value)}>
+                                <option value="">No date groups</option><option value="year">Year</option><option value="quarter">Quarter</option>
+                                <option value="month">Month</option><option value="week">Week</option>
+                            </select>
+                        ) : null}
+                    </div>
                 </div>
             ))}
             <select className="ks-pivot-add" aria-label={'Add to ' + label} value="" onChange={(e) => { if (e.target.value) change({ [key]: list.concat([e.target.value]) }); }}>
