@@ -50,7 +50,13 @@ export function matrixOf(value, spec) {
     const table = (rows) => {
         const fields = fieldsOf(rows, spec && spec.fields);
         const body = rows.map((o) => fields.map((f) => o[f]));
-        return spec && spec.header ? [fields.slice()].concat(body) : body;
+        // the header row: the field names (header: true), or the titles a report wants, in the order of the fields (["No. PO", "Tanggal"]) or by
+        // field ({ id: "No. PO" }); a field without a title keeps its name
+        const h = spec && spec.header;
+        if (!h) return body;
+        const titles = Array.isArray(h) ? fields.map((f, i) => (h[i] === undefined ? f : h[i]))
+            : typeof h === "object" ? fields.map((f) => (h[f] === undefined ? f : h[f])) : fields.slice();
+        return [titles].concat(body);
     };
     if (!Array.isArray(value)) {
         if (isPlain(value) && !isCellObject(value, keys) && (shape === "auto" || shape === "table")) return table([value]);
@@ -109,7 +115,7 @@ export function expandPopulate(value, spec, limits) {
  *
  * @param {any} wb
  * @param {string} s
- * @param {{ at: string|{ r: number, c: number }, direction?: 'down'|'right', header?: boolean, fields?: string[], shape?: string, limit?: number }} spec
+ * @param {{ at: string|{ r: number, c: number }, direction?: 'down'|'right', header?: boolean|string[]|Object<string, string>, fields?: string[], shape?: string, limit?: number }} spec
  * @param {any} value
  * @returns {{ r1: number, c1: number, r2: number, c2: number }|null}  where it wrote
  */

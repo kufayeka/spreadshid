@@ -125,5 +125,16 @@ function boq() {
     ok('the server checks a save: protected cells, protected rows by a condition, types, deleted rows; mergePatch puts the patch on what is stored');
 }
 
+// the header row of a table: the field names, titles in the order of the fields, or titles by field
+{
+    const wb = createWorkbook();
+    const rows = [{ id: 'PO-1', qty: 4 }];
+    populate(wb, 'Sheet1', { at: 'A1', header: true }, rows);
+    populate(wb, 'Sheet1', { at: 'A4', header: ['No. PO', 'Jumlah'] }, rows);
+    populate(wb, 'Sheet1', { at: 'A7', header: { qty: 'Jumlah' } }, rows);
+    assert.deepStrictEqual([0, 3, 6].map((r) => [wb.value('Sheet1', r, 0), wb.value('Sheet1', r, 1)]), [['id', 'qty'], ['No. PO', 'Jumlah'], ['id', 'Jumlah']]);
+    ok('a populated table titles its columns by field name, by a list, or by field');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');
