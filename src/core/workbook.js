@@ -1268,7 +1268,8 @@ export function createWorkbook(doc, options) {
                 const rule = ruleAt(api, op.sheet, r, c);
                 if (!rule || rule.reject === false) continue;
                 const wanted = breaks(api, op.sheet, rule, engine.value(op.sheet, ch.row, ch.col));
-                if (wanted) return { op, message: 'The value in ' + colName(c) + (r + 1) + ' must be ' + wanted };
+                // the rule's own message when it has one (in the app's language, "{cell}" stands for the address), else the one made here
+                if (wanted) return { op, message: rule.message ? String(rule.message).split('{cell}').join(colName(c) + (r + 1)) : 'The value in ' + colName(c) + (r + 1) + ' must be ' + wanted };
             }
         }
         return null;

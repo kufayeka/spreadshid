@@ -38,7 +38,7 @@ export function ValidationDialog({ range, rule, onSave, onRemove, onClose, conta
     const ops = kind === 'text' ? TEXT_OPS : NUMBER_OPS;
 
     function save() {
-        const spec = { kind, reject, ...(help ? { help } : {}) };
+        const spec = { kind, reject, ...(help ? { help } : {}), ...(rule && rule.message ? { message: rule.message } : {}) };
         if (kind === 'list') spec.values = values.split(',').map((x) => x.trim()).filter(Boolean);
         if (kind === 'listFrom') spec.source = source.trim();
         if (numeric || kind === 'text') {

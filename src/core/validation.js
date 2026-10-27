@@ -10,7 +10,8 @@
 //     op: 'between' | 'notBetween' | 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'notContains' | 'email' | 'url',
 //     a, b,                                       the bounds of op
 //     reject: true,                               true: what breaks it is refused; false: it is kept and marked
-//     help: 'Pick a status' }                     shown when a cell of the range is selected
+//     help: 'Pick a status',                      shown when a cell of the range is selected
+//     message: 'Qty in {cell} is 1 to 500' }      what a refusal says ({cell} is the address); none: a message made from the rule, in English
 
 import { newId } from './ids.js';
 import { colIndex } from './formula/address.js';

@@ -81,5 +81,17 @@ const rect = (r1, c1, r2, c2) => ({ r1, c1, r2: r2 === undefined ? r1 : r2, c2: 
     ok('rules are one change (undo, redo), can be removed, the last one wins, and are saved with the sheet');
 }
 
+// a rule's own message (in the app's language) is what a refusal says, with {cell} as the address
+{
+    const wb = createWorkbook();
+    const s = wb.sheet('Sheet1');
+    const said = [];
+    wb.on('reject', (e) => said.push(e.reason));
+    s.addValidation('D2:D9', { kind: 'number', op: 'between', a: 1, b: 500, reject: true, message: 'Qty di {cell} harus 1 sampai 500' });
+    s.setValues('D3', 0, { source: 'user' });
+    assert.deepStrictEqual(said, ['Qty di D3 harus 1 sampai 500']);
+    ok('a rule of validation says its own message when it has one');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');
