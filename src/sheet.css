@@ -314,3 +314,23 @@
 .ks-outline-toggle { border: 1px solid #80868b; border-radius: 2px; background: var(--ks-bg); }
 .ks-outline-toggle:hover, .ks-outline-level:hover { background: #e8eaed; }
 .ks-outline-level { border: 0; border-radius: 2px; background: none; color: #5f6368; }
+/* access and roles: the panel, and the bar that says the sheet is seen as a role */
+.ks-viewas { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #fef7e0; color: #3c4043; border-bottom: 1px solid #f9d77e; font: var(--ks-ui-font); }
+.ks-viewas .ks-button { margin-left: auto; }
+.ks-access { width: 360px; }
+.ks-access-section { display: flex; flex-direction: column; gap: 8px; }
+.ks-access-section h3 { margin: 4px 0 0; font-size: 13px; font-weight: 500; }
+.ks-access-roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.ks-chip { font: inherit; padding: 4px 10px; border: 1px solid #dadce0; border-radius: 16px; background: var(--ks-bg); color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; }
+.ks-chip.ks-on { background: #e8f0fe; border-color: var(--ks-accent); color: var(--ks-accent); }
+.ks-chip-add .ks-icon { width: 14px; height: 14px; }
+.ks-access-role { display: flex; flex-direction: column; gap: 8px; }
+.ks-access-row { display: flex; align-items: center; gap: 6px; }
+.ks-access-row input { flex: 1; min-width: 0; }
+.ks-access-group { border: 1px solid #e0e0e0; border-radius: 4px; padding: 6px 10px 8px; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.ks-access-group legend { font-size: 12px; color: #5f6368; padding: 0 4px; }
+.ks-access-group .ks-field, .ks-access-group .ks-rule-list, .ks-access-group .ks-add-rule { grid-column: 1 / -1; }
+.ks-check { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.ks-check.ks-implied { color: #80868b; }
+.ks-access-range, .ks-access-member { gap: 6px; padding: 4px 6px; }
+.ks-access-range .ks-rule-text, .ks-access-member .ks-rule-says { flex: 1; min-width: 0; }

@@ -21,6 +21,7 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {(kind: 'find'|'replace') => void} props.onFind
  * @param {() => void} props.onLink @param {() => void} props.onSettings @param {() => void} props.onConditional  Opens the panel of conditional formatting.
  * @param {() => void} props.onNames  Opens the panel of named ranges.
+ * @param {(() => void)|null} [props.onAccess]  Opens the panel of access and roles (an owner of a workbook with a policy only).
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
  * @param {(message: string) => void} props.onError  Also how what an import left out is told.
@@ -139,6 +140,7 @@ export function Menubar(props) {
             { value: 'data:filter', label: sheet.filter ? 'Remove filter' : 'Create a filter' },
             { value: 'data:validation', label: 'Data validation' },
             { value: 'data:names', label: 'Named ranges' },
+            ...(props.onAccess ? [{ separator: true }, { value: 'data:access', label: 'Access and roles…' }] : []),
             { separator: true },
             { label: 'Sort range', disabled: nr < 2, children: [{ value: 'data:sortRange:asc', label: 'Sort range by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortRange:desc', label: 'Sort range by column ' + colName(sel.active.c) + ' (Z to A)' }] }
         ]
@@ -243,6 +245,7 @@ export function Menubar(props) {
             case 'data': {
                 if (what === 'validation') { props.onValidation(null); break; }
                 if (what === 'names') { props.onNames(); break; }
+                if (what === 'access') { if (props.onAccess) props.onAccess(); break; }
                 // a filter on the selection, or on the block of filled cells around the active cell when one cell is selected (as in Google Sheets)
                 if (what === 'filter') {
                     if (sheet.filter) run(() => wb.removeFilter(s, how));
