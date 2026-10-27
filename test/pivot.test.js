@@ -29,6 +29,11 @@ sh.setValues('A1', [
     rab.addName('Pekerjaan', 'Sheet1', 'A1:F7');
     assert.strictEqual(tableOf(rab, null, 'Pekerjaan').records.length, 5, 'a named range');
     assert.throws(() => tableOf(rab, null, 'A1:B2'), /not a named range, and no sheet/);
+    // a column this person may not see is read as empty (its header still names it)
+    const secret = createWorkbook();
+    secret.setValues('Sheet1', 'A1', [['Bab', 'Biaya'], ['Tanah', 10], ['Tanah', 5]]);
+    secret.setRules([{ columns: ['Biaya'], mode: 'hidden' }]);
+    assert.deepStrictEqual(tableOf(secret, 'Sheet1', 'A1:B3').records, [{ Bab: 'Tanah', Biaya: null }, { Bab: 'Tanah', Biaya: null }], 'hidden cells are read as empty');
     ok('tableOf: a range, whole columns, a named range; formulas worked out, empty rows left out');
 }
 

@@ -51,7 +51,9 @@ export function tableOf(wb, sheet, where) {
         } else rect = rangeOf(where);
     } else rect = where;
     if (!s) throw new Error('tableOf: "' + where + '" is not a named range, and no sheet was given');
-    const read = (r) => { const row = []; for (let c = rect.c1; c <= rect.c2; c++) row.push(wb.value(s, r, c)); return row; };
+    // a cell this person may not see (hidden or invisible by the rules) is read as empty: a summary does not tell what the cells do not
+    const unseen = (r, c) => { const m = wb.modeAt ? wb.modeAt(s, r, c) : null; return !!m && (m.mode === 'hidden' || m.mode === 'invisible'); };
+    const read = (r) => { const row = []; for (let c = rect.c1; c <= rect.c2; c++) row.push(unseen(r, c) ? null : wb.value(s, r, c)); return row; };
     const fields = fieldNames(read(rect.r1), rect.c1);
     const records = [];
     for (let r = rect.r1 + 1; r <= rect.r2; r++) {
