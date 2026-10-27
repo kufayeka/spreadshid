@@ -2,6 +2,8 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { colName } from '../core/formula/address.js';
 import { Icon } from './icons.js';
 import { Gutter, gutterSize } from './Outline.js';
+import { parseAddressText } from './FormulaBar.js';
+import { refusalOf } from '../core/policy.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
 import { createAxis } from '../core/axis.js';
@@ -145,7 +147,10 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui }) {
+    // what the access policy lets this person see (policy.js): no headers, no grid lines, only an area of the sheet
+    const seen = ui || {};
+    const HW = seen.headers === false ? 0 : ROW_HEADER_WIDTH, HH = seen.headers === false ? 0 : HEADER_HEIGHT;
     const scroller = useRef(null);
     const view = useRef(null);
     // the keyboard sink is the host's when it gives one (the formula bar gives the keyboard back to it)
@@ -197,16 +202,18 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const props = useMemo(() => wb.sheetProps(sheetId), [wb, sheetId, revision]);
     // the sizes of the sheet at the zoom (the workbook keeps them at 100%)
     const baseRows = wb.rowAxis(sheetId), baseCols = wb.colAxis(sheetId);
-    const rowAxis = useMemo(() => (zoom === 1 ? baseRows : createAxis(baseRows.count, (i) => baseRows.size(i) * zoom)), [baseRows, zoom]);
-    const colAxis = useMemo(() => (zoom === 1 ? baseCols : createAxis(baseCols.count, (i) => baseCols.size(i) * zoom)), [baseCols, zoom]);
+    // the rows and columns outside the area the policy shows have no size here (they are the person's to not see, not hidden in the sheet)
+    const area = useMemo(() => (seen.area ? parseAddressText(seen.area) : null), [seen.area]);
+    const rowAxis = useMemo(() => (zoom === 1 && !area ? baseRows : createAxis(baseRows.count, (i) => (area && (i < area.r1 || i > area.r2) ? 0 : baseRows.size(i) * zoom))), [baseRows, zoom, area]);
+    const colAxis = useMemo(() => (zoom === 1 && !area ? baseCols : createAxis(baseCols.count, (i) => (area && (i < area.c1 || i > area.c2) ? 0 : baseCols.size(i) * zoom))), [baseCols, zoom, area]);
     const size = { rows: rowAxis.count, cols: colAxis.count };
     const blocks = useMemo(() => wb.merges(sheetId), [wb, sheetId, revision]);
-    const layout = layoutOf({ rows: rowAxis, cols: colAxis, freezeRows: props.freezeRows, freezeCols: props.freezeCols,
+    const layout = layoutOf({ headW: HW, headH: HH, rows: rowAxis, cols: colAxis, freezeRows: props.freezeRows, freezeCols: props.freezeCols,
         scrollTop: scroll.top, scrollLeft: scroll.left, width: box.width, height: box.height });
 
     const fw = layout.frozenWidth, fh = layout.frozenHeight;
     const R = layout.rows, C = layout.cols;
-    const top = HEADER_HEIGHT, left = ROW_HEADER_WIDTH;
+    const top = HH, left = HW;
 
     const blockAt = (r, c) => blocks.find((b) => r >= b.r1 && r <= b.r2 && c >= b.c1 && c <= b.c2);
 
@@ -353,6 +360,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (editing) return; // the editor copies its own text
         if (rects.length !== 1) { e.preventDefault(); return; } // as in Google Sheets: a copy is one rectangle
         e.preventDefault();
+        // the access policy may keep the sheet's content in it (no copy out)
+        if (!wb.can('copy')) { if (onError) onError(refusalOf('copy', wb.access().message)); return; }
         const clip = copyBlock(wb, sheetId, rects[0], cut);
         e.clipboardData.setData('text/plain', clipText(clip));
         rememberCopy(clip);
@@ -363,6 +372,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     function onPaste(e) {
         if (editing) return; // the editor pastes into its text
         e.preventDefault();
+        if (!wb.can('paste')) { if (onError) onError(refusalOf('paste', wb.access().message)); return; }
         const only = valuesOnly.current ? 'values' : 'all';
         valuesOnly.current = false;
         const target = rects[rects.length - 1];
@@ -747,8 +757,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         const x0 = colAxis.start(cols.from) - xBase, x1 = colAxis.start(cols.to + 1) - xBase;
         const y0 = rowAxis.start(rows.from) - yBase, y1 = rowAxis.start(rows.to + 1) - yBase;
         // a sheet can hide its grid lines (View, Show, Gridlines)
-        if (!props.hideGridlines) for (let r = rows.from; r <= rows.to; r++) if (rowAxis.size(r)) out.push(<div key={'h' + r} className="ks-line-h" style={{ top: rowAxis.start(r + 1) - yBase - 1, left: x0, width: x1 - x0 }} />);
-        if (!props.hideGridlines) for (let c = cols.from; c <= cols.to; c++) if (colAxis.size(c)) out.push(<div key={'v' + c} className="ks-line-v" style={{ left: colAxis.start(c + 1) - xBase - 1, top: y0, height: y1 - y0 }} />);
+        if (!props.hideGridlines && seen.gridlines !== false) for (let r = rows.from; r <= rows.to; r++) if (rowAxis.size(r)) out.push(<div key={'h' + r} className="ks-line-h" style={{ top: rowAxis.start(r + 1) - yBase - 1, left: x0, width: x1 - x0 }} />);
+        if (!props.hideGridlines && seen.gridlines !== false) for (let c = cols.from; c <= cols.to; c++) if (colAxis.size(c)) out.push(<div key={'v' + c} className="ks-line-v" style={{ left: colAxis.start(c + 1) - xBase - 1, top: y0, height: y1 - y0 }} />);
         for (let r = rows.from; r <= rows.to; r++) {
             const h = rowAxis.size(r);
             if (!h) continue;
@@ -835,8 +845,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         for (let c = cols.from; c <= cols.to; c++) {
             const w = colAxis.size(c);
             if (!w) continue;
-            out.push(<div key={c} className={'ks-colhead' + colState(c)} data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HEADER_HEIGHT }}>{colName(c)}</div>);
-            out.push(<div key={'e' + c} className="ks-colresize" data-resize-col={c} style={{ left: colAxis.start(c + 1) - base - 3, height: HEADER_HEIGHT }} />);
+            out.push(<div key={c} className={'ks-colhead' + colState(c)} data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HH }}>{colName(c)}</div>);
+            out.push(<div key={'e' + c} className="ks-colresize" data-resize-col={c} style={{ left: colAxis.start(c + 1) - base - 3, height: HH }} />);
         }
         return out;
     };
@@ -846,8 +856,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         for (let r = rows.from; r <= rows.to; r++) {
             const h = rowAxis.size(r);
             if (!h) continue;
-            out.push(<div key={r} className={'ks-rowhead' + rowState(r)} data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: ROW_HEADER_WIDTH }}>{r + 1}</div>);
-            out.push(<div key={'e' + r} className="ks-rowresize" data-resize-row={r} style={{ top: rowAxis.start(r + 1) - base - 3, width: ROW_HEADER_WIDTH }} />);
+            out.push(<div key={r} className={'ks-rowhead' + rowState(r)} data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: HW }}>{r + 1}</div>);
+            out.push(<div key={'e' + r} className="ks-rowresize" data-resize-row={r} style={{ top: rowAxis.start(r + 1) - base - 3, width: HW }} />);
         }
         return out;
     };
@@ -863,9 +873,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const sx = scroll.left, sy = scroll.top;
     return (
         <div className="ks-grid-frame" style={{ gridTemplateColumns: gw + 'px minmax(0, 1fr)', gridTemplateRows: gh + 'px minmax(0, 1fr)' }}>
-        {gh && box.width > 0 ? <Gutter kind="cols" outline={colOutline} axis={colAxis} frozen={props.freezeCols || 0} frozenSize={fw} shown={{ from: 0, to: C.scrolling.to }} scroll={sx} length={box.width}
+        {gh && box.width > 0 ? <Gutter kind="cols" headSize={HW} outline={colOutline} axis={colAxis} frozen={props.freezeCols || 0} frozenSize={fw} shown={{ from: 0, to: C.scrolling.to }} scroll={sx} length={box.width}
             onToggle={(g) => wb.foldColGroup(sheetId, g.from, g.level, !g.folded, how)} onLevel={(level) => wb.showColLevel(sheetId, level, how)} /> : null}
-        {gw && box.height > 0 ? <Gutter kind="rows" outline={rowOutline} axis={rowAxis} frozen={props.freezeRows || 0} frozenSize={fh} shown={{ from: 0, to: R.scrolling.to }} scroll={sy} length={box.height}
+        {gw && box.height > 0 ? <Gutter kind="rows" headSize={HH} outline={rowOutline} axis={rowAxis} frozen={props.freezeRows || 0} frozenSize={fh} shown={{ from: 0, to: R.scrolling.to }} scroll={sy} length={box.height}
             onToggle={(g) => wb.foldRowGroup(sheetId, g.from, g.level, !g.folded, how)} onLevel={(level) => wb.showRowLevel(sheetId, level, how)} /> : null}
         <div className="ks-grid" ref={scroller} onScroll={onScroll}>
             <div className="ks-spacer" style={{ width: layout.contentWidth, height: layout.contentHeight }} />
@@ -876,11 +886,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                         <Pane className="ks-top" left={left + fw} top={top} width={layout.mainWidth} height={fh} shiftX={sx} shiftY={0}>{paneCells(R.frozen, C.scrolling, false, true)}</Pane>
                         <Pane className="ks-left" left={left} top={top + fh} width={fw} height={layout.mainHeight} shiftX={0} shiftY={sy}>{paneCells(R.scrolling, C.frozen, true, false)}</Pane>
                         <Pane className="ks-corner" left={left} top={top} width={fw} height={fh} shiftX={0} shiftY={0}>{paneCells(R.frozen, C.frozen, false, false)}</Pane>
-                        <Pane className="ks-heads-cols" left={left + fw} top={0} width={layout.mainWidth} height={HEADER_HEIGHT} shiftX={sx} shiftY={0}>{colHeads(C.scrolling, true)}</Pane>
-                        <Pane className="ks-heads-cols ks-frozen" left={left} top={0} width={fw} height={HEADER_HEIGHT} shiftX={0} shiftY={0}>{colHeads(C.frozen, false)}</Pane>
-                        <Pane className="ks-heads-rows" left={0} top={top + fh} width={ROW_HEADER_WIDTH} height={layout.mainHeight} shiftX={0} shiftY={sy}>{rowHeads(R.scrolling, true)}</Pane>
-                        <Pane className="ks-heads-rows ks-frozen" left={0} top={top} width={ROW_HEADER_WIDTH} height={fh} shiftX={0} shiftY={0}>{rowHeads(R.frozen, false)}</Pane>
-                        <div className="ks-origin" style={{ width: ROW_HEADER_WIDTH, height: HEADER_HEIGHT }} />
+                        <Pane className="ks-heads-cols" left={left + fw} top={0} width={layout.mainWidth} height={HH} shiftX={sx} shiftY={0}>{colHeads(C.scrolling, true)}</Pane>
+                        <Pane className="ks-heads-cols ks-frozen" left={left} top={0} width={fw} height={HH} shiftX={0} shiftY={0}>{colHeads(C.frozen, false)}</Pane>
+                        <Pane className="ks-heads-rows" left={0} top={top + fh} width={HW} height={layout.mainHeight} shiftX={0} shiftY={sy}>{rowHeads(R.scrolling, true)}</Pane>
+                        <Pane className="ks-heads-rows ks-frozen" left={0} top={top} width={HW} height={fh} shiftX={0} shiftY={0}>{rowHeads(R.frozen, false)}</Pane>
+                        <div className="ks-origin" style={{ width: HW, height: HH }} />
                         {fh > 0 ? <div className="ks-freeze-line ks-h" style={{ top: top + fh - 1, width: box.width }} /> : null}
                         {fw > 0 ? <div className="ks-freeze-line ks-v" style={{ left: left + fw - 1, height: box.height }} /> : null}
                         {guide ? <div className={'ks-guide ' + (guide.kind === 'col' ? 'ks-v' : 'ks-h')} style={guide.kind === 'col' ? { left: guide.at - 1, height: box.height } : { top: guide.at - 1, width: box.width }} /> : null}

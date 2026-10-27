@@ -23,6 +23,14 @@ const LINES = { thin: { width: 1, style: 'solid' }, medium: { width: 2, style: '
  * @param {() => void} props.onDone  A select was used: the keyboard goes back to the grid.
  * @param {import('react').RefObject<HTMLElement>} props.container
  */
+// the action of the access policy each tool needs (policy.js), by the start of its label
+const TOOL_ACTION = {
+    'Paint format': 'format', 'Format as': 'format.number', 'Decrease decimal': 'format.number', 'Increase decimal': 'format.number', 'More formats': 'format.number',
+    'Bold': 'format.bold', 'Italic': 'format.italic', 'Strikethrough': 'format.strike', 'Underline': 'format.underline', 'Borders': 'format.borders', 'Merge cells': 'format.merge',
+    'Horizontal align': 'format.align', 'Vertical align': 'format.align', 'Text wrapping': 'format.wrap', 'Text rotation': 'format.rotate', 'Insert link': 'format.link',
+    'Functions': 'edit', 'Clear formatting': 'format.clear'
+};
+
 export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting, onPaint, onStartEdit, onLink, onDone, container }) {
     const [menu, setMenu] = useState(null); // { kind, x, y }
     const [borderLine, setBorderLine] = useState({ width: 1, style: 'solid', color: '#000000' });
@@ -36,9 +44,11 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
     const someDay = 46321.5625; // 26 October 2026, 13:30
 
     const open = (kind) => (e) => { const b = e.currentTarget.getBoundingClientRect(); setMenu({ kind, x: b.left, y: b.bottom + 2 }); };
+    // a tool the access policy does not let this person use is greyed (the workbook would refuse it anyway, and say why)
+    const allowed = (label) => { const action = Object.entries(TOOL_ACTION).find(([k]) => label.startsWith(k)); return !action || wb.can(action[1]); };
     const tool = (label, icon, onClick, pressed, extra) => (
         <button type="button" className={'ks-tool' + (pressed ? ' ks-pressed' : '')} aria-label={label} title={label} aria-pressed={pressed === undefined ? undefined : !!pressed}
-            onMouseDown={keep} onClick={onClick} {...extra}>{icon}</button>
+            onMouseDown={keep} onClick={onClick} {...extra} disabled={(extra && extra.disabled) || !allowed(label)}>{icon}</button>
     );
     const dropTool = (label, icon, kind) => tool(label, <>{icon}<Icon name="drop" /></>, open(kind), undefined, { 'aria-haspopup': 'menu' });
 
@@ -102,10 +112,10 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
             {tool('Increase decimal places', <span className="ks-tool-text">.00&#8594;</span>, () => stepDecimals(wb, s, sel, 1))}
             {dropTool('More formats', <span className="ks-tool-text">123</span>, 'formats')}
             {sep('b')}
-            <select className="ks-tool-select ks-font" aria-label="Font" title="Font" value={style.font || 'Arial'} onChange={(e) => { setPart(wb, s, sel, 'font', e.target.value === 'Arial' ? null : e.target.value); onDone(); }}>
+            <select className="ks-tool-select ks-font" aria-label="Font" title="Font" disabled={!wb.can('format.font')} value={style.font || 'Arial'} onChange={(e) => { setPart(wb, s, sel, 'font', e.target.value === 'Arial' ? null : e.target.value); onDone(); }}>
                 {FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
             </select>
-            <select className="ks-tool-select ks-size" aria-label="Font size" title="Font size" value={style.fontSize || 10} onChange={(e) => { setPart(wb, s, sel, 'fontSize', Number(e.target.value) === 10 ? null : Number(e.target.value)); onDone(); }}>
+            <select className="ks-tool-select ks-size" aria-label="Font size" title="Font size" disabled={!wb.can('format.size')} value={style.fontSize || 10} onChange={(e) => { setPart(wb, s, sel, 'fontSize', Number(e.target.value) === 10 ? null : Number(e.target.value)); onDone(); }}>
                 {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             {sep('c')}
@@ -113,13 +123,13 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
             {tool('Italic (Ctrl+I)', <Icon name="italic" />, () => toggle(wb, s, sel, 'italic'), style.italic)}
             {tool('Strikethrough (Alt+Shift+5)', <Icon name="strike" />, () => toggle(wb, s, sel, 'strike'), style.strike)}
             {tool('Underline (Ctrl+U)', <Icon name="underline" />, () => toggle(wb, s, sel, 'underline'), style.underline)}
-            <ColorPicker label="Text color" icon={<Icon name="textColor" under={style.color || '#000000'} />} value={style.color || null} container={container}
+            <ColorPicker label="Text color" disabled={!wb.can('format.color')} icon={<Icon name="textColor" under={style.color || '#000000'} />} value={style.color || null} container={container}
                 onPick={(c) => setPart(wb, s, sel, 'color', c)} />
-            <ColorPicker label="Fill color" icon={<Icon name="fill" under={style.fill || '#ffffff'} />} value={style.fill || null} container={container}
+            <ColorPicker label="Fill color" disabled={!wb.can('format.fill')} icon={<Icon name="fill" under={style.fill || '#ffffff'} />} value={style.fill || null} container={container}
                 onPick={(c) => setPart(wb, s, sel, 'fill', c)} />
             {sep('d')}
             {dropTool('Borders', <Icon name="borders" />, 'borders')}
-            <ColorPicker label="Border color" icon={<span className="ks-border-swatch" style={{ background: borderLine.color }} />} value={borderLine.color} container={container}
+            <ColorPicker label="Border color" disabled={!wb.can('format.borders')} icon={<span className="ks-border-swatch" style={{ background: borderLine.color }} />} value={borderLine.color} container={container}
                 onPick={(c) => setBorderLine({ ...borderLine, color: c || '#000000' })} />
             {dropTool('Merge cells', <Icon name="merge" />, 'merge')}
             {sep('e')}

@@ -27,6 +27,24 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {string} [props.fileName]  The name a download gets (without its extension).
  * @param {import('react').RefObject<HTMLElement>} props.container
  */
+// the action of the access policy a menu item needs, by its value ("area:what:extra")
+function actionOfMenu(value) {
+    const [area, what, extra] = value.split(':');
+    const BY = {
+        file: { import: 'import', download: 'download', settings: 'settings' },
+        edit: { cut: 'copy', copy: 'copy', paste: 'paste', pasteValues: 'paste', pasteStyles: 'paste', clear: 'edit', deleteRows: 'rows.delete', deleteCols: 'cols.delete' },
+        view: { freezeRows: 'view.freeze', freezeCols: 'view.freeze', gridlines: 'view.gridlines', foldRows: 'rows.group', foldCols: 'cols.group' },
+        insert: { rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
+        data: { sortSheet: 'sort', sortRange: 'sort', filter: 'filter', validation: 'validation', names: 'names' }
+    };
+    if (area === 'view' && (what === 'group' || what === 'ungroup')) return extra === 'cols' ? 'cols.group' : 'rows.group';
+    if (area === 'format') return what === 'conditional' ? 'format.conditional' : what === 'clear' ? 'format.clear' : 'format.number';
+    if (area === 'style') return 'format.' + what;
+    if (area === 'align' || area === 'valign') return 'format.align';
+    if (['wrap', 'rotate', 'size', 'merge'].includes(area)) return 'format.' + (area === 'size' ? 'size' : area);
+    return (BY[area] && BY[area][what]) || null;
+}
+
 export function Menubar(props) {
     const { workbook: wb, sheetId: s, sel, setSel, sinkRef, container } = props;
     const [open, setOpen] = useState(null); // { name, x, y }
@@ -125,6 +143,17 @@ export function Menubar(props) {
             { label: 'Sort range', disabled: nr < 2, children: [{ value: 'data:sortRange:asc', label: 'Sort range by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortRange:desc', label: 'Sort range by column ' + colName(sel.active.c) + ' (Z to A)' }] }
         ]
     };
+
+    // an item the access policy does not let this person use is greyed (policy.js); its submenus are looked at too
+    const greyed = (items) => items.map((item) => {
+        if (item.separator) return item;
+        const out = { ...item };
+        if (item.children) { out.children = greyed(item.children); if (out.children.every((x) => x.separator || x.disabled)) out.disabled = true; }
+        const action = item.value ? actionOfMenu(item.value) : null;
+        if (action && !wb.can(action)) out.disabled = true;
+        return out;
+    });
+    for (const name of Object.keys(MENUS)) MENUS[name] = greyed(MENUS[name]);
 
     const how = { source: 'user' };
     const run = (fn) => { try { fn(); } catch (err) { props.onError(err.message); } };

@@ -237,9 +237,11 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     }
 
     // Nothing here may touch window or document while rendering: Next.js renders this on the server first, where neither exists.
+    // what the access policy lets this person see (policy.js): the parts of the screen it hides are not drawn
+    const ui = wb.access().ui;
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
-            <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
+            {ui.menubar ? <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
@@ -249,11 +251,11 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                     setValidating({ range: rectText(b), rule: kind ? { kind } : own });
                 }}
                 onStartEdit={(text) => setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' })}
-                onReveal={() => setRevealTick((t) => t + 1)} container={root} />
-            <Toolbar workbook={wb} sheetId={sheetId} sel={sel} revision={revision} zoom={zoom} onZoom={setZoom} painting={!!paint} onPaint={onPaint}
+                onReveal={() => setRevealTick((t) => t + 1)} container={root} /> : null}
+            {ui.toolbar ? <Toolbar workbook={wb} sheetId={sheetId} sel={sel} revision={revision} zoom={zoom} onZoom={setZoom} painting={!!paint} onPaint={onPaint}
                 onStartEdit={(text) => { setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' }); }}
-                onLink={() => setLinking(true)} onDone={toGrid} container={root} />
-            <FormulaBar address={nameOfSelection() || rectText(rectsOf(sel)[rectsOf(sel).length - 1])} onGoName={goToName} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
+                onLink={() => setLinking(true)} onDone={toGrid} container={root} /> : null}
+            {ui.formulaBar ? <FormulaBar address={nameOfSelection() || rectText(rectsOf(sel)[rectsOf(sel).length - 1])} onGoName={goToName} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
                 onStartEdit={(text) => {
                     const m = wb.modeAt(sheetId, sel.active.r, sel.active.c);
                     if (m) { setNotice(m.message || 'This cell is protected: it cannot be changed here'); toGrid(); return; }
@@ -268,10 +270,10 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                     setSel({ ranges: [{ anchor: { r: Math.min(b.r1, r2), c: Math.min(b.c1, c2) }, focus: { r: r2, c: c2 } }], active: { r: Math.min(b.r1, r2), c: Math.min(b.c1, c2) } });
                     setRevealTick((t) => t + 1);
                     toGrid();
-                }} />
+                }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}
@@ -285,7 +287,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 {panel && panel.kind === 'names' ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
                     onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>
-            <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} />
+            {ui.tabs ? <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} /> : null}
             {filterMenu && wb.filterOf(sheetId) ? (
                 <FilterMenu workbook={wb} sheetId={sheetId} c={filterMenu.c} at={filterMenu} container={root} onError={setNotice}
                     onClose={() => { setFilterMenu(null); toGrid(); }}

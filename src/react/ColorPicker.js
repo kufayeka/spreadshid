@@ -24,14 +24,15 @@ export const PALETTE = [
  * @param {string|null} props.value  The colour now (of the active cell).
  * @param {(color: string|null) => void} props.onPick
  * @param {import('react').RefObject<HTMLElement>} props.container
+ * @param {boolean} [props.disabled]  The access policy does not let this person use it.
  */
-export function ColorPicker({ label, icon, value, onPick, container }) {
+export function ColorPicker({ label, icon, value, onPick, container, disabled }) {
     const service = useMachine(popover.machine, { id: useId(), positioning: { placement: 'bottom-start', gutter: 4, strategy: 'fixed' } });
     const api = popover.connect(service, normalizeProps);
     const pick = (color) => { onPick(color); api.setOpen(false); };
     return (
         <>
-            <button type="button" {...api.getTriggerProps()} className="ks-tool" aria-label={label} title={label} onMouseDown={(e) => e.preventDefault()}>
+            <button type="button" {...api.getTriggerProps()} className="ks-tool" aria-label={label} title={label} disabled={!!disabled} onMouseDown={(e) => e.preventDefault()}>
                 {icon}
             </button>
             {api.open ? (

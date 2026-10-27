@@ -20,11 +20,12 @@ export const gutterSize = (maxLevel) => (maxLevel ? (maxLevel + 1) * LEVEL_SIZE 
  * @param {{ from: number, to: number }} p.shown  The rows (or columns) the grid draws now (frozen ones included).
  * @param {number} p.scroll  The grid's scroll along this direction. @param {number} p.length  The grid's box along it.
  * @param {(g: object) => void} p.onToggle  A group's [−] / [+] was clicked.
+ * @param {number} [p.headSize]  How big the headers along it are (0 when they are hidden).
  * @param {(level: number) => void} p.onLevel  A level button was clicked: show the groups up to that level (0: fold them all).
  */
-export function Gutter({ kind, outline, axis, frozen, frozenSize, shown, scroll, length, onToggle, onLevel }) {
+export function Gutter({ kind, outline, axis, frozen, frozenSize, shown, scroll, length, onToggle, onLevel, headSize }) {
     const rows = kind === 'rows';
-    const head = rows ? HEADER_HEIGHT : ROW_HEADER_WIDTH;
+    const head = headSize !== undefined ? headSize : rows ? HEADER_HEIGHT : ROW_HEADER_WIDTH;
     const size = gutterSize(outline.maxLevel);
     // where a row (or column) starts in the gutter, and whether it is cut by the frozen part
     const at = (i) => head + axis.start(i) - (i >= frozen ? scroll : 0);

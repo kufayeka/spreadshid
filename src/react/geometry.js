@@ -40,19 +40,20 @@ export function frozenSpan(axis, frozen) {
  * @param {{ rows: any, cols: any, freezeRows: number, freezeCols: number, scrollTop: number, scrollLeft: number, width: number, height: number }} at
  */
 export function layoutOf(at) {
+    const HW = at.headW === undefined ? ROW_HEADER_WIDTH : at.headW, HH = at.headH === undefined ? HEADER_HEIGHT : at.headH;
     const fr = Math.min(at.freezeRows || 0, at.rows.count);
     const fc = Math.min(at.freezeCols || 0, at.cols.count);
     const frozenHeight = at.rows.start(fr);
     const frozenWidth = at.cols.start(fc);
-    const cellsWidth = Math.max(0, at.width - ROW_HEADER_WIDTH);
-    const cellsHeight = Math.max(0, at.height - HEADER_HEIGHT);
+    const cellsWidth = Math.max(0, at.width - HW);
+    const cellsHeight = Math.max(0, at.height - HH);
     const mainWidth = Math.max(0, cellsWidth - frozenWidth);
     const mainHeight = Math.max(0, cellsHeight - frozenHeight);
     return {
         fr, fc, frozenHeight, frozenWidth, mainWidth, mainHeight,
         // the size the scroller must have so that its scrollbars reach the last row and the last column
-        contentWidth: ROW_HEADER_WIDTH + at.cols.total,
-        contentHeight: HEADER_HEIGHT + at.rows.total,
+        contentWidth: HW + at.cols.total,
+        contentHeight: HH + at.rows.total,
         rows: { frozen: frozenSpan(at.rows, fr), scrolling: scrollingSpan(at.rows, fr, at.scrollTop, mainHeight) },
         cols: { frozen: frozenSpan(at.cols, fc), scrolling: scrollingSpan(at.cols, fc, at.scrollLeft, mainWidth) },
         // where a row or column starts inside a pane: a frozen pane does not scroll, a scrolling one is moved by the scroll (a merged block that starts in
@@ -61,8 +62,8 @@ export function layoutOf(at) {
         colX: (c, scrolling) => (scrolling ? at.cols.start(c) - frozenWidth - at.scrollLeft : at.cols.start(c)),
         // the cell under a point of the grid's box (header included), or null on a header
         cellAt(x, y) {
-            if (x < ROW_HEADER_WIDTH || y < HEADER_HEIGHT) return null;
-            const cx = x - ROW_HEADER_WIDTH, cy = y - HEADER_HEIGHT;
+            if (x < HW || y < HH) return null;
+            const cx = x - HW, cy = y - HH;
             // past the frozen part, the point is as far into the sheet as it is into the pane plus how far the pane is scrolled
             const c = at.cols.indexAt(cx < frozenWidth ? cx : cx + at.scrollLeft);
             const r = at.rows.indexAt(cy < frozenHeight ? cy : cy + at.scrollTop);
