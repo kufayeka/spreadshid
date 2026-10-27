@@ -60,8 +60,8 @@ export const SHOTS = [
         const p = await cellAt(js, 3, 2); await click(p.x, p.y); await wait(200); await key('ArrowDown', 'ArrowDown', 40, 1); await wait(400);
     }, clip: { x: 0, y: 110, width: 1000, height: 420 } },
     { name: 'aturan', page: '10-aturan.page.js', act: async ({ js, click, type, wait }) => {
-        const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(200); await type('1'); await wait(300);
-    }, clip: { x: 0, y: 110, width: 900, height: 510 } }
+        const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(200); await type('1'); await wait(300);
+    }, clip: { x: 0, y: 110, width: 1100, height: 400 } }
 ];
 
 export async function takeShots(filter) {
