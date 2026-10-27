@@ -40,7 +40,7 @@ export const ACTIONS = [
     'cols.insert', 'cols.delete', 'cols.resize', 'cols.hide', 'cols.group',
     'sheets.add', 'sheets.delete', 'sheets.rename', 'sheets.move', 'sheets.hide',
     'view.freeze', 'view.gridlines',
-    'sort', 'filter', 'validation', 'names', 'settings',
+    'sort', 'filter', 'validation', 'names', 'settings', 'pivot',
     'copy', 'paste', 'download', 'import',
     'comment.read', 'comment.create', 'comment.reply', 'comment.resolve', 'comment.edit', 'comment.delete', 'comment.moderate',
     'access'
@@ -105,7 +105,7 @@ const STYLE_ACTION = { bold: 'format.bold', italic: 'format.italic', underline: 
 const ROW_ACTION = { height: 'rows.resize', hidden: 'rows.hide', level: 'rows.group', fold: 'rows.group' };
 const COL_ACTION = { width: 'cols.resize', hidden: 'cols.hide', level: 'cols.group', fold: 'cols.group', format: 'format.number' };
 const SHEET_ACTION = { name: 'sheets.rename', hidden: 'sheets.hide', freezeRows: 'view.freeze', freezeCols: 'view.freeze', hideGridlines: 'view.gridlines', filter: 'filter',
-    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize' };
+    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize', pivots: 'pivot' };
 const OP_ACTION = { insertRows: 'rows.insert', deleteRows: 'rows.delete', insertCols: 'cols.insert', deleteCols: 'cols.delete', moveRows: 'sort', moveCols: 'cols.insert',
     addSheet: 'sheets.add', removeSheet: 'sheets.delete', moveSheet: 'sheets.move' };
 
@@ -190,7 +190,7 @@ export const ACTION_INFO = [
     ['cols.insert', 'Insert columns', 'Columns'], ['cols.delete', 'Delete columns', 'Columns'], ['cols.resize', 'Resize columns', 'Columns'], ['cols.hide', 'Hide columns', 'Columns'], ['cols.group', 'Group columns', 'Columns'],
     ['sheets.add', 'Add sheets', 'Sheets'], ['sheets.delete', 'Delete sheets', 'Sheets'], ['sheets.rename', 'Rename sheets', 'Sheets'], ['sheets.move', 'Move sheets', 'Sheets'], ['sheets.hide', 'Hide sheets', 'Sheets'],
     ['view.freeze', 'Freeze rows and columns', 'View'], ['view.gridlines', 'Show or hide gridlines', 'View'],
-    ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
+    ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['pivot', 'Pivot tables', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
     ['copy', 'Copy out', 'Clipboard and files'], ['paste', 'Paste', 'Clipboard and files'], ['download', 'Download', 'Clipboard and files'], ['import', 'Import', 'Clipboard and files'],
     ['comment.read', 'See comments', 'Comments'], ['comment.create', 'Start a comment', 'Comments'], ['comment.reply', 'Reply', 'Comments'], ['comment.resolve', 'Resolve and reopen', 'Comments'],
     ['comment.edit', 'Edit own comments', 'Comments'], ['comment.delete', 'Delete own comments', 'Comments'], ['comment.moderate', 'Edit and delete anyone\'s comments', 'Comments'],

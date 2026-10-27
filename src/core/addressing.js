@@ -69,7 +69,7 @@ const oneRow = (x) => (typeof x === 'string' ? rowList(x)[0] : x);
 
 // the functions that take a cell as (s, r, c, ...): also (s, "C2", ...)
 const CELL_FNS = ['raw', 'value', 'input', 'display', 'style', 'cellFormat', 'modeAt', 'typeAt', 'validationAt', 'choicesAt', 'invalidAt', 'commentAt', 'hasComment',
-    'conditionalStyleAt', 'shownStyle', 'setValues', 'addComment', 'filteredOut'];
+    'conditionalStyleAt', 'shownStyle', 'setValues', 'addComment', 'filteredOut', 'pivotAt'];
 // the functions that take a range as their argument number i (after the sheet): also its text
 const RANGE_FNS = { setStyle: 1, clear: 1, mergeCells: 1, unmergeCells: 1, createFilter: 1, addValidation: 1, setValidation: 1, removeValidation: 1, addConditional: 1, setConditional: 2 };
 
@@ -155,4 +155,5 @@ const SHEET_FNS = [...CELL_FNS, ...Object.keys(RANGE_FNS), 'setRowProps', 'setCo
     'rowProps', 'colProps', 'rowId', 'colId', 'rowIndex', 'colIndex', 'size', 'sheetProps', 'setSheetProps', 'merges', 'lastFilled', 'forEachFilledRow', 'setBlock',
     'rowAxis', 'colAxis', 'setTypes', 'groupRows', 'ungroupRows', 'groupCols', 'ungroupCols', 'foldRowGroup', 'foldColGroup', 'showRowLevel', 'showColLevel',
     'rowGroups', 'colGroups', 'removeFilter', 'setFilterColumn', 'filterOf', 'filterValues', 'dataRegion', 'conditionals', 'removeConditional', 'moveConditional',
-    'replyComment', 'editComment', 'deleteComment', 'resolveComment', 'comments', 'hideSheet', 'removeSheet', 'duplicateSheet', 'moveSheet', 'sheetShown'];
+    'replyComment', 'editComment', 'deleteComment', 'resolveComment', 'comments', 'hideSheet', 'removeSheet', 'duplicateSheet', 'moveSheet', 'sheetShown',
+    'addPivot', 'setPivot', 'removePivot', 'pivots'];

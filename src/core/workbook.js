@@ -18,7 +18,8 @@ import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { makeConditional, conditionalStyleOf } from './conditional.js';
 import { outlineOf, MAX_LEVEL } from './outline.js';
-import { addressable } from './addressing.js';
+import { addressable, cellOf, rangeOf } from './addressing.js';
+import { tableOf, pivot } from './pivot.js';
 import { resolveAccess, actionsOfOp, refusalOf } from './policy.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
@@ -660,6 +661,7 @@ export function createWorkbook(doc, options) {
      * edit only reads.
      */
     function cellMode(s, r, c, action) {
+        if (anyPivots() && pivotAt(s, r, c)) return { mode: 'readonly', message: 'This is a pivot table: change it in its editor' };
         const m = rules.length ? modeOf(api, rules, s, r, c, revision) : null;
         if (m) return m.mode === 'edit' ? null : m;
         // a change made for an action of its own (a sort) needs that action, not 'edit'
@@ -962,6 +964,155 @@ export function createWorkbook(doc, options) {
     /** Every thread of a sheet (open and resolved), with where its cell stands now ({ r, c }, or null when its row or column was deleted). */
     const comments = (s) => { if (!readable()) return []; s = sheetIdOf(s); return threadsOf(s).map((x) => { const r = api.rowIndex(s, x.row), c = api.colIndex(s, x.col); return { ...clone(x), at: r >= 0 && c >= 0 ? { r, c } : null }; }); };
 
+    // ---- pivot tables (pivot.js): a summary of a range written into the sheet, worked out again when its data changes -------------------------------
+    //   pivots: [{ id, at: { r: rowId, c: colId }, source: 'RAB!A1:F500' | 'NamedRange', spec, size: { rows, cols } }]   in the props of the sheet it is in
+    // The result is written as values (formulas elsewhere can read it, and it is saved with the sheet), by the workbook itself (source 'remote': not
+    // undone, not checked); a person cannot type in it. What a pivot wrote is known by `size`, so a smaller result clears what is left of the bigger one.
+
+    const pivotsOf = (s) => sheetOf(s).props.pivots || [];
+    const anyPivots = () => sheetOrder.some((s) => (sheets.get(s).props.pivots || []).length);
+    const pivotWritten = new Map(); // id -> the key of what was written for it (its definition), and where: { key, s, rect }
+    let pivotWriting = false;
+
+    // where a pivot's data is: a named range, or a range "Sheet!A1:F500" / "A1:F500" (in the pivot's own sheet)
+    function pivotSource(s, p) {
+        const named = nameRange(p.source);
+        if (named) return { s: named.sheetId, rect: named.range };
+        const m = /^\s*(?:(?:'((?:[^']|'')+)'|([^!'"]+))!)?(.+)$/.exec(String(p.source || ''));
+        if (!m) return null;
+        const sheetName = m[1] ? m[1].replace(/''/g, "'") : m[2];
+        const src = sheetName ? grid.sheetIdByName(sheetName.trim()) : s;
+        if (!src) return null;
+        try { return { s: src, rect: rangeOf(m[3]) }; } catch { return null; }
+    }
+
+    // the top-left cell of a pivot where it stands now, or null when its row or column was deleted
+    function pivotAnchor(s, p) {
+        const r = api.rowIndex(s, p.at.r), c = api.colIndex(s, p.at.c);
+        return r < 0 || c < 0 ? null : { r, c };
+    }
+
+    /** The area of a pivot (what it wrote last), by position, or null. */
+    function pivotArea(s, p) {
+        const a = pivotAnchor(s, p);
+        if (!a || !p.size || !p.size.rows) return null;
+        return { r1: a.r, c1: a.c, r2: a.r + p.size.rows - 1, c2: a.c + p.size.cols - 1 };
+    }
+
+    // a pivot's table, or the reason it cannot be made
+    function pivotCells(s, p) {
+        const src = pivotSource(s, p);
+        if (!src) return { error: 'Pivot table: its data "' + p.source + '" is not there' };
+        try {
+            const { records } = tableOf(api, src.s, src.rect);
+            return pivot(records, p.spec);
+        } catch (err) { return { error: 'Pivot table: ' + err.message }; }
+    }
+
+    // writes a pivot's table where it is (clearing what it wrote before and no longer covers), and keeps its size
+    function writePivot(s, p) {
+        const a = pivotAnchor(s, p);
+        if (!a) return;
+        const out = pivotCells(s, p);
+        const cells = out.error ? [[out.error]] : out.cells;
+        const rows = cells.length, cols = cells.reduce((n, row) => Math.max(n, row.length), 0);
+        const size = sheetOf(s).rows ? grid.size(s) : { rows: 0, cols: 0 };
+        const entries = [];
+        const put = (r, c, value, style) => { if (r < size.rows && c < size.cols) entries.push({ r, c, value, style }); };
+        const kinds = out.rows ? out.rows.map((x) => x.kind) : [];
+        for (let i = 0; i < rows; i++) {
+            const kind = i < (out.header || 0) ? 'header' : kinds[i - (out.header || 0)];
+            for (let j = 0; j < cols; j++) {
+                const v = cells[i][j];
+                // what a pivot writes is data: a text stays a text (a group named "=1" is no formula)
+                const value = v === null || v === undefined || v === '' ? null : typeof v === 'string' ? "'" + v : v;
+                const style = kind === 'header' ? { bold: true, fill: '#e8f0fe' } : kind === 'total' ? { bold: true, fill: '#f1f3f4' } : kind === 'subtotal' ? { bold: true } : null;
+                put(a.r + i, a.c + j, value, style);
+            }
+        }
+        const was = p.size || { rows: 0, cols: 0 };
+        for (let i = 0; i < was.rows; i++) for (let j = 0; j < was.cols; j++) if (i >= rows || j >= cols) put(a.r + i, a.c + j, null, null);
+        pivotWriting = true;
+        try {
+            if (entries.length) setBlock(s, entries, { source: 'remote' });
+            if (was.rows !== rows || was.cols !== cols) {
+                setSheetProps(s, { pivots: pivotsOf(s).map((x) => (x.id === p.id ? { ...x, size: { rows, cols } } : x)) }, { source: 'remote' });
+            }
+        } finally { pivotWriting = false; }
+    }
+
+    // clears what a pivot that is gone wrote
+    function clearPivot(s, rect) {
+        if (!sheets.has(s) || !rect) return;
+        const entries = [];
+        for (let r = rect.r1; r <= rect.r2; r++) for (let c = rect.c1; c <= rect.c2; c++) entries.push({ r, c, value: null, style: null });
+        pivotWriting = true;
+        try { setBlock(s, entries, { source: 'remote' }); } finally { pivotWriting = false; }
+    }
+
+    // After a change: a pivot made or changed is written, one whose data was touched is worked out again, one taken away (or undone) is cleared.
+    function reconcilePivots(ops) {
+        if (pivotWriting || (!pivotWritten.size && !anyPivots())) return;
+        const touched = new Set(ops.map((op) => (typeof op.sheet === 'string' ? op.sheet : op.sheet && op.sheet.id)).filter(Boolean));
+        const namesChanged = ops.some((op) => op.t === 'settings');
+        const seen = new Set();
+        for (const s of [...sheetOrder]) {
+            for (const p of pivotsOf(s)) {
+                seen.add(p.id);
+                const key = JSON.stringify([s, p.at, p.source, p.spec]);
+                const src = pivotSource(s, p);
+                const was = pivotWritten.get(p.id);
+                if (!was || was.key !== key || namesChanged || (src && touched.has(src.s))) {
+                    writePivot(s, p);
+                    const now = pivotsOf(s).find((x) => x.id === p.id) || p;
+                    pivotWritten.set(p.id, { key, s, rect: pivotArea(s, now) });
+                }
+            }
+        }
+        for (const [id, w] of [...pivotWritten]) if (!seen.has(id)) { clearPivot(w.s, w.rect); pivotWritten.delete(id); }
+    }
+
+    /**
+     * Makes a pivot table: the summary of `source` (a range "RAB!A1:F500", a range of this sheet, or a named range; its first row names the fields)
+     * written from the cell `at` on, as `spec` says (pivot.js). One change (undone at once). Returns its id.
+     */
+    function addPivot(s, at, source, spec, how) {
+        s = sheetIdOf(s);
+        const a = typeof at === 'string' ? cellOf(at) : at;
+        const p = { id: newId(), at: { r: api.rowId(s, a.r), c: api.colId(s, a.c) }, source: String(source), spec: spec || { values: [] }, size: { rows: 0, cols: 0 } };
+        const src = pivotSource(s, p);
+        if (!src) throw new Error('the data of a pivot table "' + source + '" is not a range or a named range');
+        if (src.s === s && a.r >= src.rect.r1 && a.r <= src.rect.r2 && a.c >= src.rect.c1 && a.c <= src.rect.c2) throw new Error('a pivot table cannot be written inside its own data');
+        setSheetProps(s, { pivots: pivotsOf(s).concat([p]) }, how);
+        return p.id;
+    }
+
+    /** Changes a pivot table: its source, its spec (rows, columns, values, filters, sort, totals), or where it is (`at`). One change. */
+    function setPivot(s, id, patch, how) {
+        s = sheetIdOf(s);
+        const all = pivotsOf(s);
+        const at = all.findIndex((x) => x.id === id);
+        if (at < 0) throw new Error('there is no pivot table ' + id);
+        const next = { ...all[at] };
+        if (patch.source !== undefined) next.source = String(patch.source);
+        if (patch.spec !== undefined) next.spec = patch.spec;
+        if (patch.at !== undefined) { const a = typeof patch.at === 'string' ? cellOf(patch.at) : patch.at; next.at = { r: api.rowId(s, a.r), c: api.colId(s, a.c) }; }
+        return setSheetProps(s, { pivots: all.map((x, i) => (i === at ? next : x)) }, how);
+    }
+
+    /** Takes a pivot table away, and what it wrote. One change. */
+    const removePivot = (s, id, how) => { s = sheetIdOf(s); const all = pivotsOf(s); const kept = all.filter((x) => x.id !== id); return kept.length === all.length ? [] : setSheetProps(s, { pivots: kept.length ? kept : null }, how); };
+
+    /** The pivot tables of a sheet: [{ id, source, spec, area }]. */
+    const pivots = (s) => { s = sheetIdOf(s); return pivotsOf(s).map((p) => ({ id: p.id, source: p.source, spec: clone(p.spec), area: pivotArea(s, p) })); };
+
+    /** The pivot table whose result covers the cell (r, c), or null. */
+    function pivotAt(s, r, c) {
+        s = sheetIdOf(s);
+        for (const p of pivotsOf(s)) { const b = pivotArea(s, p); if (b && r >= b.r1 && r <= b.r2 && c >= b.c1 && c <= b.c2) return { id: p.id, source: p.source, spec: clone(p.spec), area: b }; }
+        return null;
+    }
+
     // ---- named ranges: a name for a range ("Budget" for BOQ!D2:D200) that formulas use (=SUM(Budget)) and the name box goes to ---------------------
 
     /** Why a name cannot be given (a reason), or '' when it can. Names are as in Google Sheets: a letter or _ first, then letters, digits, _ and dots. */
@@ -1148,7 +1299,7 @@ export function createWorkbook(doc, options) {
         }
         // a person's change must keep the host's rules and the policy's ranges (read-only and hidden cells), and a person who may not edit writes only
         // in the ranges open to them; the host's own code is not stopped by them
-        if (source === 'user' && (rules.length || !access.can('edit'))) {
+        if (source === 'user' && (rules.length || !access.can('edit') || anyPivots())) {
             const broken = brokenRule(accepted, how && how.action);
             if (broken) { emit('reject', { op: broken.op, reason: broken.message, source }); return null; }
         }
@@ -1191,6 +1342,8 @@ export function createWorkbook(doc, options) {
         revision++;
         const stamped = accepted.map((op) => ({ ...op, user: opt.user || null, at }));
         emit('op', { ops: stamped, source });
+        // the pivot tables whose data or definition changed are written again (a change of their own, after this one)
+        reconcilePivots(accepted);
         return stamped;
     }
 
@@ -1641,6 +1794,8 @@ export function createWorkbook(doc, options) {
         addComment, replyComment, editComment, deleteComment, resolveComment, commentAt, comments, hasComment,
         /** The person who writes from now on ({ id, name }): their name goes on their comments, and only they change them. */
         setUser: (user) => { opt.user = user; },
+        // pivot tables
+        addPivot, setPivot, removePivot, pivots, pivotAt,
         // named ranges
         addName, setName, removeName, names, nameRange, nameProblem,
         // conditional formatting

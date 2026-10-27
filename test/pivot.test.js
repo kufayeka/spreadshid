@@ -106,5 +106,43 @@ sh.setValues('A1', [
     ok('a server: two files read by their named range, summed by week, made cumulative (an S-curve)');
 }
 
+{
+    // a pivot table in a workbook: written as values, worked out again, locked for a person, made smaller and cleared, saved, undone
+    const wb = createWorkbook();
+    const said = [];
+    wb.on('reject', (e) => said.push(e.reason));
+    const data = wb.sheet('Sheet1');
+    data.setValues('A1', [['Bab', 'Status', 'Jumlah'], ['Tanah', 'Approved', 10], ['Beton', 'Draft', 20], ['Tanah', 'Draft', 5]]);
+    const rekap = wb.sheet(wb.addSheet('Rekap'));
+    const id = rekap.addPivot('B2', 'Sheet1!A1:C4', { rows: ['Bab'], columns: ['Status'], values: [{ field: 'Jumlah', fn: 'SUM' }] });
+    const table = (sh, a) => { const at = sh.pivotAt(a).area; const out = []; for (let r = at.r1; r <= at.r2; r++) { const row = []; for (let c = at.c1; c <= at.c2; c++) row.push(sh.value(r, c)); out.push(row); } return out; };
+    assert.deepStrictEqual(table(rekap, 'B2'), [['Bab', 'Approved', 'Draft', 'Grand total'], ['Beton', null, 20, 20], ['Tanah', 10, 5, 15], ['Grand total', 10, 25, 35]], 'written from B2 in another sheet');
+    assert.deepStrictEqual(rekap.style('B2'), { bold: true, fill: '#e8f0fe' }, 'its header is bold');
+    rekap.setValues('E3', '=SUM(D3:D4)');
+    assert.strictEqual(rekap.value('E3'), 25, 'a formula elsewhere reads it');
+
+    data.setValues('C3', 200);
+    assert.strictEqual(rekap.value('D3'), 200, 'its data changed: worked out again');
+    rekap.setValues('C3', 1, { source: 'user' });
+    assert.deepStrictEqual([rekap.value('C3'), said.pop()], [null, 'This is a pivot table: change it in its editor'], 'a person cannot type in it');
+
+    rekap.setPivot(id, { spec: { rows: ['Bab'], values: [{ field: 'Jumlah', fn: 'SUM' }], totals: false } });
+    assert.deepStrictEqual(table(rekap, 'B2'), [['Bab', 'SUM of Jumlah'], ['Beton', 200], ['Tanah', 15]], 'changed: smaller');
+    assert.deepStrictEqual([rekap.value('D2'), rekap.value('E5'), rekap.style('D2')], [null, null, undefined], 'what it no longer covers is cleared');
+    wb.undo();
+    assert.strictEqual(rekap.value('E2'), 'Grand total', 'undone: as it was');
+
+    const again = createWorkbook(wb.toJSON());
+    assert.strictEqual(again.value('Rekap', 'E5'), 215, 'saved with the sheet, as values');
+    again.setValues('Sheet1', 'C2', 1000);
+    assert.strictEqual(again.value('Rekap', 'C4'), 1000, 'opened again: still worked out again when its data changes');
+
+    assert.throws(() => data.addPivot('B2', 'A1:C4', { values: [{ field: 'Jumlah' }] }), /inside its own data/);
+    assert.throws(() => data.addPivot('H1', 'Tidak ada!A1:B2', { values: [] }), /is not a range or a named range/);
+    rekap.removePivot(id);
+    assert.deepStrictEqual([rekap.value('B2'), rekap.pivots().length], [null, 0], 'taken away: what it wrote is cleared');
+    ok('a pivot table in a workbook: values, another sheet, formulas read it, worked out again, locked, smaller, undone, saved, taken away');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');
