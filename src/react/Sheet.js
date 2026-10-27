@@ -43,6 +43,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {(event: { reason: string, op: object, source: string }) => void} [props.onReject]  A change was refused (by the rules, the types, or beforeOp).
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
  * @param {(sel: { ranges: object[], active: { r: number, c: number } }) => void} [props.onSelectionChange]
+ * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
  * @param {boolean} [props.showProtected]  Draw the protected cells striped (the rules are the workbook's: setRules).
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
  * @param {import('react').CSSProperties} [props.style]  Inline style of the outer element (its height above all: the grid fills it).
@@ -115,7 +116,8 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
         return () => offs.forEach((off) => off());
     }, [wb]);
     useEffect(() => { if (props.onSelectionChange) props.onSelectionChange(sel); }, [sel]);
-    useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), 4000); return () => clearTimeout(t); }, [notice]);
+    // a notice goes after a while, a longer one (what an import left out) later
+    useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), Math.min(12000, 4000 + notice.length * 40)); return () => clearTimeout(t); }, [notice]);
 
     // ---- find and replace --------------------------------------------------------------------------------------------------------------------------
 
@@ -200,7 +202,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
-                onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice}
+                onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
                     const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);

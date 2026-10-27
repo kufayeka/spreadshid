@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Menu } from './Menu.js';
 import { rectsOf, selectCell } from '../core/selection.js';
 import { colName } from '../core/formula/address.js';
@@ -7,10 +7,12 @@ import { formatValue, FORMAT_PRESETS } from '../core/format.js';
 import { toggle, setPart, setFormat, merge, clearFormatting, functionText } from './toolbarActions.js';
 import { pasteFromClipboard } from './commands.js';
 import { SIZES, ZOOMS } from './Toolbar.js';
+import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/excel/index.js';
 
 /**
  * The menu bar, as in Google Sheets: File, Edit, View, Insert, Format, Data, each with its submenus. Every item does what the toolbar, the keys or the
- * right-click menu do (one change, one undo), so the three never disagree. File gets import, download and the versions with steps R7 and R8.
+ * right-click menu do (one change, one undo), so the three never disagree. File imports an .xlsx or .csv file (its sheets are added, one undo) and
+ * downloads the workbook as .xlsx or this sheet as .csv.
  *
  * @param {object} props
  * @param {any} props.workbook @param {string} props.sheetId @param {any} props.sel @param {(sel: any) => void} props.setSel
@@ -20,12 +22,14 @@ import { SIZES, ZOOMS } from './Toolbar.js';
  * @param {() => void} props.onLink @param {() => void} props.onSettings
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
- * @param {(message: string) => void} props.onError
+ * @param {(message: string) => void} props.onError  Also how what an import left out is told.
+ * @param {string} [props.fileName]  The name a download gets (without its extension).
  * @param {import('react').RefObject<HTMLElement>} props.container
  */
 export function Menubar(props) {
     const { workbook: wb, sheetId: s, sel, setSel, sinkRef, container } = props;
     const [open, setOpen] = useState(null); // { name, x, y }
+    const fileInput = useRef(null);
     const rects = rectsOf(sel);
     const b = rects[rects.length - 1];
     const sheet = wb.sheetProps(s);
@@ -36,6 +40,9 @@ export function Menubar(props) {
 
     const MENUS = {
         File: [
+            { value: 'file:import', label: 'Import…' },
+            { label: 'Download', children: [{ value: 'file:download:xlsx', label: 'Microsoft Excel (.xlsx)' }, { value: 'file:download:csv', label: 'Comma-separated values (.csv, this sheet)' }] },
+            { separator: true },
             { value: 'file:settings', label: 'Spreadsheet settings…' }
         ],
         Edit: [
@@ -110,12 +117,42 @@ export function Menubar(props) {
     const run = (fn) => { try { fn(); } catch (err) { props.onError(err.message); } };
     const toGrid = () => { if (sinkRef.current) sinkRef.current.focus({ preventScroll: true }); };
 
+    // the workbook as an .xlsx file, or this sheet as a .csv file, saved by the browser
+    function download(kind) {
+        const name = (props.fileName || 'Spreadsheet') + (kind === 'csv' ? ' - ' + sheet.name + '.csv' : '.xlsx');
+        // a byte order mark before a CSV text, so Excel reads its letters as UTF-8
+        const blob = kind === 'csv' ? new Blob(['\uFEFF' + exportCsv(wb, s)], { type: 'text/csv;charset=utf-8' })
+            : new Blob([exportXlsx(wb)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    // a file chosen to import: an .xlsx adds its sheets, a .csv (or a .tsv or .txt) one sheet named after the file; the first new sheet is shown
+    async function importFile(file) {
+        try {
+            const csv = !/\.xlsx$/i.test(file.name);
+            const result = csv ? importCsvInto(wb, await file.text(), file.name.replace(/\.[^.]*$/, ''), how) : await importXlsxInto(wb, new Uint8Array(await file.arrayBuffer()), how);
+            if (result.sheetIds.length) props.onShow(result.sheetIds[0]);
+            const n = result.sheetIds.length;
+            props.onError('Imported ' + n + (n === 1 ? ' sheet' : ' sheets') + (result.warnings.length ? '. ' + result.warnings.join('. ') : ''));
+        } catch (err) { props.onError('The file could not be imported: ' + err.message); }
+    }
+
     async function onSelect(value) {
         setOpen(null);
         const [area, what, extra] = value.split(':');
         toGrid();
         switch (area) {
-            case 'file': props.onSettings(); break;
+            case 'file':
+                if (what === 'import') { if (fileInput.current) fileInput.current.click(); }
+                else if (what === 'download') download(extra);
+                else props.onSettings();
+                break;
             case 'edit':
                 if (what === 'undo') wb.undo();
                 else if (what === 'redo') wb.redo();
@@ -183,6 +220,8 @@ export function Menubar(props) {
                     {name}
                 </button>
             ))}
+            <input ref={fileInput} type="file" accept=".xlsx,.csv,.tsv,.txt" hidden aria-label="Import a file"
+                onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) importFile(f); }} />
             {open ? <Menu key={open.name} at={{ x: open.x, y: open.y }} items={MENUS[open.name]} onSelect={onSelect} onClose={() => setOpen(null)} container={container} label={open.name} /> : null}
         </div>
     );

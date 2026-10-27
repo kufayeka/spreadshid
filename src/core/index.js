@@ -19,4 +19,4 @@ export { fromApiMakerType, fieldType, checkValue } from './types.js';
 export { mergePatch, checkPatch } from './server.js';
 export { copyBlock, pasteClip, pasteText, fillBlock } from './transfer.js';
 export { findAll, replaceIn, sortRange } from './search.js';
-export { exportXlsx, importXlsx, importXlsxInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';
+export { exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';

@@ -4,7 +4,7 @@
 //   node test/excel.test.js
 import assert from 'node:assert';
 import { deflateRawSync } from 'node:zlib';
-import { createWorkbook, exportXlsx, importXlsx, importXlsxInto, exportCsv, parseCsv, dateToSerial } from '../src/core/index.js';
+import { createWorkbook, exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, dateToSerial } from '../src/core/index.js';
 import { crc32 } from '../src/core/excel/zip.js';
 
 let passed = 0;
@@ -169,6 +169,19 @@ function excelPackage(files) {
     wb.setValues(s, 5, 0, parseCsv('Pile;10;1.250,5'));
     assert.strictEqual(wb.value(s, 5, 2), 1250.5, 'CSV texts written in a sheet are read as typed in its locale');
     ok('CSV: out with quotes where needed; in with the separator found, quotes, new lines; numbers in the locale');
+}
+
+{
+    const wb = createWorkbook({ settings: { locale: 'id-ID', currency: 'IDR' } });
+    wb.setSheetProps(wb.sheetIds()[0], { name: 'termin' });
+    const { sheetIds: [n] } = importCsvInto(wb, 'Termin;Nilai\r\nDP;1.250,5\r\nTotal;=B2*2', 'Termin');
+    assert.strictEqual(wb.sheetProps(n).name, 'Termin (2)', 'a name that is taken (whatever its case) gets a number');
+    assert.deepStrictEqual([wb.value(n, 1, 1), wb.value(n, 2, 1)], [1250.5, 2501], 'numbers in the locale, formulas');
+    const big = importCsvInto(wb, Array.from({ length: 1500 }, (_, i) => i + ',xxx' + ','.repeat(28) + ',last').join('\n'), 'Big').sheetIds[0];
+    assert.deepStrictEqual([wb.value(big, 1499, 0), wb.value(big, 1499, 30)], [1499, 'last'], 'a sheet as big as the file');
+    wb.undo();
+    assert.strictEqual(wb.sheetIds().length, 2, 'one change');
+    ok('a CSV as a new sheet: its name, numbers in the locale, formulas, as big as it is, one undo');
 }
 
 console.log('\n' + passed + ' passed');

@@ -175,7 +175,7 @@
 
 /* a short message, at the bottom of the grid */
 .ks-notice { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 30; padding: 10px 16px; background: #323232; color: #fff;
-    border-radius: 4px; font: var(--ks-ui-font); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+    border-radius: 4px; font: var(--ks-ui-font); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); max-width: min(560px, calc(100% - 32px)); width: max-content; }
 
 /* the name box and the formula bar */
 .ks-formulabar { flex: none; display: flex; align-items: center; height: 30px; border-bottom: 1px solid var(--ks-head-line); background: var(--ks-bg); }

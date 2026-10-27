@@ -185,7 +185,12 @@ export async function importXlsxInto(wb, bytes, how) {
     // the formulas are put in the sheets in a workbook of their own (they read one another by name), then the finished sheets move over
     const temp = createWorkbook({ sheets: docs, settings: wb.settings() });
     docs.forEach((d, i) => { if (formulas[i].length) temp.setBlock(d.id, formulas[i], { source: 'remote' }); });
-    const ready = temp.toJSON().sheets;
+    const sheetIds = addFinishedSheets(wb, temp.toJSON().sheets, how);
+    return { sheetIds, warnings: read.warnings };
+}
+
+// The finished sheets of another workbook added after the sheets of this one, as one change (one undo), a name that is taken given a number.
+function addFinishedSheets(wb, ready, how) {
     const ids = wb.sheetIds();
     let last = ids.length ? wb._sheetKey(ids[ids.length - 1]) : null;
     const taken = new Set(ids.map((s) => String(wb.sheetProps(s).name).toLowerCase()));
@@ -197,7 +202,7 @@ export async function importXlsxInto(wb, bytes, how) {
         return { t: 'addSheet', sheet: { ...sheet, key: last, props: { ...sheet.props, name } } };
     });
     wb.apply(ops, how || { source: 'user' });
-    return { sheetIds: ops.map((op) => op.sheet.id), warnings: read.warnings };
+    return ops.map((op) => op.sheet.id);
 }
 
 // ---- CSV ------------------------------------------------------------------------------------------------------------------------------------------
@@ -210,7 +215,9 @@ export function exportCsv(wb, s, options) {
     for (let r = 0; r <= last.r; r++) {
         const fields = [];
         for (let c = 0; c <= last.c; c++) {
-            const t = wb.display(s, r, c).text;
+            // a cell this person may not see goes out empty, as in an .xlsx (its dots are for the screen)
+            const m = wb.modeAt(s, r, c);
+            const t = m && m.mode === 'hidden' ? '' : wb.display(s, r, c).text;
             fields.push(/["\r\n]/.test(t) || t.includes(sep) ? '"' + t.replace(/"/g, '""') + '"' : t);
         }
         lines.push(fields.join(sep));
@@ -246,4 +253,25 @@ export function parseCsv(text, delimiter) {
     }
     if (started || field !== '' || row.length) { row.push(field); rows.push(row); }
     return rows;
+}
+
+/**
+ * The rows of a CSV text added as a new sheet after the sheets of a workbook, named as asked (a name that is taken gets a number): one change.
+ * Every field is read as if typed in the workbook's locale, so "1.250,5" in an Indonesian workbook is the number 1250.5 and "=A1*2" a formula.
+ * Returns { sheetIds, warnings }.
+ * @param {ReturnType<typeof createWorkbook>} wb
+ * @param {string} text
+ * @param {string} [name]
+ */
+export function importCsvInto(wb, text, name, how) {
+    const rows = parseCsv(text);
+    const width = rows.reduce((n, row) => Math.max(n, row.length), 0);
+    const temp = createWorkbook({ settings: wb.settings() });
+    const s = temp.sheetIds()[0];
+    temp.setSheetProps(s, { name: String(name || 'Sheet1').trim() || 'Sheet1' });
+    // a sheet as big as the rows, with room after them, as a sheet the person made would have
+    if (rows.length > temp.size(s).rows) temp.insertRows(s, temp.size(s).rows, rows.length - temp.size(s).rows);
+    if (width > temp.size(s).cols) temp.insertCols(s, temp.size(s).cols, width - temp.size(s).cols);
+    if (rows.length) temp.setValues(s, 0, 0, rows.map((row) => row.concat(new Array(width - row.length).fill(''))));
+    return { sheetIds: addFinishedSheets(wb, temp.toJSON().sheets, how), warnings: [] };
 }
