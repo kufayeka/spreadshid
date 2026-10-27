@@ -83,6 +83,7 @@ sh.setValues('A1', [
         const q = pivot(recs, { values: [{ field, fn }] });
         assert.strictEqual(fn === 'COUNTUNIQUE' ? pivot(recs.map((r) => ({ ...r, Minggu: 1 })), { values: [{ field, fn }] }).cells[1][1] : q.cells[1][1], want, fn);
     }
+    assert.deepStrictEqual(pivot(recs, { rows: ['Minggu'], values: [{ field: 'Realisasi', fn: 'COUNT' }], filters: { Minggu: { hidden: [1, 2] } } }).cells, [['Minggu', 'COUNT of Realisasi'], ['Grand total', 0]], 'every record filtered out: the value column stays, the total counts nothing');
     assert.throws(() => pivot(recs, { values: [{ field: 'Realisasi', fn: 'VLOOKUP' }] }), /has no function VLOOKUP/);
     assert.throws(() => pivot(recs, { rows: ['Minggu'] }), /at least one value/);
     ok('two row fields with subtotals; every function; a function it has not and no values said');

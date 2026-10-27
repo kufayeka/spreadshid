@@ -15,6 +15,7 @@ import { ValidationDialog } from './ValidationDialog.js';
 import { ConditionalPanel } from './ConditionalPanel.js';
 import { NamesPanel } from './NamesPanel.js';
 import { CommentsPanel } from './CommentsPanel.js';
+import { PivotPanel, PivotDialog } from './PivotPanel.js';
 import { FilterMenu } from './FilterMenu.js';
 import { sortRange } from '../core/search.js';
 import { parseRangeText } from '../core/validation.js';
@@ -110,6 +111,13 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const policy = props.access ? props.access.policy : null;
     const who = props.access ? props.access.who : null;
     useEffect(() => { if (props.access) wb.setAccess(policy, who); }, [wb, policy, JSON.stringify(who), !!props.access]);
+    // making a pivot table (its dialog), and its editor that opens when a cell of a pivot table is selected (and closes when one outside is)
+    const [pivotDialog, setPivotDialog] = useState(null);
+    useEffect(() => {
+        const pv = wb.pivotAt(sheetId, sel.active.r, sel.active.c);
+        if (pv && wb.can('pivot') && wb.shows('panel.pivot')) setPanel((now) => (now && now.kind === 'pivot' && now.id === pv.id ? now : { kind: 'pivot', id: pv.id }));
+        else setPanel((now) => (now && now.kind === 'pivot' ? null : now));
+    }, [sheetId, sel.active.r, sel.active.c]);
     // the menu of a column of the filter: { c, x, y } (the column, and where its button is)
     const [filterMenu, setFilterMenu] = useState(null);
     useEffect(() => { setFilterMenu(null); }, [sheetId]);
@@ -257,6 +265,14 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onComment={() => setPanel({ kind: 'comments', start: Date.now() })}
+                onPivot={() => {
+                    // the data to start with: the selection, or the block of filled cells around the active cell
+                    const b = rectsOf(sel)[rectsOf(sel).length - 1];
+                    const one = b.r1 === b.r2 && b.c1 === b.c2;
+                    const at = one ? wb.dataRegion(sheetId, b.r1, b.c1) : b;
+                    const name = wb.sheetProps(sheetId).name;
+                    setPivotDialog({ range: (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'") + '!' + rectText(at) });
+                }}
                 onComments={() => setPanel(panel && panel.kind === 'comments' ? null : { kind: 'comments', start: 0 })}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
@@ -299,10 +315,37 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                     key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'comments' && wb.can('comment.read') && wb.shows('panel.comments') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision} start={panel.start}
                     onGo={(r, c) => goToRange(sheetId, { r1: r, c1: c, r2: r, c2: c })} onError={setNotice} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'pivot' && wb.shows('panel.pivot') ? <PivotPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
+                    key={panel.id} onError={setNotice} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'names' && wb.shows('panel.names') ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
                     onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>
             {ui.tabs ? <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} /> : null}
+            {pivotDialog ? (
+                <PivotDialog container={root} range={pivotDialog.range} onClose={() => { setPivotDialog(null); toGrid(); }}
+                    onCreate={(source, where) => {
+                        try {
+                            let target = sheetId, cell = 'A1';
+                            if (where.newSheet) {
+                                let n = 1;
+                                while (wb.sheetIdByName('Pivot table ' + n)) n++;
+                                target = wb.addSheet('Pivot table ' + n, { source: 'user' });
+                            } else {
+                                const m = /^(?:(?:'((?:[^']|'')+)'|([^!'"]+))!)?\s*([A-Za-z]{1,3}\d+)\s*$/.exec(where.at);
+                                if (!m) return 'Write the cell the table goes to, for example H1 or Rekap!B2';
+                                const named = m[1] ? m[1].replace(/''/g, "'") : m[2];
+                                if (named) { target = wb.sheetIdByName(named.trim()); if (!target) return 'There is no sheet "' + named + '"'; }
+                                cell = m[3];
+                            }
+                            wb.addPivot(target, cell, source, { rows: [], values: [] }, { source: 'user' });
+                            setPivotDialog(null);
+                            // the table's sheet and its first cell: its editor opens
+                            const r = Number(cell.replace(/^[A-Za-z]+/, '')) - 1, c = cell.replace(/\d+$/, '').toUpperCase().split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+                            goToRange(target, { r1: r, c1: c, r2: r, c2: c });
+                            return null;
+                        } catch (err) { return err.message[0].toUpperCase() + err.message.slice(1); }
+                    }} />
+            ) : null}
             {filterMenu && wb.filterOf(sheetId) && wb.shows('panel.filter') ? (
                 <FilterMenu workbook={wb} sheetId={sheetId} c={filterMenu.c} at={filterMenu} container={root} onError={setNotice}
                     onClose={() => { setFilterMenu(null); toGrid(); }}

@@ -214,10 +214,10 @@ export const UI_ITEMS = [
         ['menu.view:freezeRows', 'View > Freeze rows'], ['menu.view:freezeCols', 'View > Freeze columns'], ['menu.view:group', 'View > Group'], ['menu.view:comments', 'View > Comments'],
         ['menu.view:zoom', 'View > Zoom'], ['menu.insert:rowsAbove', 'Insert > Rows'], ['menu.insert:colsLeft', 'Insert > Columns'], ['menu.insert:sheet', 'Insert > Sheet'],
         ['menu.insert:checkbox', 'Insert > Checkbox'], ['menu.insert:dropdown', 'Insert > Dropdown'], ['menu.insert:fn', 'Insert > Function'], ['menu.insert:link', 'Insert > Link'],
-        ['menu.insert:comment', 'Insert > Comment'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
+        ['menu.insert:comment', 'Insert > Comment'], ['menu.insert:pivot', 'Insert > Pivot table'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
         ['menu.data:sortRange', 'Data > Sort range'], ['menu.data:filter', 'Data > Filter'], ['menu.data:validation', 'Data > Data validation'], ['menu.data:names', 'Data > Named ranges']
     ].map(([id, label]) => ({ id, label, group: 'Menu items' })),
-    [['panel.comments', 'Comments panel'], ['panel.conditional', 'Conditional formatting panel'], ['panel.names', 'Named ranges panel'], ['panel.validation', 'Data validation dialog'],
+    [['panel.comments', 'Comments panel'], ['panel.pivot', 'Pivot table editor'], ['panel.conditional', 'Conditional formatting panel'], ['panel.names', 'Named ranges panel'], ['panel.validation', 'Data validation dialog'],
         ['panel.find', 'Find and replace'], ['panel.settings', 'Settings dialog'], ['panel.filter', 'Filter buttons and menu']].map(([id, label]) => ({ id, label, group: 'Panels' })),
     [['feature.contextMenu', 'Right-click menu'], ['feature.fillHandle', 'Fill handle'], ['feature.resize', 'Resizing rows and columns by dragging'], ['feature.groups', 'Group buttons'],
         ['cell.commentMark', 'Comment marks on cells'], ['cell.validation', 'Dropdown arrows and checkboxes']].map(([id, label]) => ({ id, label, group: 'Features' }))

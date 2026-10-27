@@ -1003,6 +1003,7 @@ export function createWorkbook(doc, options) {
     function pivotCells(s, p) {
         const src = pivotSource(s, p);
         if (!src) return { error: 'Pivot table: its data "' + p.source + '" is not there' };
+        if (!p.spec || !(p.spec.values || []).length) return { error: 'Pivot table: add Rows and Values in its editor' };
         try {
             const { records } = tableOf(api, src.s, src.rect);
             return pivot(records, p.spec);

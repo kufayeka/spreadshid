@@ -145,8 +145,11 @@ export function pivot(records, spec) {
         return 0;
     };
     const rowKeys = [...rowKeySet.values()].sort(order(rowFields));
-    const colKeys = [...colKeySet.values()].sort(order(colFields));
-    const value = (rk, ck, i) => { const b = buckets.get(JSON.stringify([rk, ck])); return b ? PIVOT_FUNCTIONS[values[i].fn](b[i]) : null; };
+    // no column fields: one column group, there even when no record is left (the table still has its value columns)
+    const colKeys = colFields.length ? [...colKeySet.values()].sort(order(colFields)) : [[]];
+    // a row group and a column group that have no record together are blank (as in Google Sheets); a total with no record is what its function makes
+    // of nothing (0 for SUM and COUNT), as the grand total of a table whose records are all filtered out
+    const value = (rk, ck, i) => { const b = buckets.get(JSON.stringify([rk, ck])); if (!b && rk.length && ck.length) return null; return PIVOT_FUNCTIONS[values[i].fn](b ? b[i] : []); };
     const valueName = (v) => v.as || v.fn + ' of ' + v.field;
 
     // the columns of the table: each column group (and, with totals, the grand total), times each value
