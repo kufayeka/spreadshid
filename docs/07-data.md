@@ -63,13 +63,13 @@ console.log('filter dihapus  :', jual.value('N1'), 'baris');
 
 <!-- hasil: 07-sort-filter.js -->
 ```text
-total terbesar  : 48:Jak:12495000  218:Sur:12495000  112:Jak:11760000  282:Sur:11760000  176:Jak:11025000
+total terbesar  : 48:Ban:12495000  218:Jak:12495000  112:Sur:11760000  282:Ban:11760000  176:Jak:11025000
 rumus K2        : =H2*I2*(1-J2) (baris transaksi 48)
-cabang, lalu total: 27:Ban:9760000  91:Ban:8692500  155:Ban:8540000  219:Ban:7930000  283:Ban:7320000
-dua kali undo   : 1:Jak:752400  2:Sur:1148000  3:Ban:795000  4:Jak:912000  5:Jak:290000
-pilihan cabang  : [{"text":"Bandung","count":75},{"text":"Jakarta","count":150},{"text":"Surabaya","count":75}]
-hanya Jakarta   : 150 baris | omzet 295305000
-+ total > 5 jt  : 11 baris | omzet 99519000
+cabang, lalu total: 48:Ban:12495000  282:Ban:11760000  240:Ban:10290000  27:Ban:9760000  181:Ban:8379000
+dua kali undo   : 1:Jak:752400  2:Ban:1148000  3:Jak:795000  4:Sur:912000  5:Jak:290000
+pilihan cabang  : [{"text":"Bandung","count":86},{"text":"Jakarta","count":129},{"text":"Surabaya","count":85}]
+hanya Jakarta   : 129 baris | omzet 264052400
++ total > 5 jt  : 11 baris | omzet 93665000
 diskon semen/besi: 16 baris | omzet 21010000
 contoh baris    : 1 Semen 0.05 | 28 Semen 0.05 | 47 Besi 0.1 | 55 Semen 0.05
 filter disimpan : 1 kolom, di props sheet

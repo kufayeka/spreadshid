@@ -176,12 +176,12 @@ console.log('jumlah 5 minggu = total omzet:', lap.value('E13'), '| 1 Oktober 202
 
 <!-- hasil: 05-laporan.js -->
 ```text
-Jakarta   omzet 295305000 | trx 150 | rata2 1968700 | max 12495000 | pangsa 47.6% | #1 A
-Bandung   omzet 143583350 | trx 75 | rata2 1914445 | max 9760000 | pangsa 23.1% | #3 C
-Surabaya  omzet 181564800 | trx 75 | rata2 2420864 | max 12495000 | pangsa 29.3% | #2 B
+Jakarta   omzet 264052400 | trx 129 | rata2 2046918 | max 12495000 | pangsa 42.6% | #1 A
+Bandung   omzet 187095250 | trx 86 | rata2 2175526 | max 12495000 | pangsa 30.2% | #2 B
+Surabaya  omzet 169305500 | trx 85 | rata2 1991829 | max 11760000 | pangsa 27.3% | #3 B
 Total     omzet 620453150 | trx 300 | rata2 2068177 | max 12495000 | pangsa 100.0% 
 Cabang terbaik    : Jakarta
-Omzet kedua       : Surabaya
+Omzet kedua       : Bandung
 Diskon diberikan  : 46 transaksi
 Qty terbanyak     : 27 x Semen Portland 50 kg
 Semua cabang      : Jakarta, Bandung, Surabaya
@@ -283,16 +283,16 @@ console.log('filter tanpa Surabaya       :', rekap.value('B10'), '(9) |', rekap.
 <!-- hasil: 05-nama-subtotal.js -->
 ```text
 rumus             : =SUMIFS(Omzet, Cabang, "Bandung")
-omzet Bandung     : 143583350 | semen 97448800
+omzet Bandung     : 187095250 | semen 97448800
 komisi (belum ada): #NAME? <- nama Komisi belum dibuat
-komisi            : 2153750 <- rumus jalan begitu namanya ada
+komisi            : 2806429 <- rumus jalan begitu namanya ada
 ganti nama        : =SUMIFS(Total, Cabang, "Bandung")
-baris baru masuk  : 146483350 (+2.900.000)
+baris baru masuk  : 189995250 (+2.900.000)
 semua nama        : Cabang = Penjualan!C2:C302, Kategori = Penjualan!G2:G302, Total = Penjualan!K2:K302, Komisi = Laporan!E1
 nama tidak boleh  : "\"A1\" is the address of a cell, not a name" | "there is a named range \"Total\" already"
 SUBTOTAL vs SUM   : 140157500 vs 280315000 <- SUM menghitung subtotal dua kali
-Bandung semen disembunyikan : 140157500 (9) | 127759100 (109)
-filter tanpa Surabaya       : 114438500 (9) | 114438500 (109)
+Bandung semen disembunyikan : 140157500 (9) | 111629100 (109)
+filter tanpa Surabaya       : 104075000 (9) | 104075000 (109)
 ```
 <!-- /hasil -->
 
