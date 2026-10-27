@@ -74,6 +74,7 @@ export function createEngine(host) {
     const inColumn = new Map();       // column id -> Set of entries in that column
     const pendingInColumn = new Map();// column id -> Set of entries in that column that have no value
     const volatile = new Set();       // entries that read the clock (NOW, TODAY, RAND)
+    const nameReaders = new Set();    // entries that read a named range (it can point into any sheet, and be moved to another range)
     let structure = 0;                // raised whenever rows or columns move: the positions kept for ranges are old after it
 
     function entryAt(row, col) { const m = entries.get(row); return m ? m.get(col) : undefined; }
@@ -95,6 +96,7 @@ export function createEngine(host) {
         addTo(inColumn, e.col, e);
         addTo(pendingInColumn, e.col, e);
         for (const ref of e.formula.refs) {
+            if (ref.k === 'name') { nameReaders.add(e); continue; }
             const target = ref.s || e.s;
             addTo(sheetReaders, target, e);
             if (ref.k === 'cell') {
@@ -114,6 +116,7 @@ export function createEngine(host) {
         takeFrom(inColumn, e.col, e);
         takeFrom(pendingInColumn, e.col, e);
         for (const ref of e.formula.refs) {
+            if (ref.k === 'name') { nameReaders.delete(e); continue; }
             const target = ref.s || e.s;
             takeFrom(sheetReaders, target, e);
             if (ref.k === 'cell') {
@@ -143,19 +146,23 @@ export function createEngine(host) {
         const direct = byCol && byCol.get(col);
         if (direct) for (const e of direct) out.push(e);
         const ranged = rangeReaders.get(s);
-        if (!ranged || !ranged.size) return;
+        if ((!ranged || !ranged.size) && !nameReaders.size) return;
         const c = host.colIndexOf(s, col);
         if (c < 0) return;
         // the row is looked up only when a range covers the column (most cells that change are outside every range's columns)
         let r = -2;
-        for (const e of ranged) {
-            const refs = e.formula.refs;
-            for (let i = 0; i < refs.length; i++) {
-                if (refs[i].k === 'cell' || (refs[i].s || e.s) !== s) continue;
-                const rect = rectOf(e, i);
-                if (!rect || c < rect.c1 || c > rect.c2) continue;
-                if (r === -2) r = host.rowIndexOf(s, row);
-                if (r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2) { out.push(e); break; }
+        // the ranges into this sheet, and the named ranges (which point into a sheet only their name knows)
+        for (const set of [ranged, nameReaders]) {
+            if (!set) continue;
+            for (const e of set) {
+                const refs = e.formula.refs;
+                for (let i = 0; i < refs.length; i++) {
+                    if (refs[i].k === 'cell' || (refs[i].k !== 'name' && (refs[i].s || e.s) !== s)) continue;
+                    const rect = rectOf(e, i);
+                    if (!rect || rect.s !== s || c < rect.c1 || c > rect.c2) continue;
+                    if (r === -2) r = host.rowIndexOf(s, row);
+                    if (r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2) { out.push(e); break; }
+                }
             }
         }
     }
@@ -223,7 +230,8 @@ export function createEngine(host) {
         e.env = {
             slot(i, asRange) {
                 const rect = rectOf(e, i);
-                if (!rect) return ERR.REF;
+                // a name the workbook does not have is #NAME?, as in Google Sheets and Excel
+                if (!rect) return e.formula.refs[i].k === 'name' ? ERR.NAME : ERR.REF;
                 const ref = e.formula.refs[i];
                 if (ref.k === 'cell' && !asRange) return valueOfIds(rect.s, ref.r1, ref.c1);
                 // ROW(A5) and the like ask where the cell stands: the answer changes when rows move
@@ -304,7 +312,7 @@ export function createEngine(host) {
     // the formulas whose answer can change when rows or columns of sheet s move: ranges into it, and the ones that ask for positions in it
     function movedIn(s) {
         structure++;
-        return [...(rangeReaders.get(s) || []), ...(positional.get(s) || [])];
+        return [...(rangeReaders.get(s) || []), ...(positional.get(s) || []), ...nameReaders];
     }
 
     return {
@@ -334,7 +342,14 @@ export function createEngine(host) {
         /** A whole sheet came or went: every formula in it and every formula that reads it is worked out again. */
         sheetChanged(s) {
             structure++;
-            loseAll([...(inSheet.get(s) || []), ...(sheetReaders.get(s) || [])]);
+            loseAll([...(inSheet.get(s) || []), ...(sheetReaders.get(s) || []), ...nameReaders]);
+        },
+        /** The formulas that read a named range: { s, row, col, formula } (for the workbook, when a name is made: see addName). */
+        nameReaderCells() { return [...nameReaders].map((e) => ({ s: e.s, row: e.row, col: e.col, formula: e.formula })); },
+        /** A named range was made, changed, renamed or taken away: every formula that reads a name is worked out again. */
+        namesChanged() {
+            structure++;
+            loseAll([...nameReaders]);
         },
         /** The clock moved on: NOW, TODAY and RAND are worked out again, and what reads them. */
         tick() { loseAll([...volatile]); },

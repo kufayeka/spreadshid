@@ -76,6 +76,16 @@ export function storeFormula(text, sheetId, grid) {
             i++;
             t = toks[i];
         }
+        // a word on its own (not a function, not TRUE or FALSE) is a named range: kept by the id of the name, and by its text for a name made later
+        if (t.type === 'name' && target === sheetId && grid.nameId) {
+            const next = toks[i + 1];
+            const up = t.text.toUpperCase();
+            if ((next && next.type === 'op' && next.text === '(') || up === 'TRUE' || up === 'FALSE') continue;
+            out += src.slice(at, t.start) + OPEN + refs.length + CLOSE;
+            refs.push({ k: 'name', id: grid.nameId(t.text), n: t.text });
+            at = t.end;
+            continue;
+        }
         if (t.type !== 'cell' && t.type !== 'colrange' && t.type !== 'rowrange') continue;
         let end = t.end;
         let ref = null;
@@ -150,6 +160,8 @@ function lineRef(kind, x, y, fixedX, fixedY, sheetId, grid) {
  * @param {Grid} grid
  */
 export function resolveRef(ref, sheetId, grid) {
+    // a named range points where its name points now, or nowhere (#NAME?) when the workbook has no such name
+    if (ref.k === 'name') return grid.nameRect ? grid.nameRect(ref) : null;
     const s = ref.s || sheetId;
     let size;
     try { size = grid.size(s); } catch { return null; }
@@ -183,6 +195,8 @@ function sheetPrefix(ref, sheetId, grid) {
 
 /** The A1 text of one reference as it points now, or "#REF!". */
 export function refText(ref, sheetId, grid) {
+    // a name shows as it is called now (renamed, every formula shows the new name), or as it was typed when there is no such name
+    if (ref.k === 'name') return grid.nameText ? grid.nameText(ref) : ref.n;
     const at = resolveRef(ref, sheetId, grid);
     if (!at) return '#REF!';
     const prefix = sheetPrefix(ref, sheetId, grid);

@@ -13,6 +13,7 @@ import { Menubar } from './Menubar.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
 import { ConditionalPanel } from './ConditionalPanel.js';
+import { NamesPanel } from './NamesPanel.js';
 import { parseRangeText } from '../core/validation.js';
 import { copyBlock, pasteClip } from '../core/transfer.js';
 import { useAutoHeights } from './autoHeights.js';
@@ -94,8 +95,8 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const [settingsOpen, setSettingsOpen] = useState(false);
     // the data validation dialog: open for the selection, with the rule of the active cell (or a new one of a kind)
     const [validating, setValidating] = useState(null);
-    // the panel of conditional formatting, and the selection it opened on (where a new rule goes)
-    const [conditional, setConditional] = useState(null);
+    // the panel on the right of the grid (conditional formatting, named ranges), and the selection it opened on (where a new rule or name goes)
+    const [panel, setPanel] = useState(null); // { kind: 'conditional' | 'names', range }
 
     // the formula bar's edit ends as the cell's does: the text is written, and Enter, Tab move on
     function commitFromBar(move) {
@@ -201,12 +202,42 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     const marks = matches.filter((m) => m.sheet === sheetId);
     const current = matches[find.index];
 
+    // a range selected on its sheet (another sheet is shown first), and shown
+    function goToRange(id, r) {
+        setSelections((m) => new Map(m).set(id, { ranges: [{ anchor: { r: r.r1, c: r.c1 }, focus: { r: r.r2, c: r.c2 } }], active: { r: r.r1, c: r.c1 } }));
+        if (id !== sheetId) show(id);
+        setRevealTick((t) => t + 1);
+        toGrid();
+    }
+
+    // A word typed in the name box: a named range is gone to; a new name names the selection, as in Google Sheets and Excel.
+    function goToName(text) {
+        const at = wb.nameRange(text);
+        if (at) { goToRange(at.sheetId, at.range); return; }
+        const why = wb.nameProblem(text);
+        if (why) { setNotice(why[0].toUpperCase() + why.slice(1)); toGrid(); return; }
+        const b = rectsOf(sel)[rectsOf(sel).length - 1];
+        wb.addName(text.trim(), sheetId, b, { source: 'user' });
+        setNotice('Named range ' + text.trim() + ' is ' + rectText(b));
+        toGrid();
+    }
+
+    // the name box shows the name of a named range that is exactly the selection, as in Google Sheets
+    function nameOfSelection() {
+        const all = rectsOf(sel);
+        if (all.length !== 1) return '';
+        const b = all[0];
+        const n = wb.names().find((x) => x.sheetId === sheetId && x.range && x.range.r1 === b.r1 && x.range.c1 === b.c1 && x.range.r2 === b.r2 && x.range.c2 === b.c2);
+        return n ? n.name : '';
+    }
+
     // Nothing here may touch window or document while rendering: Next.js renders this on the server first, where neither exists.
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
-                onConditional={() => setConditional({ range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
+                onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
+                onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
                     const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);
@@ -217,7 +248,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
             <Toolbar workbook={wb} sheetId={sheetId} sel={sel} revision={revision} zoom={zoom} onZoom={setZoom} painting={!!paint} onPaint={onPaint}
                 onStartEdit={(text) => { setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' }); }}
                 onLink={() => setLinking(true)} onDone={toGrid} container={root} />
-            <FormulaBar address={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
+            <FormulaBar address={nameOfSelection() || rectText(rectsOf(sel)[rectsOf(sel).length - 1])} onGoName={goToName} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
                 onStartEdit={(text) => {
                     const m = wb.modeAt(sheetId, sel.active.r, sel.active.c);
                     if (m) { setNotice(m.message || 'This cell is protected: it cannot be changed here'); toGrid(); return; }
@@ -233,7 +264,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                     setRevealTick((t) => t + 1);
                     toGrid();
                 }} />
-            <div className={'ks-body' + (conditional ? ' ks-with-panel' : '')}>
+            <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} />
                 {find.open ? (
@@ -244,8 +275,10 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                         onMore={() => setFind((f) => ({ ...f, open: false, dialog: true }))} />
                 ) : null}
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
-                {conditional ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={conditional.range} revision={revision} container={root}
-                    key={sheetId} onClose={() => { setConditional(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'conditional' ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
+                    key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'names' ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
+                    onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>
             <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} />
             {validating ? (

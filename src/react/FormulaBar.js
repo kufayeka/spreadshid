@@ -23,8 +23,9 @@ export function parseAddressText(text) {
  * @param {(move: { dr: number, dc: number }|null) => void} props.onCommit
  * @param {() => void} props.onCancel
  * @param {(rect: object) => void} props.onGo  An address was typed in the name box.
+ * @param {(text: string) => void} [props.onGoName]  A word that is no address was typed in the name box (a named range, or a new name for the selection).
  */
-export function FormulaBar({ address, content, editing, onStartEdit, onText, onCommit, onCancel, onGo }) {
+export function FormulaBar({ address, content, editing, onStartEdit, onText, onCommit, onCancel, onGo, onGoName }) {
     const [name, setName] = useState(null); // what is typed in the name box, while it is typed
     const input = useRef(null);
     const text = editing ? editing.text : content;
@@ -47,6 +48,7 @@ export function FormulaBar({ address, content, editing, onStartEdit, onText, onC
                         setName(null);
                         e.currentTarget.blur();
                         if (rect) onGo(rect);
+                        else if (onGoName && /\S/.test(name || '')) onGoName((name || '').trim());
                     }
                     if (e.key === 'Escape') { setName(null); e.currentTarget.blur(); }
                 }} />

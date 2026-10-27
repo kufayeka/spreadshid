@@ -138,7 +138,8 @@ export function parseFormula(text) {
             const up = tok.text.toUpperCase();
             if (up === "TRUE") return { t: "bool", v: true };
             if (up === "FALSE") return { t: "bool", v: false };
-            return { t: "err", v: ERR.NAME };
+            // a word that is no function: a name the workbook does not have (a name it has is a reference, kept by its id: see refs.js)
+            return { t: "err", v: ERR.NAME, name: tok.text };
         }
         if (isOp(tok, "(")) {
             const inner = comparison();
@@ -295,14 +296,15 @@ export function renameInFormula(text, from, to) {
  * Why a formula cannot be kept by the grid: "" when it can (it reads, and every function in it is one the grid has), else the first function it does not have, or a word
  * for the other cases. Used when a file from Excel is read: a formula the grid cannot work out is replaced by the value Excel worked out.
  */
-export function formulaProblem(text) {
+export function formulaProblem(text, knownNames) {
     const res = parseFormula(text);
     if (!res.ast) return "a formula it cannot read";
     let problem = "";
     const walk = (n) => {
         if (!n || problem) return;
         if (n.t === "call") { if (!FUNCTIONS[n.name]) { problem = n.name; return; } n.args.forEach(walk); }
-        else if (n.t === "err" && n.v === ERR.NAME) problem = "a name";
+        // a name is a problem unless the workbook will have it (`knownNames`: lower-case names, when a file brings its own)
+        else if (n.t === "err" && n.v === ERR.NAME && !(knownNames && n.name && knownNames.has(n.name.toLowerCase()))) problem = n.name ? "the name " + n.name : "a name";
         else if (n.a) { walk(n.a); if (n.b) walk(n.b); }
     };
     walk(res.ast);

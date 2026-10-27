@@ -20,6 +20,7 @@ import { readXlsx } from './read.js';
 import { toExcelRule } from './conditional.js';
 import { conditionalRects, conditionalFormulaText } from '../conditional.js';
 import { formulaProblem } from '../formula/formula.js';
+import { colName } from '../formula/address.js';
 
 // ---- out ------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -116,7 +117,13 @@ export function exportXlsx(wb) {
             conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean)
         };
     });
-    return zipStore(buildXlsxFiles({ sheets, active: 0 }));
+    // the named ranges, by the names the sheets have in the file (Excel takes a sheet name of 31 characters at most, without \ / ? * [ ] :)
+    const fileName = (s) => String(wb.sheetProps(s).name || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet1';
+    const names = wb.names().filter((n) => n.range).map((n) => ({
+        name: n.name,
+        ref: "'" + fileName(n.sheetId).replace(/'/g, "''") + "'!$" + colName(n.range.c1) + '$' + (n.range.r1 + 1) + (n.range.r2 > n.range.r1 || n.range.c2 > n.range.c1 ? ':$' + colName(n.range.c2) + '$' + (n.range.r2 + 1) : '')
+    }));
+    return zipStore(buildXlsxFiles({ sheets, active: 0, names }));
 }
 
 // ---- in -------------------------------------------------------------------------------------------------------------------------------------------
@@ -126,10 +133,17 @@ export function exportXlsx(wb) {
 function addRules(wb, docs, read) {
     read.sheets.forEach((sh, i) => {
         for (const { rects, spec } of sh.conditionals || []) {
-            if (spec.op === 'formula') { const problem = formulaProblem(spec.formula); if (problem) { read.warnings.push('"' + sh.name + '": a rule of conditional formatting with ' + problem + ' was not imported'); continue; } }
+            if (spec.op === 'formula') { const problem = formulaProblem(spec.formula, read.knownNames); if (problem) { read.warnings.push('"' + sh.name + '": a rule of conditional formatting with ' + problem + ' was not imported'); continue; } }
             try { wb.addConditional(docs[i].id, rects, spec, { source: 'remote' }); } catch (err) { read.warnings.push('"' + sh.name + '": a rule of conditional formatting was not imported (' + err.message + ')'); }
         }
     });
+}
+
+// the named ranges of a file put in a workbook made from its sheets, before their formulas (which then keep them by id)
+function addNames(wb, docs, read) {
+    for (const n of read.names || []) {
+        try { wb.addName(n.name, docs[n.sheetIndex].id, n, { source: 'remote' }); } catch (err) { read.warnings.push('the named range ' + n.name + ' was not imported (' + err.message + ')'); }
+    }
 }
 
 // the documents of sheets read from a file, their formulas still as texts (put in once the sheets are in a workbook, where they can be kept by ids)
@@ -185,6 +199,7 @@ export async function importXlsx(bytes, options) {
     const read = await readXlsx(bytes);
     const { docs, formulas } = sheetDocs(read);
     const wb = createWorkbook({ sheets: docs, settings: (options && options.settings) || {} }, { ...options, fresh: true });
+    addNames(wb, docs, read);
     docs.forEach((d, i) => { if (formulas[i].length) wb.setBlock(d.id, formulas[i], { source: 'remote' }); });
     addRules(wb, docs, read);
     return { workbook: wb, warnings: read.warnings, active: docs[read.active] ? docs[read.active].id : docs[0].id };
@@ -199,15 +214,23 @@ export async function importXlsxInto(wb, bytes, how) {
     const read = await readXlsx(bytes);
     const { docs, formulas } = sheetDocs(read);
     // the formulas are put in the sheets in a workbook of their own (they read one another by name), then the finished sheets move over
-    const temp = createWorkbook({ sheets: docs, settings: wb.settings() });
+    // the temporary workbook starts with no names of its own: the file's names go in it, then over to the workbook with its sheets
+    const temp = createWorkbook({ sheets: docs, settings: { ...wb.settings(), names: undefined } });
+    addNames(temp, docs, read);
     docs.forEach((d, i) => { if (formulas[i].length) temp.setBlock(d.id, formulas[i], { source: 'remote' }); });
     addRules(temp, docs, read);
-    const sheetIds = addFinishedSheets(wb, temp.toJSON().sheets, how);
+    // a name the workbook has already stays the workbook's (the file's formulas that use it then read the workbook's range), and it is said
+    const fileNames = (temp.settings().names || []).filter((n) => {
+        if (!wb.nameRange(n.name)) return true;
+        read.warnings.push('the workbook has a named range ' + n.name + ' already: the file\'s was not added');
+        return false;
+    });
+    const sheetIds = addFinishedSheets(wb, temp.toJSON().sheets, how, fileNames);
     return { sheetIds, warnings: read.warnings };
 }
 
 // The finished sheets of another workbook added after the sheets of this one, as one change (one undo), a name that is taken given a number.
-function addFinishedSheets(wb, ready, how) {
+function addFinishedSheets(wb, ready, how, names) {
     const ids = wb.sheetIds();
     let last = ids.length ? wb._sheetKey(ids[ids.length - 1]) : null;
     const taken = new Set(ids.map((s) => String(wb.sheetProps(s).name).toLowerCase()));
@@ -218,8 +241,11 @@ function addFinishedSheets(wb, ready, how) {
         last = keyBetween(last, null);
         return { t: 'addSheet', sheet: { ...sheet, key: last, props: { ...sheet.props, name } } };
     });
+    // the named ranges that come with the sheets, in the same change
+    const sheetOps = ops.slice();
+    if (names && names.length) { const before = wb.settings(); ops.push({ t: 'settings', before, after: { ...before, names: (before.names || []).concat(names) } }); }
     wb.apply(ops, how || { source: 'user' });
-    return ops.map((op) => op.sheet.id);
+    return sheetOps.map((op) => op.sheet.id);
 }
 
 // ---- CSV ------------------------------------------------------------------------------------------------------------------------------------------

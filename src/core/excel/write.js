@@ -184,6 +184,8 @@ export function buildXlsxFiles(book) {
         + (dxfs.list.length ? '<dxfs count="' + dxfs.list.length + '">' + dxfs.list.map(dxfXml).join("") + "</dxfs>" : "") + "</styleSheet>";
 
     const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    // the named ranges of the workbook ({ name, ref: "'BOQ'!$D$2:$D$200" }), as Excel keeps them
+    const namesXml = book.names && book.names.length ? '<definedNames>' + book.names.map((n) => '<definedName name="' + xmlEsc(n.name) + '">' + xmlEsc(n.ref) + '</definedName>').join('') + '</definedNames>' : '';
     const sheetParts = rendered.map((x, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("");
     const sheetRels = rendered.map((x, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join("");
     const activeTab = Math.max(0, Math.min(rendered.length - 1, Number(book.active) || 0));
@@ -191,7 +193,7 @@ export function buildXlsxFiles(book) {
     return [
         { name: "[Content_Types].xml", text: head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheetParts + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
         { name: "_rels/.rels", text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
-        { name: "xl/workbook.xml", text: head + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="' + activeTab + '"/></bookViews><sheets>' + sheetList + '</sheets></workbook>' },
+        { name: "xl/workbook.xml", text: head + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="' + activeTab + '"/></bookViews><sheets>' + sheetList + '</sheets>' + namesXml + '</workbook>' },
         { name: "xl/_rels/workbook.xml.rels", text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheetRels + '<Relationship Id="rId' + (rendered.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
         { name: "xl/styles.xml", text: styles }
     ].concat(rendered.map((x, i) => ({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", text: x.sheet })));

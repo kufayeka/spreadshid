@@ -20,6 +20,7 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {number} props.zoom @param {(z: number) => void} props.onZoom
  * @param {(kind: 'find'|'replace') => void} props.onFind
  * @param {() => void} props.onLink @param {() => void} props.onSettings @param {() => void} props.onConditional  Opens the panel of conditional formatting.
+ * @param {() => void} props.onNames  Opens the panel of named ranges.
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
  * @param {(message: string) => void} props.onError  Also how what an import left out is told.
@@ -109,6 +110,7 @@ export function Menubar(props) {
         Data: [
             { label: 'Sort sheet', children: [{ value: 'data:sortSheet:asc', label: 'Sort sheet by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortSheet:desc', label: 'Sort sheet by column ' + colName(sel.active.c) + ' (Z to A)' }] },
             { value: 'data:validation', label: 'Data validation' },
+            { value: 'data:names', label: 'Named ranges' },
             { separator: true },
             { label: 'Sort range', disabled: nr < 2, children: [{ value: 'data:sortRange:asc', label: 'Sort range by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortRange:desc', label: 'Sort range by column ' + colName(sel.active.c) + ' (Z to A)' }] }
         ]
@@ -197,6 +199,7 @@ export function Menubar(props) {
             case 'merge': run(() => merge(wb, s, sel, what)); break;
             case 'data': {
                 if (what === 'validation') { props.onValidation(null); break; }
+                if (what === 'names') { props.onNames(); break; }
                 const dir = extra;
                 if (what === 'sortRange') run(() => sortRange(wb, s, b, sel.active.c, dir));
                 else {

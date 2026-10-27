@@ -202,7 +202,7 @@ function readSheet(root, shared, styles, info, warnings) {
                     else if (shares.has(f.attrs.si)) { const m = shares.get(f.attrs.si); text = shiftFormula('=' + m.text, a.r - m.r, a.c - m.c).slice(1); }
                 }
                 if (text) {
-                    const problem = formulaProblem('=' + text);
+                    const problem = formulaProblem('=' + text, info.knownNames);
                     if (!problem) formula = '=' + text;
                     else unknown.add(problem);
                 }
@@ -279,6 +279,18 @@ export async function readXlsx(bytes) {
     const styles = readStyles(files), shared = readShared(files);
     const date1904 = !!kid(wb, 'workbookPr') && ['1', 'true'].includes(kid(wb, 'workbookPr').attrs.date1904);
     const warnings = [], sheets = [];
+    // the named ranges of the workbook, read before the sheets so a formula that uses one is kept (a name of one sheet only, or one that is a
+    // formula and not a range, is left out and said)
+    const names = [], knownNames = new Set(), leftOut = [];
+    for (const d of kids(kid(wb, 'definedNames'), 'definedName')) {
+        const name = d.attrs.name || '';
+        if (!name || /^_xlnm\./i.test(name)) continue;
+        const m = /^(?:'((?:[^']|'')+)'|([^!'"]+))!\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?$/.exec((d.text || '').trim());
+        if (d.attrs.localSheetId !== undefined || !m) { leftOut.push(name); continue; }
+        const r1 = Number(m[4]) - 1, c1 = colIndex(m[3]), r2 = m[6] ? Number(m[6]) - 1 : r1, c2 = m[5] ? colIndex(m[5]) : c1;
+        names.push({ name, sheet: m[1] ? m[1].replace(/''/g, "'") : m[2], r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) });
+        knownNames.add(name.toLowerCase());
+    }
     const infos = kids(kid(wb, 'sheets'), 'sheet');
     if (!infos.length) throw new Error('The workbook has no sheets');
     if (infos.length > MAX_SHEETS) warnings.push('only the first ' + MAX_SHEETS + ' sheets were read');
@@ -287,14 +299,17 @@ export async function readXlsx(bytes) {
         const path = target ? (target[0] === '/' ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '')) : '';
         const part = files.get(path);
         if (!part) { warnings.push('the sheet "' + s.attrs.name + '" is not in the file (a chart sheet?)'); continue; }
-        const read = readSheet(parseXml(new TextDecoder().decode(part)), shared, styles, { name: s.attrs.name, hidden: !!s.attrs.state && s.attrs.state !== 'visible' }, warnings);
+        const read = readSheet(parseXml(new TextDecoder().decode(part)), shared, styles, { name: s.attrs.name, hidden: !!s.attrs.state && s.attrs.state !== 'visible', knownNames }, warnings);
         // a workbook of the 1904 system counts its dates from 1904: moved to the sheet's count
         if (date1904) for (const cell of read.cells) if (typeof cell.value === 'number' && cell.style.format && /date|time/.test(cell.style.format.type)) cell.value += 1462;
         sheets.push(read);
     }
     if (!sheets.length) throw new Error('The workbook has no sheet that can be read');
-    if (kid(wb, 'definedNames') && kids(kid(wb, 'definedNames'), 'definedName').some((d) => !/^_xlnm\./.test(d.attrs.name || ''))) warnings.push('named ranges were not imported (a formula that used one kept its value)');
+    if (leftOut.length) warnings.push('the named ranges ' + leftOut.slice(0, 6).join(', ') + (leftOut.length > 6 ? ' …' : '') + ' were not imported (a name of one sheet, or of a formula): a formula that used one kept its value');
+    // each name by the index of its sheet among the sheets read
+    const lower = sheets.map((x) => String(x.name).toLowerCase());
+    const named = names.map((n) => ({ ...n, sheetIndex: lower.indexOf(String(n.sheet).toLowerCase()) })).filter((n) => n.sheetIndex >= 0);
     const view = kid(kid(wb, 'bookViews'), 'workbookView');
     const active = Math.max(0, Math.min(sheets.length - 1, Number(view && view.attrs.activeTab) || 0));
-    return { sheets, active, warnings };
+    return { sheets, active, warnings, names: named, knownNames };
 }

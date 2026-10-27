@@ -169,8 +169,24 @@ export function createWorkbook(doc, options) {
             const fmt = formatOfIds(s, rid, cid);
             return fmt && fmt.type === 'money' ? (fmt.decimals === undefined ? 2 : fmt.decimals) : null;
         },
-        now: () => (opt.now ? opt.now() : new Date())
+        now: () => (opt.now ? opt.now() : new Date()),
+        // named ranges (kept in the settings, so they are saved, undone and checked as the workbook's own): found by id, else by the text typed
+        nameId: (text) => { const n = findName(text); return n ? n.id : null; },
+        nameRect(ref) {
+            const n = (ref.id && namesOf().find((x) => x.id === ref.id)) || findName(ref.n);
+            return n ? nameRectOf(n) : null;
+        },
+        nameText: (ref) => { const n = ref.id && namesOf().find((x) => x.id === ref.id); return n ? n.name : ref.n; }
     };
+    const namesOf = () => settings.names || [];
+    const findName = (text) => { const want = String(text || '').toLowerCase(); return namesOf().find((x) => x.name.toLowerCase() === want) || null; };
+    // where a name points now: { s, r1, c1, r2, c2 }, or null when its sheet, a row or a column of its corners is gone
+    function nameRectOf(n) {
+        if (!sheets.has(n.s)) return null;
+        const r1 = grid.rowIndexOf(n.s, n.r1), r2 = grid.rowIndexOf(n.s, n.r2), c1 = grid.colIndexOf(n.s, n.c1), c2 = grid.colIndexOf(n.s, n.c2);
+        if (r1 < 0 || r2 < 0 || c1 < 0 || c2 < 0) return null;
+        return { s: n.s, r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) };
+    }
     /** The format of a cell: its own (its style's), else its column's, else none. */
     function formatOfIds(s, rid, cid) {
         const sheet = sheets.get(s);
@@ -398,8 +414,10 @@ export function createWorkbook(doc, options) {
             dirty.sheets.set(op.id, changeNo);
         },
         settings(op) {
+            const namesBefore = JSON.stringify(settings.names || null);
             settings = clone(op.after || {});
             dirty.settings = changeNo;
+            if (JSON.stringify(settings.names || null) !== namesBefore) engine.namesChanged();
         }
     };
 
@@ -653,6 +671,77 @@ export function createWorkbook(doc, options) {
         setSheetProps(s, { validations: kept.concat([rule]) }, how);
         return rule.id;
     }
+
+    // ---- named ranges: a name for a range ("Budget" for BOQ!D2:D200) that formulas use (=SUM(Budget)) and the name box goes to ---------------------
+
+    /** Why a name cannot be given (a reason), or '' when it can. Names are as in Google Sheets: a letter or _ first, then letters, digits, _ and dots. */
+    function nameProblem(name, exceptId) {
+        const text = String(name || '').trim();
+        if (!text) return 'a named range needs a name';
+        if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(text)) return 'a name starts with a letter or _ and has only letters, digits, _ and dots: "' + text + '"';
+        if (/^[A-Za-z]{1,3}\d+$/.test(text) || /^R\d*C\d*$/i.test(text)) return '"' + text + '" is the address of a cell, not a name';
+        if (/^(TRUE|FALSE)$/i.test(text)) return '"' + text + '" is a value, not a name';
+        const same = findName(text);
+        if (same && same.id !== exceptId) return 'there is a named range "' + same.name + '" already';
+        return '';
+    }
+
+    /** Gives a range of a sheet a name (one change). Returns its id. */
+    function addName(name, s, rect, how) {
+        s = sheetIdOf(s);
+        const why = nameProblem(name);
+        if (why) throw new Error(why);
+        const n = { id: newId(), name: String(name).trim(), s, r1: api.rowId(s, rect.r1), c1: api.colId(s, rect.c1), r2: api.rowId(s, rect.r2), c2: api.colId(s, rect.c2) };
+        const ops = [{ t: 'settings', before: clone(settings), after: merged(settings, { names: namesOf().concat([n]) }) }];
+        // the formulas written before the name was made know it only by its text: they get its id in the same change, so a rename reaches them
+        const want = n.name.toLowerCase();
+        ops.push(...nameRefOps((ref) => !ref.id && String(ref.n).toLowerCase() === want, (ref) => ({ ...ref, id: n.id })));
+        apply(ops, how);
+        return n.id;
+    }
+
+    // changes to the formulas that read names: each name reference that `pick` takes is made anew by `make` (one 'cells' op per sheet)
+    function nameRefOps(pick, make) {
+        const bySheet = new Map();
+        for (const cell of engine.nameReaderCells()) {
+            if (!cell.formula.refs.some((ref) => ref.k === 'name' && pick(ref))) continue;
+            const after = { ...cell.formula, refs: cell.formula.refs.map((ref) => (ref.k === 'name' && pick(ref) ? make(ref) : ref)) };
+            if (!bySheet.has(cell.s)) bySheet.set(cell.s, []);
+            bySheet.get(cell.s).push({ row: cell.row, col: cell.col, before: cell.formula, after });
+        }
+        return [...bySheet].map(([sheet, changes]) => ({ t: 'cells', sheet, changes }));
+    }
+
+    /** Renames a named range, or points it at another range ({ name, sheetId, range }): one change. Formulas that use it follow. */
+    function setName(id, patch, how) {
+        const all = namesOf();
+        const at = all.findIndex((x) => x.id === id);
+        if (at < 0) throw new Error('there is no named range ' + id);
+        const n = { ...all[at] };
+        if (patch.name !== undefined) { const why = nameProblem(patch.name, id); if (why) throw new Error(why); n.name = String(patch.name).trim(); }
+        if (patch.range) {
+            const s = sheetIdOf(patch.sheetId || n.s), b = patch.range;
+            Object.assign(n, { s, r1: api.rowId(s, b.r1), c1: api.colId(s, b.c1), r2: api.rowId(s, b.r2), c2: api.colId(s, b.c2) });
+        }
+        const ops = [{ t: 'settings', before: clone(settings), after: merged(settings, { names: all.map((x, i) => (i === at ? n : x)) }) }];
+        // renamed: the formulas keep the new name as their text too (a formula shows it if the name is taken away later, as in Google Sheets)
+        if (n.name !== all[at].name) ops.push(...nameRefOps((ref) => ref.id === id, (ref) => ({ ...ref, n: n.name })));
+        apply(ops, how);
+        return id;
+    }
+
+    /** Takes a named range away (one change): the formulas that use it show #NAME? until a range has that name again. */
+    function removeName(id, how) {
+        const all = namesOf();
+        const kept = all.filter((x) => x.id !== id);
+        return kept.length === all.length ? [] : setSettings({ names: kept.length ? kept : null }, how);
+    }
+
+    /** The named ranges: { id, name, sheetId, range } (range null when what it pointed at is gone), in the order they were made. */
+    const names = () => namesOf().map((n) => { const at = nameRectOf(n); return { id: n.id, name: n.name, sheetId: n.s, range: at ? { r1: at.r1, c1: at.c1, r2: at.r2, c2: at.c2 } : null }; });
+
+    /** Where a name points: { sheetId, range }, or null. */
+    const nameRange = (name) => { const n = findName(name); const at = n && nameRectOf(n); return at ? { sheetId: at.s, range: { r1: at.r1, c1: at.c1, r2: at.r2, c2: at.c2 } } : null; };
 
     // ---- conditional formatting (conditional.js): rules a person makes on ranges, kept in the sheet's props, worked out when a cell is drawn -------
 
@@ -1228,6 +1317,8 @@ export function createWorkbook(doc, options) {
         setRules, setTypes, modeAt, typeAt,
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
+        // named ranges
+        addName, setName, removeName, names, nameRange, nameProblem,
         // conditional formatting
         addConditional, setConditional, removeConditional, moveConditional, conditionalStyleAt, shownStyle,
         conditionals: (s) => clone(conditionalsOf(sheetIdOf(s))),
