@@ -1,12 +1,14 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { colName } from '../core/formula/address.js';
 import { Icon } from './icons.js';
+import { Gutter, gutterSize } from './Outline.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
 import { createAxis } from '../core/axis.js';
 import { toggle, setFormat, clearFormatting } from './toolbarActions.js';
 import { keyAction } from './keys.js';
 import { columnNeed } from './measure.js';
+import { groupSelection } from './toolbarActions.js';
 import { copyBlock, clipText, clipHtml, clipFromHtml, pasteClip, pasteText, fillBlock } from '../core/transfer.js';
 import { fillTarget } from '../core/fill.js';
 import { sortRange } from '../core/search.js';
@@ -304,6 +306,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 Digit4: () => setFormat(wb, sheetId, sel, 'money'), Digit5: () => setFormat(wb, sheetId, sel, 'percent') }[e.code]
             : !ctrl && e.shiftKey && e.altKey ? { Digit5: () => toggle(wb, sheetId, sel, 'strike') }[e.code] : undefined;
         if (shortcut) { e.preventDefault(); shortcut(); return; }
+        if (e.altKey && e.shiftKey && !ctrl && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+            e.preventDefault();
+            try { groupSelection(wb, sheetId, sel, e.key === 'ArrowRight'); } catch (err) { if (onError) onError(err.message); }
+            return;
+        }
         if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
             const cells = [];
             for (const b of rects) for (let r = b.r1; r <= b.r2 && cells.length < 100000; r++) for (let c = b.c1; c <= b.c2; c++) cells.push({ r, c });
@@ -725,6 +732,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const rects = rectsOf(sel);
     // the filter of the sheet: a frame around its range, and a button in each cell of its header
     const filter = wb.filterOf(sheetId);
+    // the groups of rows and columns: a gutter for each, when there are groups
+    const rowOutline = useMemo(() => wb.rowGroups(sheetId), [wb, sheetId, revision]);
+    const colOutline = useMemo(() => wb.colGroups(sheetId), [wb, sheetId, revision]);
+    const gw = gutterSize(rowOutline.maxLevel), gh = gutterSize(colOutline.maxLevel);
+    const how = { source: 'user' };
 
     // The cells of a pane, against the sheet: a scrolling direction counts from the end of the frozen part, and the pane's layer moves by the scroll.
     const paneCells = (rows, cols, rowsScroll, colsScroll) => {
@@ -850,6 +862,11 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
 
     const sx = scroll.left, sy = scroll.top;
     return (
+        <div className="ks-grid-frame" style={{ gridTemplateColumns: gw + 'px minmax(0, 1fr)', gridTemplateRows: gh + 'px minmax(0, 1fr)' }}>
+        {gh && box.width > 0 ? <Gutter kind="cols" outline={colOutline} axis={colAxis} frozen={props.freezeCols || 0} frozenSize={fw} shown={{ from: 0, to: C.scrolling.to }} scroll={sx} length={box.width}
+            onToggle={(g) => wb.foldColGroup(sheetId, g.from, g.level, !g.folded, how)} onLevel={(level) => wb.showColLevel(sheetId, level, how)} /> : null}
+        {gw && box.height > 0 ? <Gutter kind="rows" outline={rowOutline} axis={rowAxis} frozen={props.freezeRows || 0} frozenSize={fh} shown={{ from: 0, to: R.scrolling.to }} scroll={sy} length={box.height}
+            onToggle={(g) => wb.foldRowGroup(sheetId, g.from, g.level, !g.folded, how)} onLevel={(level) => wb.showRowLevel(sheetId, level, how)} /> : null}
         <div className="ks-grid" ref={scroller} onScroll={onScroll}>
             <div className="ks-spacer" style={{ width: layout.contentWidth, height: layout.contentHeight }} />
             <div className={'ks-view' + (painting ? ' ks-painting' : '')} ref={view} style={{ width: box.width, height: box.height, '--ks-zoom': zoom }} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick} onContextMenu={onContextMenu}>
@@ -891,6 +908,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 {menu ? <Menu at={{ x: menu.x, y: menu.y }} items={menuItems(menu)} onSelect={onMenuSelect} onClose={() => setMenu(null)} container={container} label="Cell" /> : null}
                 <span ref={mirror} className="ks-mirror" style={editStyle ? { fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily } : undefined} />
             </div>
+        </div>
         </div>
     );
 }

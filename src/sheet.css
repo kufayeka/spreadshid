@@ -242,7 +242,7 @@
 
 /* the panel of conditional formatting, on the right of the grid (the grid gets narrower, as in Google Sheets) */
 .ks-body.ks-with-panel { flex-direction: row; }
-.ks-body.ks-with-panel > .ks-grid { min-width: 0; }
+.ks-body.ks-with-panel > .ks-grid-frame { min-width: 0; }
 .ks-panel { flex: none; width: 320px; display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; overflow: auto; border-left: 1px solid var(--ks-head-line);
     background: var(--ks-bg); color: var(--ks-fg); font: var(--ks-ui-font); }
 .ks-panel-head { display: flex; align-items: center; justify-content: space-between; }
@@ -299,3 +299,18 @@
 .ks-filter-n { font-size: 11px; color: #80868b; }
 .ks-filter-menu .ks-dialog-actions { padding: 0 16px; }
 .ks-filter-menu .ks-dialog-status { margin: 0 16px; }
+/* the grid in its frame: a gutter for the groups of rows on its left and one for the groups of columns over it (0 wide when there are none) */
+.ks-grid-frame { position: relative; flex: 1 1 auto; min-height: 0; min-width: 0; display: grid; }
+.ks-grid-frame > .ks-grid { grid-area: 2 / 2; min-width: 0; min-height: 0; }
+.ks-outline { position: relative; overflow: hidden; background: #f8f9fa; }
+.ks-outline-rows { grid-area: 2 / 1; border-right: 1px solid var(--ks-head-line); }
+.ks-outline-cols { grid-area: 1 / 2; border-bottom: 1px solid var(--ks-head-line); }
+.ks-outline-clip { position: absolute; overflow: hidden; }
+.ks-outline-line { position: absolute; border-color: #80868b; border-style: solid; border-width: 0; pointer-events: none; }
+.ks-outline-line.ks-rows { width: 5px; border-left-width: 1px; border-bottom-width: 1px; }
+.ks-outline-line.ks-cols { height: 5px; border-top-width: 1px; border-right-width: 1px; }
+.ks-outline-toggle, .ks-outline-level { position: absolute; width: 14px; height: 14px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    font: 11px/1 Arial, sans-serif; color: #3c4043; cursor: pointer; }
+.ks-outline-toggle { border: 1px solid #80868b; border-radius: 2px; background: var(--ks-bg); }
+.ks-outline-toggle:hover, .ks-outline-level:hover { background: #e8eaed; }
+.ks-outline-level { border: 0; border-radius: 2px; background: none; color: #5f6368; }

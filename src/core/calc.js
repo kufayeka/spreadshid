@@ -151,18 +151,29 @@ export function createEngine(host) {
         if (c < 0) return;
         // the row is looked up only when a range covers the column (most cells that change are outside every range's columns)
         let r = -2;
-        // the ranges into this sheet, and the named ranges (which point into a sheet only their name knows)
-        for (const set of [ranged, nameReaders]) {
-            if (!set) continue;
-            for (const e of set) {
+        // the ranges into this sheet, then the named ranges (which point into a sheet only their name knows); this runs for every formula a change
+        // reaches, so it makes nothing new and looks at names only when a formula reads one
+        if (ranged) {
+            for (const e of ranged) {
                 const refs = e.formula.refs;
                 for (let i = 0; i < refs.length; i++) {
-                    if (refs[i].k === 'cell' || (refs[i].k !== 'name' && (refs[i].s || e.s) !== s)) continue;
+                    if (refs[i].k === 'cell' || refs[i].k === 'name' || (refs[i].s || e.s) !== s) continue;
                     const rect = rectOf(e, i);
-                    if (!rect || rect.s !== s || c < rect.c1 || c > rect.c2) continue;
+                    if (!rect || c < rect.c1 || c > rect.c2) continue;
                     if (r === -2) r = host.rowIndexOf(s, row);
-                    if (r >= rect.r1 && r <= rect.r2 && c >= rect.c1 && c <= rect.c2) { out.push(e); break; }
+                    if (r >= rect.r1 && r <= rect.r2) { out.push(e); break; }
                 }
+            }
+        }
+        if (!nameReaders.size) return;
+        for (const e of nameReaders) {
+            const refs = e.formula.refs;
+            for (let i = 0; i < refs.length; i++) {
+                if (refs[i].k !== 'name') continue;
+                const rect = rectOf(e, i);
+                if (!rect || rect.s !== s || c < rect.c1 || c > rect.c2) continue;
+                if (r === -2) r = host.rowIndexOf(s, row);
+                if (r >= rect.r1 && r <= rect.r2) { out.push(e); break; }
             }
         }
     }

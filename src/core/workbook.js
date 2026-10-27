@@ -17,6 +17,7 @@ import { displayOf } from './display.js';
 import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { makeConditional, conditionalStyleOf } from './conditional.js';
+import { outlineOf, MAX_LEVEL } from './outline.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
@@ -466,11 +467,14 @@ export function createWorkbook(doc, options) {
             const fallback = sheet.props.rowHeight || DEFAULT_ROW_HEIGHT;
             const auto = sheet.autoHeights;
             const filtered = filteredOf(sheet);
+            // the groups of rows, worked out with the layout (a row of a folded group is not shown)
+            sheet.rowOutline = outlineOf(sheet.rowOrder.length, (i) => sheet.rows.get(sheet.rowOrder[i]).props);
+            const folded = sheet.rowOutline.hidden;
             // a height set by hand wins; else the height the screen measured for the row's text (wrapped, several lines, a big font); else the default
             sheet.rowAxis = createAxis(sheet.rowOrder.length, (i) => {
                 const rid = sheet.rowOrder[i];
                 const p = sheet.rows.get(rid).props;
-                if (p.hidden || filtered.has(rid)) return 0;
+                if (p.hidden || filtered.has(rid) || folded.has(i)) return 0;
                 if (p.height) return p.height;
                 const measured = auto && auto.get(rid);
                 return measured && measured > fallback ? measured : fallback;
@@ -522,9 +526,11 @@ export function createWorkbook(doc, options) {
         const sheet = sheetOf(sheetIdOf(s));
         if (!sheet.colAxis) {
             const fallback = sheet.props.colWidth || DEFAULT_COL_WIDTH;
+            sheet.colOutline = outlineOf(sheet.colOrder.length, (i) => sheet.cols.get(sheet.colOrder[i]).props);
+            const folded = sheet.colOutline.hidden;
             sheet.colAxis = createAxis(sheet.colOrder.length, (i) => {
                 const p = sheet.cols.get(sheet.colOrder[i]).props;
-                return p.hidden ? 0 : p.width || fallback;
+                return p.hidden || folded.has(i) ? 0 : p.width || fallback;
             });
         }
         return sheet.colAxis;
@@ -674,6 +680,60 @@ export function createWorkbook(doc, options) {
         const rule = makeRule(api, s, rect, spec);
         setSheetProps(s, { validations: kept.concat([rule]) }, how);
         return rule.id;
+    }
+
+    // ---- groups of rows and columns (outline.js): a level in the props of each row or column, folded groups not shown ----------------------------------
+
+    const setPropsOf = (kind) => (kind === 'rows' ? setRowProps : setColProps);
+    const propsAt = (kind, s, i) => (kind === 'rows' ? api.rowProps(s, i) : api.colProps(s, i)) || {};
+
+    /** The groups of rows (or columns) of a sheet: { groups: [{ level, from, to, folded }], maxLevel }. */
+    function groupsOf(kind, s) {
+        s = sheetIdOf(s);
+        const sheet = sheetOf(s);
+        if (kind === 'rows') rowAxis(s); else colAxis(s);
+        const o = kind === 'rows' ? sheet.rowOutline : sheet.colOutline;
+        return { groups: o.groups.map((g) => ({ ...g })), maxLevel: o.maxLevel };
+    }
+
+    /** Groups rows (or columns) from..to: each goes one level deeper (7 at most), as Google Sheets' Group does. One change. */
+    function group(kind, s, from, to, how) {
+        s = sheetIdOf(s);
+        const list = [];
+        for (let i = Math.min(from, to); i <= Math.max(from, to); i++) list.push(i);
+        if (list.some((i) => (Number(propsAt(kind, s, i).level) || 0) >= MAX_LEVEL)) throw new Error('groups go ' + MAX_LEVEL + ' levels deep at most');
+        return setPropsOf(kind)(s, list, (i) => ({ level: (Number(propsAt(kind, s, i).level) || 0) + 1 }), how);
+    }
+
+    /** Ungroups rows (or columns) from..to: each comes one level up; what is not grouped is left. One change. */
+    function ungroup(kind, s, from, to, how) {
+        s = sheetIdOf(s);
+        const list = [];
+        for (let i = Math.min(from, to); i <= Math.max(from, to); i++) if (Number(propsAt(kind, s, i).level) > 0) list.push(i);
+        // a fold kept for a level the row no longer has would fold a group made there later: it goes
+        return list.length ? setPropsOf(kind)(s, list, (i) => {
+            const level = Number(propsAt(kind, s, i).level) - 1;
+            const fold = (propsAt(kind, s, i).fold || []).filter((l) => l <= level);
+            return { level: level || null, fold: fold.length ? fold : null };
+        }, how) : [];
+    }
+
+    /** Folds (or opens) the group of a level that starts at row (or column) `from`. One change. */
+    function foldGroup(kind, s, from, level, folded, how) {
+        s = sheetIdOf(s);
+        const fold = new Set(propsAt(kind, s, from).fold || []);
+        if (folded) fold.add(level); else fold.delete(level);
+        return setPropsOf(kind)(s, [from], { fold: fold.size ? [...fold].sort() : null }, how);
+    }
+
+    /** Shows the groups up to a level, as the level buttons do: the groups deeper than `level` are folded, the others open (level 0 folds them all). One change. */
+    function showLevel(kind, s, level, how) {
+        s = sheetIdOf(s);
+        const { groups } = groupsOf(kind, s);
+        const starts = new Map();
+        for (const g of groups) { if (!starts.has(g.from)) starts.set(g.from, new Set()); if (g.level > level) starts.get(g.from).add(g.level); }
+        const changed = [...starts.keys()].filter((i) => JSON.stringify([...starts.get(i)].sort()) !== JSON.stringify((propsAt(kind, s, i).fold || []).slice().sort()));
+        return changed.length ? setPropsOf(kind)(s, changed, (i) => ({ fold: starts.get(i).size ? [...starts.get(i)].sort() : null }), how) : [];
     }
 
     // ---- the filter of a sheet (filter.js): a range with a header, criteria per column, the rows that fail hidden -----------------------------------------
@@ -1138,7 +1198,9 @@ export function createWorkbook(doc, options) {
         const before = at > 0 ? sheet.rows.get(sheet.rowOrder[at - 1]).key : null;
         const after = at < sheet.rowOrder.length ? sheet.rows.get(sheet.rowOrder[at]).key : null;
         const keys = keysBetween(before, after, count);
-        return apply([{ t: 'insertRows', sheet: s, rows: keys.map((key) => ({ id: newId(), key, cells: {}, style: {}, props: {} })) }], how);
+        // rows inserted inside a group are in it, as in Google Sheets: they take the level the rows on both sides share (not a fold)
+        const level = Math.min(at > 0 ? Number(sheet.rows.get(sheet.rowOrder[at - 1]).props.level) || 0 : 0, at < sheet.rowOrder.length ? Number(sheet.rows.get(sheet.rowOrder[at]).props.level) || 0 : 0);
+        return apply([{ t: 'insertRows', sheet: s, rows: keys.map((key) => ({ id: newId(), key, cells: {}, style: {}, props: level ? { level } : {} })) }], how);
     }
 
     /** Deletes `count` rows from row `at`. */
@@ -1159,7 +1221,9 @@ export function createWorkbook(doc, options) {
         const before = at > 0 ? sheet.cols.get(sheet.colOrder[at - 1]).key : null;
         const after = at < sheet.colOrder.length ? sheet.cols.get(sheet.colOrder[at]).key : null;
         const keys = keysBetween(before, after, count);
-        return apply([{ t: 'insertCols', sheet: s, cols: keys.map((key) => ({ id: newId(), key, props: {} })) }], how);
+        // columns inserted inside a group are in it, as rows are
+        const level = Math.min(at > 0 ? Number(sheet.cols.get(sheet.colOrder[at - 1]).props.level) || 0 : 0, at < sheet.colOrder.length ? Number(sheet.cols.get(sheet.colOrder[at]).props.level) || 0 : 0);
+        return apply([{ t: 'insertCols', sheet: s, cols: keys.map((key) => ({ id: newId(), key, props: level ? { level } : {} })) }], how);
     }
 
     /** Deletes `count` columns from column `at`. */
@@ -1384,6 +1448,12 @@ export function createWorkbook(doc, options) {
         setRules, setTypes, modeAt, typeAt,
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
+        // groups of rows and columns
+        groupRows: (s, from, to, how) => group('rows', s, from, to, how), ungroupRows: (s, from, to, how) => ungroup('rows', s, from, to, how),
+        groupCols: (s, from, to, how) => group('cols', s, from, to, how), ungroupCols: (s, from, to, how) => ungroup('cols', s, from, to, how),
+        foldRowGroup: (s, from, level, folded, how) => foldGroup('rows', s, from, level, folded, how), foldColGroup: (s, from, level, folded, how) => foldGroup('cols', s, from, level, folded, how),
+        showRowLevel: (s, level, how) => showLevel('rows', s, level, how), showColLevel: (s, level, how) => showLevel('cols', s, level, how),
+        rowGroups: (s) => groupsOf('rows', s), colGroups: (s) => groupsOf('cols', s),
         // the filter
         createFilter, removeFilter, setFilterColumn, filterOf, filteredOut,
         filterValues: (s, c) => { const f = sheetOf(sheetIdOf(s)).props.filter; return f ? valuesOfFilter(api, sheetIdOf(s), f, c) : []; },

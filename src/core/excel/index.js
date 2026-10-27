@@ -19,6 +19,7 @@ import { zipStore } from './zip.js';
 import { readXlsx } from './read.js';
 import { toExcelRule } from './conditional.js';
 import { toExcelFilter, applyExcelFilter } from './filter.js';
+import { outlineOf } from '../outline.js';
 import { conditionalRects, conditionalFormulaText } from '../conditional.js';
 import { formulaProblem } from '../formula/formula.js';
 import { colName } from '../formula/address.js';
@@ -109,10 +110,14 @@ export function exportXlsx(wb) {
                 if (cell) cells.push(cell);
             }
         });
-        for (let r = 0; r < size.rows; r++) { const p = wb.rowProps(s, r); if (p && p.height) rows[r] = p.height; if ((p && p.hidden) || wb.filteredOut(s, r)) hiddenRows.push(r); }
-        for (let c = 0; c < size.cols; c++) { const p = wb.colProps(s, c); if (p && p.width) cols[c] = p.width; if (p && p.hidden) hiddenCols.push(c); }
+        // the groups: each row's level; the rows of a folded group are hidden in the file, and the row before the group (its title) is "collapsed"
+        const rowLevels = {}, colLevels = {}, foldedRows = new Set(), foldedCols = new Set(), collapsedRows = [], collapsedCols = [];
+        for (const g of wb.rowGroups(s).groups) if (g.folded) { for (let r = g.from; r <= g.to; r++) foldedRows.add(r); if (g.from > 0) collapsedRows.push(g.from - 1); }
+        for (const g of wb.colGroups(s).groups) if (g.folded) { for (let c = g.from; c <= g.to; c++) foldedCols.add(c); if (g.from > 0) collapsedCols.push(g.from - 1); }
+        for (let r = 0; r < size.rows; r++) { const p = wb.rowProps(s, r); if (p && p.height) rows[r] = p.height; if (p && p.level) rowLevels[r] = p.level; if ((p && p.hidden) || wb.filteredOut(s, r) || foldedRows.has(r)) hiddenRows.push(r); }
+        for (let c = 0; c < size.cols; c++) { const p = wb.colProps(s, c); if (p && p.width) cols[c] = p.width; if (p && p.level) colLevels[c] = p.level; if ((p && p.hidden) || foldedCols.has(c)) hiddenCols.push(c); }
         return {
-            name: props.name, hidden: !!props.hidden, cells, rows, cols, hiddenRows, hiddenCols,
+            name: props.name, hidden: !!props.hidden, cells, rows, cols, hiddenRows, hiddenCols, rowLevels, colLevels, collapsedRows, collapsedCols,
             defaultCol: props.colWidth || 100, defaultRow: props.rowHeight || 21,
             merges: wb.merges(s), freeze: { rows: props.freezeRows || 0, cols: props.freezeCols || 0 },
             autoFilter: toExcelFilter(wb, s),
@@ -160,21 +165,39 @@ function addNames(wb, docs, read) {
     }
 }
 
+// The groups of a file: a group whose rows (or columns) are all hidden is folded, the outermost one only (the ones inside it keep open). Returns where
+// each fold starts (index -> [levels]) and the indexes the folds cover (hidden by the group, not by hand).
+function foldsOf(count, levels, hidden) {
+    const { groups } = outlineOf(count, (i) => ({ level: levels[i] || 0 }));
+    const starts = new Map(), covered = new Set();
+    for (const g of groups) {
+        let all = true;
+        for (let i = g.from; i <= g.to && all; i++) if (!hidden.has(i)) all = false;
+        if (!all || covered.has(g.from)) continue;
+        starts.set(g.from, (starts.get(g.from) || []).concat([g.level]));
+        for (let i = g.from; i <= g.to; i++) covered.add(i);
+    }
+    return { starts, covered };
+}
+
 // the documents of sheets read from a file, their formulas still as texts (put in once the sheets are in a workbook, where they can be kept by ids)
 function sheetDocs(read) {
     const docs = [], formulas = [];
     const sheetKeys = keysBetween(null, null, read.sheets.length);
     read.sheets.forEach((sh, i) => {
-        const rowCount = Math.max(1000, sh.maxR + 1, ...sh.hiddenRows.map((r) => r + 1));
-        const colCount = Math.max(26, sh.maxC + 1, ...sh.hiddenCols.map((c) => c + 1));
+        const rowCount = Math.max(1000, sh.maxR + 1, ...sh.hiddenRows.map((r) => r + 1), ...Object.keys(sh.rowLevels || {}).map((r) => Number(r) + 1));
+        const colCount = Math.max(26, sh.maxC + 1, ...sh.hiddenCols.map((c) => c + 1), ...Object.keys(sh.colLevels || {}).map((c) => Number(c) + 1));
         const colIds = Array.from({ length: colCount }, () => newId());
         const rowIds = Array.from({ length: rowCount }, () => newId());
         const colKeys = keysBetween(null, null, colCount), rowKeys = keysBetween(null, null, rowCount);
         const hiddenCols = new Set(sh.hiddenCols), hiddenRows = new Set(sh.hiddenRows);
+        const rowFold = foldsOf(rowCount, sh.rowLevels || {}, hiddenRows), colFold = foldsOf(colCount, sh.colLevels || {}, hiddenCols);
         const columns = colIds.map((id, c) => {
             const props = {};
             if (sh.widths[c] !== undefined && sh.widths[c] !== sh.defaultCol) props.width = sh.widths[c];
-            if (hiddenCols.has(c)) props.hidden = true;
+            if (hiddenCols.has(c) && !colFold.covered.has(c)) props.hidden = true;
+            if (sh.colLevels && sh.colLevels[c]) props.level = sh.colLevels[c];
+            if (colFold.starts.has(c)) props.fold = colFold.starts.get(c);
             return { id, key: colKeys[c], props };
         });
         // Excel keeps the rows its filter hid as hidden rows: under a filter's header they are the filter's to hide, not hidden by hand
@@ -182,7 +205,9 @@ function sheetDocs(read) {
         const rows = rowIds.map((id, r) => {
             const props = {};
             if (sh.heights[r] !== undefined) props.height = sh.heights[r];
-            if (hiddenRows.has(r) && !(af && r > af.r1 && r <= af.r2)) props.hidden = true;
+            if (hiddenRows.has(r) && !(af && r > af.r1 && r <= af.r2) && !rowFold.covered.has(r)) props.hidden = true;
+            if (sh.rowLevels && sh.rowLevels[r]) props.level = sh.rowLevels[r];
+            if (rowFold.starts.has(r)) props.fold = rowFold.starts.get(r);
             return { id, key: rowKeys[r], cells: {}, style: {}, props };
         });
         const sheetFormulas = [];

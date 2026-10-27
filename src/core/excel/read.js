@@ -219,12 +219,13 @@ function readSheet(root, shared, styles, info, warnings) {
     const fmt = kid(sheet, 'sheetFormatPr');
     const defaultCol = fmt && fmt.attrs.defaultColWidth ? charsToPx(fmt.attrs.defaultColWidth) : null;
     const defaultRow = fmt && fmt.attrs.defaultRowHeight ? pointsToPx(fmt.attrs.defaultRowHeight) : null;
-    const widths = {}, hiddenCols = [];
+    const widths = {}, hiddenCols = [], colLevels = {}, rowLevels = {};
     for (const col of kids(kid(sheet, 'cols'), 'col')) {
         const lo = Number(col.attrs.min) - 1, hi = Math.min(Number(col.attrs.max) - 1, lo + 500);
         for (let c = lo; c <= hi; c++) {
             if (col.attrs.hidden === '1' || col.attrs.hidden === 'true') hiddenCols.push(c);
             if (col.attrs.width && col.attrs.customWidth !== '0') widths[c] = charsToPx(col.attrs.width);
+            if (Number(col.attrs.outlineLevel) > 0) colLevels[c] = Math.min(7, Number(col.attrs.outlineLevel));
         }
     }
     const heights = {}, hiddenRows = [];
@@ -232,6 +233,7 @@ function readSheet(root, shared, styles, info, warnings) {
         const r = Number(row.attrs.r) - 1;
         if (row.attrs.hidden === '1' || row.attrs.hidden === 'true') hiddenRows.push(r);
         if (row.attrs.ht && row.attrs.customHeight === '1') heights[r] = pointsToPx(row.attrs.ht);
+        if (Number(row.attrs.outlineLevel) > 0) rowLevels[r] = Math.min(7, Number(row.attrs.outlineLevel));
     }
     const autoFilter = readExcelFilter(kid(sheet, 'autoFilter'), kid, kids, addressOf);
     const merges = kids(kid(sheet, 'mergeCells'), 'mergeCell').map((m) => {
@@ -263,7 +265,7 @@ function readSheet(root, shared, styles, info, warnings) {
     }
     if (skipped.size) warnings.push('"' + info.name + '": conditional formatting with ' + [...skipped].join(', ') + ' was not imported');
     if (kid(sheet, 'dataValidations')) warnings.push('"' + info.name + '": data validation was not imported');
-    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals, autoFilter };
+    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals, autoFilter, rowLevels, colLevels };
 }
 
 /**

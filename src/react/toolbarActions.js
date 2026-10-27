@@ -109,3 +109,17 @@ export function functionText(wb, s, sel, name) {
     if (leftEdge < c) return '=' + name + '(' + wb.address(r, leftEdge) + ':' + wb.address(r, c - 1) + ')';
     return '=' + name + '()';
 }
+
+/**
+ * Groups (or ungroups) what is selected, as Google Sheets' Alt+Shift+Right (Left) and View > Group do: whole columns selected group the columns, anything
+ * else the rows of the selection. One change.
+ */
+export function groupSelection(wb, s, sel, grouping) {
+    const all = rectsOf(sel);
+    const b = all[all.length - 1];
+    const size = wb.size(s);
+    const how = { source: 'user' };
+    const cols = b.r1 === 0 && b.r2 === size.rows - 1 && !(b.c1 === 0 && b.c2 === size.cols - 1);
+    if (cols) return grouping ? wb.groupCols(s, b.c1, b.c2, how) : wb.ungroupCols(s, b.c1, b.c2, how);
+    return grouping ? wb.groupRows(s, b.r1, b.r2, how) : wb.ungroupRows(s, b.r1, b.r2, how);
+}

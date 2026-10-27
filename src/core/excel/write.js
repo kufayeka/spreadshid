@@ -138,10 +138,11 @@ export function buildXlsxFiles(book) {
         model.cells.forEach((cell) => { if (!byRow.has(cell.r)) byRow.set(cell.r, []); byRow.get(cell.r).push(cell); });
         // hidden rows and columns stay hidden in the file (the sheet's own addition)
         const hiddenRows = new Set(model.hiddenRows || []), hiddenCols = new Set(model.hiddenCols || []);
-        const rowNumbers = [...new Set([...byRow.keys(), ...Object.keys(model.rows || {}).map(Number), ...hiddenRows])].sort((a, b) => a - b);
+        const rowLevels = model.rowLevels || {}, colLevels = model.colLevels || {}, collapsedRows = new Set(model.collapsedRows || []), collapsedCols = new Set(model.collapsedCols || []);
+        const rowNumbers = [...new Set([...byRow.keys(), ...Object.keys(model.rows || {}).map(Number), ...hiddenRows, ...Object.keys(rowLevels).map(Number), ...collapsedRows])].sort((a, b) => a - b);
         let maxR = -1, maxC = -1;
         const rowsXml = rowNumbers.map((r) => {
-            const ht = (model.rows && model.rows[r] !== undefined && model.rows[r] !== model.defaultRow ? ' ht="' + pxToPoints(model.rows[r]) + '" customHeight="1"' : "") + (hiddenRows.has(r) ? ' hidden="1"' : "");
+            const ht = (model.rows && model.rows[r] !== undefined && model.rows[r] !== model.defaultRow ? ' ht="' + pxToPoints(model.rows[r]) + '" customHeight="1"' : "") + (hiddenRows.has(r) ? ' hidden="1"' : "") + (rowLevels[r] ? ' outlineLevel="' + rowLevels[r] + '"' : "") + (collapsedRows.has(r) ? ' collapsed="1"' : "");
             const cells = (byRow.get(r) || []).sort((a, b) => a.c - b.c).map((cell) => {
                 if (cell.r > maxR) maxR = cell.r;
                 if (cell.c > maxC) maxC = cell.c;
@@ -159,19 +160,22 @@ export function buildXlsxFiles(book) {
             return '<row r="' + (r + 1) + '"' + ht + ">" + cells + "</row>";
         }).join("");
 
-        const colNumbers = [...new Set([...Object.keys(model.cols || {}).map(Number), ...hiddenCols])].sort((a, b) => a - b);
+        const colNumbers = [...new Set([...Object.keys(model.cols || {}).map(Number), ...hiddenCols, ...Object.keys(colLevels).map(Number), ...collapsedCols])].sort((a, b) => a - b);
         const colsXml = colNumbers.length ? "<cols>" + colNumbers.map((c) => '<col min="' + (c + 1) + '" max="' + (c + 1) + '"'
             + (model.cols && model.cols[c] !== undefined ? ' width="' + pxToChars(model.cols[c]) + '" customWidth="1"' : ' width="' + pxToChars(model.defaultCol || 100) + '"')
-            + (hiddenCols.has(c) ? ' hidden="1"' : "") + "/>").join("") + "</cols>" : "";
+            + (hiddenCols.has(c) ? ' hidden="1"' : "") + (colLevels[c] ? ' outlineLevel="' + colLevels[c] + '"' : "") + (collapsedCols.has(c) ? ' collapsed="1"' : "") + "/>").join("") + "</cols>" : "";
         const fz = model.freeze || { rows: 0, cols: 0 };
         const pane = fz.rows || fz.cols
             ? '<pane' + (fz.cols ? ' xSplit="' + fz.cols + '"' : "") + (fz.rows ? ' ySplit="' + fz.rows + '"' : "") + ' topLeftCell="' + colName(fz.cols) + (fz.rows + 1) + '" activePane="'
                 + (fz.rows && fz.cols ? "bottomRight" : fz.rows ? "bottomLeft" : "topRight") + '" state="frozen"/>' : "";
         const merges = (model.merges || []).map((m) => '<mergeCell ref="' + colName(m.c1) + (m.r1 + 1) + ":" + colName(m.c2) + (m.r2 + 1) + '"/>');
         const dim = maxR >= 0 ? '<dimension ref="A1:' + colName(Math.max(maxC, 0)) + (maxR + 1) + '"/>' : "";
-        const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + dim
+        // the [−] of a group is on the row before it (its title) and on the column before it: Excel is told so (summaryBelow, summaryRight)
+        const levelsRow = Math.max(0, ...Object.values(rowLevels)), levelsCol = Math.max(0, ...Object.values(colLevels));
+        const outlinePr = levelsRow || levelsCol ? '<sheetPr><outlinePr summaryBelow="0" summaryRight="0"/></sheetPr>' : '';
+        const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + outlinePr + dim
             + '<sheetViews><sheetView' + (model.active ? ' tabSelected="1"' : "") + ' workbookViewId="0">' + pane + "</sheetView></sheetViews>"
-            + '<sheetFormatPr defaultRowHeight="' + pxToPoints(model.defaultRow || 28) + '"' + (model.defaultRow ? ' customHeight="1"' : "") + "/>" + colsXml
+            + '<sheetFormatPr defaultRowHeight="' + pxToPoints(model.defaultRow || 28) + '"' + (model.defaultRow ? ' customHeight="1"' : "") + (levelsRow ? ' outlineLevelRow="' + levelsRow + '"' : "") + (levelsCol ? ' outlineLevelCol="' + levelsCol + '"' : "") + "/>" + colsXml
             + "<sheetData>" + rowsXml + "</sheetData>" + autoFilterXml(model.autoFilter) + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + cfXml(model) + "</worksheet>";
         return { sheetName, hidden: !!model.hidden, sheet };
     };

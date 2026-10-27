@@ -68,6 +68,15 @@ export function Menubar(props) {
                 { value: 'view:freezeCols:0', label: 'No columns', checked: !sheet.freezeCols }, { value: 'view:freezeCols:1', label: '1 column', checked: sheet.freezeCols === 1 },
                 { value: 'view:freezeCols:2', label: '2 columns', checked: sheet.freezeCols === 2 }, { value: 'view:freezeCols:' + (sel.active.c + 1), label: 'Up to column ' + colName(sel.active.c), checked: sheet.freezeCols === sel.active.c + 1 && sel.active.c > 1 }
             ] },
+            { label: 'Group', children: [
+                { value: 'view:group:rows', label: 'Group rows ' + (b.r1 + 1) + (nr > 1 ? ' - ' + (b.r2 + 1) : ''), hint: 'Alt+Shift+→' },
+                { value: 'view:group:cols', label: 'Group columns ' + colName(b.c1) + (nc > 1 ? ' - ' + colName(b.c2) : '') },
+                { value: 'view:ungroup:rows', label: 'Ungroup rows ' + (b.r1 + 1) + (nr > 1 ? ' - ' + (b.r2 + 1) : ''), hint: 'Alt+Shift+←' },
+                { value: 'view:ungroup:cols', label: 'Ungroup columns ' + colName(b.c1) + (nc > 1 ? ' - ' + colName(b.c2) : '') },
+                { separator: true },
+                { value: 'view:foldRows:0', label: 'Collapse all row groups' }, { value: 'view:foldRows:99', label: 'Expand all row groups' },
+                { value: 'view:foldCols:0', label: 'Collapse all column groups' }, { value: 'view:foldCols:99', label: 'Expand all column groups' }
+            ] },
             { label: 'Show', children: [{ value: 'view:gridlines', label: 'Gridlines', checked: !sheet.hideGridlines }] },
             { label: 'Zoom', children: ZOOMS.map((z) => ({ value: 'view:zoom:' + z, label: Math.round(z * 100) + '%', checked: props.zoom === z })) }
         ],
@@ -177,6 +186,10 @@ export function Menubar(props) {
                 else if (what === 'freezeCols') run(() => wb.setSheetProps(s, { freezeCols: Number(extra) || null }, how));
                 else if (what === 'gridlines') run(() => wb.setSheetProps(s, { hideGridlines: sheet.hideGridlines ? null : true }, how));
                 else if (what === 'zoom') props.onZoom(Number(extra));
+                else if (what === 'group') run(() => (extra === 'rows' ? wb.groupRows(s, b.r1, b.r2, how) : wb.groupCols(s, b.c1, b.c2, how)));
+                else if (what === 'ungroup') run(() => (extra === 'rows' ? wb.ungroupRows(s, b.r1, b.r2, how) : wb.ungroupCols(s, b.c1, b.c2, how)));
+                else if (what === 'foldRows') run(() => wb.showRowLevel(s, Number(extra), how));
+                else if (what === 'foldCols') run(() => wb.showColLevel(s, Number(extra), how));
                 break;
             case 'insert':
                 if (what === 'rowsAbove') run(() => wb.insertRows(s, b.r1, nr, how));
