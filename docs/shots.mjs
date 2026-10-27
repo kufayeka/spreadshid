@@ -27,6 +27,7 @@ const proyek = (name, sheet, act, clip) => ({ name, page: 'proyek.page.js', clip
 } });
 
 export const SHOTS = [
+    { name: 'overview', page: 'galeri-overview.page.js', clip: { x: 0, y: 0, width: 800, height: 330 } },
     proyek('proyek-rab', 'RAB'),
     proyek('proyek-harga', 'Harga', null, { x: 0, y: 0, width: 1000, height: 520 }),
     proyek('proyek-ahsp', 'AHSP'),

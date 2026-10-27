@@ -9,6 +9,9 @@ atau ditolak, dan tiap orang cuma bisa melakukan apa yang dikasih perannya.
 Ditulis dalam JavaScript dengan JSDoc. File `.d.ts` untuk TypeScript dibuat dari situ waktu build, jadi editor tetap kasih saran nama fungsi dan
 parameter.
 
+**Lihat [Galeri](docs/galeri.md)**: satu proyek konstruksi lengkap (RAB, AHSP, kurva S, opname, termin, CCO, laporan harian, cash flow,
+NCR, dan overview dari banyak file) yang saling terhubung lewat rumus, dibuat dengan library ini.
+
 ## Pasang
 
 ```bash
@@ -51,6 +54,7 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 1. [Mulai cepat](docs/01-mulai-cepat.md): pasang, halaman pertama, workbook buatan sendiri, Next.js
 2. [Konsep dasar](docs/02-konsep.md): workbook, sheet, alamat sel, id baris dan kolom, perubahan (op), undo, menyimpan
 3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): semua props, event, handle (`ref`), keyboard, tema
+- [Galeri: satu proyek konstruksi](docs/galeri.md)
 4. API workbook *(menyusul)*
 5. Rumus *(menyusul)*
 6. Format dan locale *(menyusul)*
