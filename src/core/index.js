@@ -20,6 +20,7 @@ export { fromApiMakerType, fieldType, checkValue } from './types.js';
 export { mergePatch, checkPatch, viewFor } from './server.js';
 export { copyBlock, pasteClip, pasteText, fillBlock } from './transfer.js';
 export { findAll, replaceIn, sortRange } from './search.js';
+export { tableOf, pivot, PIVOT_FUNCTIONS } from './pivot.js';
 export { exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';
 export { resolveAccess, ACTIONS, ACTION_INFO, UI_ITEMS, validatePolicy } from './policy.js';
 
