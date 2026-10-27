@@ -116,10 +116,11 @@ export function expandPopulate(value, spec, limits) {
  * @param {any} wb
  * @param {string} s
  * @param {{ at: string|{ r: number, c: number }, direction?: 'down'|'right', header?: boolean|string[]|Object<string, string>, fields?: string[], shape?: string, limit?: number }} spec
+ * @param {{ source?: string }} [how]  Who makes the change, as every change of the workbook says it (default: code).
  * @param {any} value
  * @returns {{ r1: number, c1: number, r2: number, c2: number }|null}  where it wrote
  */
-export function populate(wb, s, spec, value) {
+export function populate(wb, s, spec, value, how) {
     let at = spec.at;
     if (typeof at === 'string') {
         const m = /^([A-Za-z]{1,3})(\d+)$/.exec(at.trim());
@@ -136,6 +137,7 @@ export function populate(wb, s, spec, value) {
         if (cell.f && Object.keys(cell.f).length) e.style = { ...(wb.style(s, cell.r, cell.c) || {}), ...cell.f };
         return e;
     });
-    if (entries.length) wb.setBlock(s, entries, { source: 'code' });
+    // { source: 'remote' } for data that refreshes from outside: it is not a change of the person's, so it does not go into undo
+    if (entries.length) wb.setBlock(s, entries, how || { source: 'code' });
     return out.range;
 }
