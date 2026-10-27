@@ -18,7 +18,9 @@
 //           { sheet: 'Cost', columns: ['Margin'], mode: 'invisible' }
 //         ]
 //       },
-//       site: { can: ['format.bold'], ui: { menubar: false, toolbar: false }, ranges: [{ sheet: 'Opname', range: 'D2:D500', mode: 'edit' }] }
+//       site: { can: ['format.bold'], ui: { menubar: false, toolbar: false }, ranges: [{ sheet: 'Opname', range: 'D2:D500', mode: 'edit' }] },
+//       client: { can: ['comment.read'], ui: { disallowed: 'hide', hide: ['menu.Insert', 'tool.paint', 'feature.contextMenu'], sheets: ['Summary'],
+//                 area: { Summary: 'A1:F40' } } }   every part of the screen by its id (UI_ITEMS), what may not be done hidden, only some sheets
 //     }
 //   }
 //
@@ -81,14 +83,19 @@ export function resolveAccess(policy, who) {
     };
     const ui = allShown();
     if (roles.length) for (const part of UI_PARTS) ui[part] = roles.some((r) => !r.ui || r.ui[part] !== false);
-    // a view limited to an area only when every role limits it (the first one's area is taken)
+    // a view limited to an area only when every role limits it (the first one's area is taken): one range, or one per sheet ({ BOQ: 'A1:H200' })
     ui.area = roles.length && roles.every((r) => r.ui && r.ui.area) ? roles[0].ui.area : null;
+    // a part of the screen is hidden when every role hides it; what is not allowed is hidden (not greyed) when every role says so
+    ui.hide = roles.length ? (roles[0].ui && roles[0].ui.hide ? roles[0].ui.hide : []).filter((id) => roles.every((r) => r.ui && (r.ui.hide || []).includes(id))) : [];
+    ui.disallowed = roles.length && roles.every((r) => r.ui && r.ui.disallowed === 'hide') ? 'hide' : 'grey';
+    // the sheets it sees: those any role lists (a role that lists none sees every sheet)
+    ui.sheets = roles.length && roles.every((r) => r.ui && Array.isArray(r.ui.sheets)) ? [...new Set(roles.flatMap((r) => r.ui.sheets))] : null;
     const ranges = [];
     for (const r of roles) for (const g of r.ranges || []) ranges.push({ ...g, mode: RANK[g.mode] ? g.mode : 'readonly' });
     return { owner: false, roles: roles.map((r) => r.name), can, ui, ranges, message };
 }
 
-const allShown = () => ({ menubar: true, toolbar: true, formulaBar: true, headers: true, gridlines: true, tabs: true, area: null });
+const allShown = () => ({ menubar: true, toolbar: true, formulaBar: true, headers: true, gridlines: true, tabs: true, area: null, hide: [], disallowed: 'grey', sheets: null });
 
 // ---- what a change asks to do ----------------------------------------------------------------------------------------------------------------------
 
@@ -167,4 +174,88 @@ export function refusalOf(action, message) {
     const what = SAY[action] || (action.startsWith('format') ? 'change the formatting' : action.startsWith('rows') ? 'change rows' : action.startsWith('cols') ? 'change columns'
         : action.startsWith('sheets') ? 'change sheets' : action.startsWith('view') ? 'change the view' : action);
     return 'You cannot ' + what + ' here';
+}
+
+// ---- the catalogs a host builds its own editor of policies with --------------------------------------------------------------------------------------
+
+/** Every action, with a label and its group, for an editor of policies (the order is the one an editor shows). */
+export const ACTION_INFO = [
+    ['edit', 'Edit cells', 'Cells'],
+    ['format.bold', 'Bold', 'Format'], ['format.italic', 'Italic', 'Format'], ['format.underline', 'Underline', 'Format'], ['format.strike', 'Strikethrough', 'Format'],
+    ['format.color', 'Text color', 'Format'], ['format.fill', 'Fill color', 'Format'], ['format.borders', 'Borders', 'Format'], ['format.align', 'Alignment', 'Format'],
+    ['format.wrap', 'Wrapping', 'Format'], ['format.rotate', 'Rotation', 'Format'], ['format.size', 'Font size', 'Format'], ['format.font', 'Font', 'Format'],
+    ['format.number', 'Number formats', 'Format'], ['format.link', 'Links', 'Format'], ['format.merge', 'Merge cells', 'Format'], ['format.conditional', 'Conditional formatting', 'Format'],
+    ['format.clear', 'Clear formatting', 'Format'],
+    ['rows.insert', 'Insert rows', 'Rows'], ['rows.delete', 'Delete rows', 'Rows'], ['rows.resize', 'Resize rows', 'Rows'], ['rows.hide', 'Hide rows', 'Rows'], ['rows.group', 'Group rows', 'Rows'],
+    ['cols.insert', 'Insert columns', 'Columns'], ['cols.delete', 'Delete columns', 'Columns'], ['cols.resize', 'Resize columns', 'Columns'], ['cols.hide', 'Hide columns', 'Columns'], ['cols.group', 'Group columns', 'Columns'],
+    ['sheets.add', 'Add sheets', 'Sheets'], ['sheets.delete', 'Delete sheets', 'Sheets'], ['sheets.rename', 'Rename sheets', 'Sheets'], ['sheets.move', 'Move sheets', 'Sheets'], ['sheets.hide', 'Hide sheets', 'Sheets'],
+    ['view.freeze', 'Freeze rows and columns', 'View'], ['view.gridlines', 'Show or hide gridlines', 'View'],
+    ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
+    ['copy', 'Copy out', 'Clipboard and files'], ['paste', 'Paste', 'Clipboard and files'], ['download', 'Download', 'Clipboard and files'], ['import', 'Import', 'Clipboard and files'],
+    ['comment.read', 'See comments', 'Comments'], ['comment.create', 'Start a comment', 'Comments'], ['comment.reply', 'Reply', 'Comments'], ['comment.resolve', 'Resolve and reopen', 'Comments'],
+    ['comment.edit', 'Edit own comments', 'Comments'], ['comment.delete', 'Delete own comments', 'Comments'], ['comment.moderate', 'Edit and delete anyone\'s comments', 'Comments'],
+    ['access', 'Change the access policy', 'Access']
+].map(([id, label, group]) => ({ id, label, group }));
+
+/**
+ * Every part of the screen a role can hide by its id (ui.hide), with a label and its group, for an editor of policies. The six big parts (menubar,
+ * toolbar, formulaBar, headers, gridlines, tabs) are ui flags of their own.
+ */
+export const UI_ITEMS = [
+    ['tool.undo', 'Undo'], ['tool.redo', 'Redo'], ['tool.paint', 'Paint format'], ['tool.zoom', 'Zoom'], ['tool.currency', 'Currency'], ['tool.percent', 'Percent'],
+    ['tool.decimals', 'Decimal places'], ['tool.formats', 'More formats'], ['tool.font', 'Font'], ['tool.size', 'Font size'], ['tool.bold', 'Bold'], ['tool.italic', 'Italic'],
+    ['tool.strike', 'Strikethrough'], ['tool.underline', 'Underline'], ['tool.color', 'Text color'], ['tool.fill', 'Fill color'], ['tool.borders', 'Borders'], ['tool.merge', 'Merge cells'],
+    ['tool.align', 'Horizontal align'], ['tool.valign', 'Vertical align'], ['tool.wrap', 'Text wrapping'], ['tool.rotate', 'Text rotation'], ['tool.link', 'Insert link'],
+    ['tool.functions', 'Functions'], ['tool.clear', 'Clear formatting']
+].map(([id, label]) => ({ id, label, group: 'Toolbar' })).concat(
+    ['File', 'Edit', 'View', 'Insert', 'Format', 'Data'].map((m) => ({ id: 'menu.' + m, label: m + ' menu', group: 'Menus' })),
+    [['menu.file:import', 'File > Import'], ['menu.file:download', 'File > Download'], ['menu.file:settings', 'File > Spreadsheet settings'],
+        ['menu.edit:find', 'Edit > Find and replace'], ['menu.edit:deleteRows', 'Edit > Delete rows'], ['menu.edit:deleteCols', 'Edit > Delete columns'],
+        ['menu.view:freezeRows', 'View > Freeze rows'], ['menu.view:freezeCols', 'View > Freeze columns'], ['menu.view:group', 'View > Group'], ['menu.view:comments', 'View > Comments'],
+        ['menu.view:zoom', 'View > Zoom'], ['menu.insert:rowsAbove', 'Insert > Rows'], ['menu.insert:colsLeft', 'Insert > Columns'], ['menu.insert:sheet', 'Insert > Sheet'],
+        ['menu.insert:checkbox', 'Insert > Checkbox'], ['menu.insert:dropdown', 'Insert > Dropdown'], ['menu.insert:fn', 'Insert > Function'], ['menu.insert:link', 'Insert > Link'],
+        ['menu.insert:comment', 'Insert > Comment'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
+        ['menu.data:sortRange', 'Data > Sort range'], ['menu.data:filter', 'Data > Filter'], ['menu.data:validation', 'Data > Data validation'], ['menu.data:names', 'Data > Named ranges']
+    ].map(([id, label]) => ({ id, label, group: 'Menu items' })),
+    [['panel.comments', 'Comments panel'], ['panel.conditional', 'Conditional formatting panel'], ['panel.names', 'Named ranges panel'], ['panel.validation', 'Data validation dialog'],
+        ['panel.find', 'Find and replace'], ['panel.settings', 'Settings dialog'], ['panel.filter', 'Filter buttons and menu']].map(([id, label]) => ({ id, label, group: 'Panels' })),
+    [['feature.contextMenu', 'Right-click menu'], ['feature.fillHandle', 'Fill handle'], ['feature.resize', 'Resizing rows and columns by dragging'], ['feature.groups', 'Group buttons'],
+        ['cell.commentMark', 'Comment marks on cells'], ['cell.validation', 'Dropdown arrows and checkboxes']].map(([id, label]) => ({ id, label, group: 'Features' }))
+);
+
+const ACTION_IDS = new Set(ACTION_INFO.map((a) => a.id));
+const GROUP_IDS = new Set(ACTION_INFO.map((a) => a.id.split('.')[0]).filter((g, i, all) => all.indexOf(g) === i && ACTION_INFO.some((a) => a.id.startsWith(g + '.'))));
+const UI_IDS = new Set(UI_ITEMS.map((u) => u.id));
+const RANGE_TEXT = /^\s*\$?[A-Za-z]{1,3}\$?\d+\s*(:\s*\$?[A-Za-z]{1,3}\$?\d+\s*)?$/;
+
+/**
+ * What is wrong with a policy, for an editor (and before it is kept): [{ path, problem }] (empty when it is right). Unknown actions and parts of the
+ * screen, roles that are named but not there, modes and ranges that cannot be read.
+ */
+export function validatePolicy(policy) {
+    const out = [];
+    const say = (path, problem) => out.push({ path, problem });
+    if (!policy || typeof policy !== 'object') return [{ path: '', problem: 'a policy is an object' }];
+    const roles = policy.roles || {};
+    if (typeof roles !== 'object') say('roles', 'roles is an object of roles by their name');
+    for (const [name, role] of Object.entries(roles)) {
+        const at = 'roles.' + name;
+        for (const a of role.can || []) if (a !== '*' && !ACTION_IDS.has(a) && !GROUP_IDS.has(a)) say(at + '.can', 'there is no action "' + a + '"');
+        const ui = role.ui || {};
+        for (const id of ui.hide || []) if (!UI_IDS.has(id) && !/^menu\.[a-z]+:[A-Za-z]+/.test(id)) say(at + '.ui.hide', 'there is no part of the screen "' + id + '"');
+        if (ui.disallowed && !['grey', 'hide'].includes(ui.disallowed)) say(at + '.ui.disallowed', 'disallowed is "grey" or "hide"');
+        const areas = typeof ui.area === 'string' ? { '*': ui.area } : ui.area || {};
+        for (const [sheet, area] of Object.entries(areas)) if (!RANGE_TEXT.test(area)) say(at + '.ui.area' + (sheet === '*' ? '' : '.' + sheet), 'the area "' + area + '" is not a range');
+        (role.ranges || []).forEach((g, i) => {
+            if (g.mode && !RANK[g.mode]) say(at + '.ranges.' + i, 'the mode "' + g.mode + '" is not edit, readonly, hidden or invisible');
+            if (g.range && !RANGE_TEXT.test(g.range)) say(at + '.ranges.' + i, 'the range "' + g.range + '" cannot be read');
+            if (g.when && !String(g.when).trim().startsWith('=')) say(at + '.ranges.' + i, 'a condition is a formula: it starts with =');
+        });
+    }
+    for (const [who, r] of Object.entries(policy.members || {})) {
+        if (!/^(user|group):.+/.test(who)) say('members.' + who, 'a member is "user:<id>" or "group:<id>"');
+        for (const name of [].concat(r)) if (!roles[name]) say('members.' + who, 'there is no role "' + name + '"');
+    }
+    if (policy.default && !roles[policy.default]) say('default', 'there is no role "' + policy.default + '"');
+    return out;
 }

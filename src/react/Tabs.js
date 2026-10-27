@@ -14,7 +14,8 @@ import { Menu } from './Menu.js';
  */
 export function Tabs({ workbook: wb, active, onShow, container, onError }) {
     const ids = wb.sheetIds();
-    const shown = ids.filter((id) => !wb.sheetProps(id).hidden);
+    // the tabs of the sheets that show: not hidden, and seen by this person (the access policy's ui.sheets)
+    const shown = ids.filter((id) => !wb.sheetProps(id).hidden && wb.sheetShown(id));
     const [renaming, setRenaming] = useState(null);
     const [menuAt, setMenuAt] = useState(null);     // { x, y, sheet }
     const [listAt, setListAt] = useState(null);     // { x, y }
@@ -123,7 +124,7 @@ export function Tabs({ workbook: wb, active, onShow, container, onError }) {
             </div>
             <Menu at={menuAt} items={tabItems} onSelect={onMenu} onClose={() => setMenuAt(null)} container={container} label="Sheet" />
             <Menu at={listAt} container={container} label="All sheets" onClose={() => setListAt(null)}
-                items={ids.map((id) => ({ value: id, label: (wb.sheetProps(id).hidden ? '(hidden) ' : '') + wb.sheetProps(id).name }))}
+                items={ids.filter((id) => wb.sheetShown(id)).map((id) => ({ value: id, label: (wb.sheetProps(id).hidden ? '(hidden) ' : '') + wb.sheetProps(id).name }))}
                 onSelect={(id) => { setListAt(null); if (wb.sheetProps(id).hidden) attempt(() => wb.hideSheet(id, false, { source: 'user' })); onShow(id); }} />
         </div>
     );

@@ -3,7 +3,7 @@
 // condition), what they see (ui), groups and several roles together, the host's own code never stopped, the policy taken away.
 //   node test/policy.test.js
 import assert from 'node:assert';
-import { createWorkbook, viewFor, checkPatch, mergePatch } from '../src/core/index.js';
+import { createWorkbook, viewFor, checkPatch, mergePatch, ACTION_INFO, UI_ITEMS, validatePolicy } from '../src/core/index.js';
 import { sortRange } from '../src/core/search.js';
 import { resolveAccess } from '../src/core/policy.js';
 
@@ -96,7 +96,7 @@ const refusals = (wb) => { const out = []; wb.on('reject', (e) => out.push(e.rea
     wb.setStyle(s, { r1: 1, c1: 0, r2: 1, c2: 0 }, { bold: true }, user);
     assert.ok(!wb.style(s, 1, 0), 'and bold only where it may write');
     assert.deepStrictEqual([wb.display(s, 1, 5).text, wb.display(s, 1, 5).kind, wb.input(s, 1, 5)], ['', 'empty', ''], 'the cost is invisible: an empty cell');
-    assert.deepStrictEqual(wb.access().ui, { menubar: false, toolbar: false, formulaBar: true, headers: true, gridlines: true, tabs: true, area: 'A1:E20' }, 'what it sees');
+    assert.deepStrictEqual(wb.access().ui, { menubar: false, toolbar: false, formulaBar: true, headers: true, gridlines: true, tabs: true, area: 'A1:E20', hide: [], disallowed: 'grey', sheets: null }, 'what it sees');
     ok('a mandor by group: writes its edit range only, an approved line stays locked, bold but not italic, the cost invisible, no menus');
 }
 
@@ -190,6 +190,49 @@ const refusals = (wb) => { const out = []; wb.on('reject', (e) => out.push(e.rea
     assert.strictEqual(sorter.value(s, 1, 0), 'Slab');
     assert.deepStrictEqual(checkPatch(stored, sorter.pendingPatch(), { policy: SERVER, who: 'user:ali' }), { ok: true, problems: [] }, 'a sort is let through');
     ok('the server: hidden cells not given, formulas reading them given as answers, a save keeps them as stored, actions refused, a sort let through');
+}
+
+// ---- the screen by id, sheets a role sees, the catalogs, validatePolicy --------------------------------------------------------------------------
+{
+    const CLIENT = {
+        members: { 'user:c': 'client', 'user:d': ['client', 'other'] },
+        roles: {
+            client: { can: ['comment.read'], ui: { disallowed: 'hide', hide: ['menu.Insert', 'menu.view:group', 'tool.paint', 'feature.contextMenu'], sheets: ['Summary'], area: { Summary: 'A1:F40' } } },
+            other: { can: [], ui: { hide: ['tool.paint'] } }
+        }
+    };
+    const wb = createWorkbook();
+    const [boq] = wb.sheetIds();
+    wb.setSheetProps(boq, { name: 'BOQ' });
+    const sum = wb.addSheet('Summary');
+    wb.setValues(boq, 0, 0, [[100], [250]]);
+    wb.setValues(sum, 0, 0, [['Total', '=SUM(BOQ!A1:A2)']]);
+    wb.setAccess(CLIENT, 'user:c');
+    assert.deepStrictEqual([wb.shows('menu.Insert'), wb.shows('menu.view:group:rows'), wb.shows('menu.view:zoom:1'), wb.shows('tool.paint'), wb.shows('tool.bold')], [false, false, true, false, true], 'parts hidden by id; a menu item under a hidden one too');
+    assert.deepStrictEqual([wb.sheetShown(boq), wb.sheetShown(sum), wb.access().ui.disallowed, wb.access().ui.area], [false, true, 'hide', { Summary: 'A1:F40' }]);
+    wb.setAccess(CLIENT, 'user:d');
+    assert.deepStrictEqual([wb.shows('tool.paint'), wb.shows('menu.Insert'), wb.access().ui.disallowed, wb.sheetShown(boq)], [false, true, 'grey', true], 'two roles: hidden only what both hide; a role without a list of sheets sees them all');
+
+    // the server: a sheet the client does not see is not sent; a formula reading it is its answer; a save into it is refused
+    const stored = wb.toJSON();
+    const sent = viewFor(stored, { policy: CLIENT, who: 'user:c' });
+    assert.deepStrictEqual(sent.sheets.map((x) => x.props.name), ['Summary'], 'only the sheets it sees are sent');
+    const theirs = createWorkbook(sent);
+    assert.deepStrictEqual([theirs.input(theirs.sheetIds()[0], 0, 1), theirs.value(theirs.sheetIds()[0], 0, 1)], ['350', 350], 'a formula into a sheet it does not see is its answer');
+    const writer = createWorkbook(stored);
+    writer.saved(writer.pendingPatch());
+    writer.setValues(boq, 0, 0, 1);
+    assert.ok(checkPatch(stored, writer.pendingPatch(), { policy: CLIENT, who: 'user:c' }).problems.some((p) => p.reason === 'This sheet is not yours to change'), 'a save into it is refused');
+
+    // the catalogs and the check of a policy, for a host's own editor
+    assert.ok(ACTION_INFO.every((a) => a.id && a.label && a.group) && UI_ITEMS.every((u) => u.id && u.label && u.group), 'every action and part of the screen has a label and a group');
+    assert.deepStrictEqual(validatePolicy(CLIENT), [], 'a right policy has no problems');
+    assert.deepStrictEqual(validatePolicy({ roles: { a: { can: ['bold'], ui: { hide: ['tool.x'], disallowed: 'maybe', area: 'here' }, ranges: [{ range: 'A1:B', mode: 'secret', when: 'A1>1' }] } }, members: { budi: 'a', 'user:x': 'b' }, default: 'z' }).map((p) => p.problem), [
+        'there is no action "bold"', 'there is no part of the screen "tool.x"', 'disallowed is "grey" or "hide"', 'the area "here" is not a range',
+        'the mode "secret" is not edit, readonly, hidden or invisible', 'the range "A1:B" cannot be read', 'a condition is a formula: it starts with =',
+        'a member is "user:<id>" or "group:<id>"', 'there is no role "b"', 'there is no role "z"'
+    ], 'what is wrong is said, each where it is');
+    ok('the screen by id, the sheets a role sees (and the server keeps from it), the catalogs, validatePolicy');
 }
 
 console.log('\n' + passed + ' passed');

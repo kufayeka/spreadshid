@@ -69,9 +69,10 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     // the sheet shown: the host's when it says, else the one the tabs chose (a sheet that went away gives its place to the first one that shows)
     const [chosen, setChosen] = useState(null);
     const ids = wb.sheetIds();
-    const showing = ids.filter((id) => !wb.sheetProps(id).hidden);
+    // the sheets that show: not hidden, and seen by this person (the access policy's ui.sheets)
+    const showing = ids.filter((id) => !wb.sheetProps(id).hidden && wb.sheetShown(id));
     const wanted = props.sheet !== undefined ? props.sheet : chosen;
-    const sheetId = wanted && ids.includes(wanted) && !wb.sheetProps(wanted).hidden ? wanted : showing[0] || ids[0];
+    const sheetId = wanted && ids.includes(wanted) && !wb.sheetProps(wanted).hidden && wb.sheetShown(wanted) ? wanted : showing[0] || ids[0];
     const show = (id) => { setChosen(id); if (props.onSheetChange) props.onSheetChange(id); };
 
     // each sheet keeps its own selection, as in Google Sheets
@@ -213,7 +214,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
         getSelection() { return sel; }
     }), [wb, sel, sheetId]);
 
-    const onFind = (kind) => setFind((f) => (kind === 'find' ? { ...f, open: true, index: -1 } : { ...f, dialog: true, index: -1, status: '' }));
+    const onFind = (kind) => wb.shows('panel.find') && setFind((f) => (kind === 'find' ? { ...f, open: true, index: -1 } : { ...f, dialog: true, index: -1, status: '' }));
     const marks = matches.filter((m) => m.sheet === sheetId);
     const current = matches[find.index];
 
@@ -252,7 +253,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             {ui.menubar ? <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
-                onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice} fileName={props.fileName}
+                onLink={() => setLinking(true)} onSettings={() => { if (wb.shows('panel.settings')) setSettingsOpen(true); }} onShow={show} onError={setNotice} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onComment={() => setPanel({ kind: 'comments', start: Date.now() })}
@@ -260,7 +261,7 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
                     const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);
-                    setValidating({ range: rectText(b), rule: kind ? { kind } : own });
+                    if (wb.shows('panel.validation')) setValidating({ range: rectText(b), rule: kind ? { kind } : own });
                 }}
                 onStartEdit={(text) => setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' })}
                 onReveal={() => setRevealTick((t) => t + 1)} container={root} /> : null}
@@ -294,15 +295,15 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                         onMore={() => setFind((f) => ({ ...f, open: false, dialog: true }))} />
                 ) : null}
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
-                {panel && panel.kind === 'conditional' ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
+                {panel && panel.kind === 'conditional' && wb.shows('panel.conditional') ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
                     key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
-                {panel && panel.kind === 'comments' && wb.can('comment.read') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision} start={panel.start}
+                {panel && panel.kind === 'comments' && wb.can('comment.read') && wb.shows('panel.comments') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision} start={panel.start}
                     onGo={(r, c) => goToRange(sheetId, { r1: r, c1: c, r2: r, c2: c })} onError={setNotice} onClose={() => { setPanel(null); toGrid(); }} /> : null}
-                {panel && panel.kind === 'names' ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
+                {panel && panel.kind === 'names' && wb.shows('panel.names') ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
                     onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>
             {ui.tabs ? <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} /> : null}
-            {filterMenu && wb.filterOf(sheetId) ? (
+            {filterMenu && wb.filterOf(sheetId) && wb.shows('panel.filter') ? (
                 <FilterMenu workbook={wb} sheetId={sheetId} c={filterMenu.c} at={filterMenu} container={root} onError={setNotice}
                     onClose={() => { setFilterMenu(null); toGrid(); }}
                     onSort={(dir) => {

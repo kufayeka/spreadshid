@@ -104,7 +104,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         const rule = wb.validationAt(sheetId, r, c);
         const invalid = rule && rule.reject === false ? wb.invalidAt(sheetId, r, c) : null;
         // a cell with an open thread of comments shows a mark in its corner
-        const noted = wb.hasComment(sheetId, r, c);
+        const noted = wb.hasComment(sheetId, r, c) && wb.shows('cell.commentMark');
         // an empty cell with no style is not drawn: the grid lines are all it shows
         if (display.kind === 'empty' && !style && !guarded && !rule && !noted) continue;
         // A text that does not wrap and sits on the left runs on into the empty cells on its right, which are then not drawn (their grid lines would
@@ -205,7 +205,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // the sizes of the sheet at the zoom (the workbook keeps them at 100%)
     const baseRows = wb.rowAxis(sheetId), baseCols = wb.colAxis(sheetId);
     // the rows and columns outside the area the policy shows have no size here (they are the person's to not see, not hidden in the sheet)
-    const area = useMemo(() => (seen.area ? parseAddressText(seen.area) : null), [seen.area]);
+    // one area for every sheet, or one per sheet by its name ({ BOQ: 'A1:H200' })
+    const areaText = typeof seen.area === 'string' ? seen.area : seen.area ? seen.area[wb.sheetProps(sheetId).name] || seen.area[sheetId] || null : null;
+    const area = useMemo(() => (areaText ? parseAddressText(areaText) : null), [areaText]);
     const rowAxis = useMemo(() => (zoom === 1 && !area ? baseRows : createAxis(baseRows.count, (i) => (area && (i < area.r1 || i > area.r2) ? 0 : baseRows.size(i) * zoom))), [baseRows, zoom, area]);
     const colAxis = useMemo(() => (zoom === 1 && !area ? baseCols : createAxis(baseCols.count, (i) => (area && (i < area.c1 || i > area.c2) ? 0 : baseCols.size(i) * zoom))), [baseCols, zoom, area]);
     const size = { rows: rowAxis.count, cols: colAxis.count };
@@ -585,6 +587,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // ---- the right-click menu ----------------------------------------------------------------------------------------------------------------------
 
     function onContextMenu(e) {
+        // the right-click menu is a feature a role may not have: then the browser's own does not show either
+        if (!wb.shows('feature.contextMenu')) { e.preventDefault(); return; }
         const { x, y } = pointIn(e);
         const target = hit(x, y);
         if (target.kind === 'all') return;
@@ -749,7 +753,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // the groups of rows and columns: a gutter for each, when there are groups
     const rowOutline = useMemo(() => wb.rowGroups(sheetId), [wb, sheetId, revision]);
     const colOutline = useMemo(() => wb.colGroups(sheetId), [wb, sheetId, revision]);
-    const gw = gutterSize(rowOutline.maxLevel), gh = gutterSize(colOutline.maxLevel);
+    // the group buttons are a feature a role may not have (feature.groups)
+    const groupsShown = wb.shows('feature.groups');
+    const gw = groupsShown ? gutterSize(rowOutline.maxLevel) : 0, gh = groupsShown ? gutterSize(colOutline.maxLevel) : 0;
     const how = { source: 'user' };
 
     // The cells of a pane, against the sheet: a scrolling direction counts from the end of the frozen part, and the pane's layer moves by the scroll.
@@ -776,7 +782,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 w={colAxis.start(b.c2 + 1) - colAxis.start(b.c1)} h={rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1)}
                 display={wb.display(sheetId, b.r1, b.c1)} style={wb.shownStyle(sheetId, b.r1, b.c1)} />);
         }
-        if (filter) {
+        if (filter && wb.shows('panel.filter')) {
             const f = filter.range;
             if (!(f.r1 > rows.to || f.r2 < rows.from || f.c1 > cols.to || f.c2 < cols.from)) {
                 out.push(<div key="filter" className="ks-filter-frame" style={{ left: colAxis.start(f.c1) - xBase, top: rowAxis.start(f.r1) - yBase,
@@ -818,7 +824,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             }
         }
         // the fill handle, at the corner of the selection when it is one rectangle
-        if (rects.length === 1 && !editing) {
+        if (rects.length === 1 && !editing && wb.shows('feature.fillHandle')) {
             const b = rects[0];
             if (b.r2 >= rows.from && b.r2 <= rows.to && b.c2 >= cols.from && b.c2 <= cols.to) {
                 out.push(<div key="handle" className="ks-fill" data-fill="" style={{ left: colAxis.start(b.c2 + 1) - xBase - 4, top: rowAxis.start(b.r2 + 1) - yBase - 4 }} />);
@@ -850,7 +856,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             const w = colAxis.size(c);
             if (!w) continue;
             out.push(<div key={c} className={'ks-colhead' + colState(c)} data-c={c} style={{ left: colAxis.start(c) - base, width: w, height: HH }}>{colName(c)}</div>);
-            out.push(<div key={'e' + c} className="ks-colresize" data-resize-col={c} style={{ left: colAxis.start(c + 1) - base - 3, height: HH }} />);
+            if (wb.shows('feature.resize')) out.push(<div key={'e' + c} className="ks-colresize" data-resize-col={c} style={{ left: colAxis.start(c + 1) - base - 3, height: HH }} />);
         }
         return out;
     };
@@ -861,7 +867,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             const h = rowAxis.size(r);
             if (!h) continue;
             out.push(<div key={r} className={'ks-rowhead' + rowState(r)} data-r={r} style={{ top: rowAxis.start(r) - base, height: h, width: HW }}>{r + 1}</div>);
-            out.push(<div key={'e' + r} className="ks-rowresize" data-resize-row={r} style={{ top: rowAxis.start(r + 1) - base - 3, width: HW }} />);
+            if (wb.shows('feature.resize')) out.push(<div key={'e' + r} className="ks-rowresize" data-resize-row={r} style={{ top: rowAxis.start(r + 1) - base - 3, width: HW }} />);
         }
         return out;
     };

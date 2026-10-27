@@ -64,7 +64,13 @@ export function checkPatch(doc, patch, what) {
     patch = keepHeld(doc, patch, what);
     const before = workbookFor(doc, what);
     const after = workbookFor(mergePatch(doc, patch), what);
-    if (what && what.policy !== undefined && !before.access().owner) problems.push(...refusedActions(doc, patch, before, what.who));
+    if (what && what.policy !== undefined && !before.access().owner) {
+        problems.push(...refusedActions(doc, patch, before, what.who));
+        // a sheet the person does not see cannot be written by them
+        const unseen = new Set(before.sheetIds().filter((s) => !before.sheetShown(s)));
+        const touched = [...patch.sheets.upsert.map((x) => x.id), ...patch.sheets.delete, ...patch.rows.upsert.map((x) => x.sheetId), ...patch.columns.upsert.map((x) => x.sheetId)];
+        for (const s of new Set(touched.filter((x) => unseen.has(x)))) problems.push({ sheet: before.sheetProps(s).name, address: null, reason: 'This sheet is not yours to change' });
+    }
     for (const [name, spec] of Object.entries((what && what.types) || {})) {
         const s = after.sheetIds().includes(name) ? name : after.sheetIdByName(name);
         if (s) after.setTypes(s, spec);
@@ -148,6 +154,7 @@ function heldCells(wb) {
         hiddenBySheet.set(s, byCol);
     }
     const reaches = (rect) => {
+        if (!wb.sheetShown(rect.s)) return true;
         const byCol = hiddenBySheet.get(rect.s);
         if (!byCol || !byCol.size) return false;
         for (const [c, rows] of byCol) {
@@ -160,6 +167,7 @@ function heldCells(wb) {
         return false;
     };
     for (const s of wb.sheetIds()) {
+        if (!wb.sheetShown(s)) continue;
         wb.forEachFilledRow(s, (r, cells) => {
             const rid = wb.rowId(s, r);
             for (const [cid, v] of Object.entries(cells)) {
@@ -187,7 +195,8 @@ export function viewFor(doc, what) {
     const wb = workbookFor(doc, what);
     const held = heldCells(wb);
     const out = clone(doc);
-    // comments a person may not read are not sent
+    // the sheets a person does not see are not sent at all (ui.sheets), nor comments they may not read
+    out.sheets = (out.sheets || []).filter((sheet) => wb.sheetShown(sheet.id));
     if (!wb.can('comment.read')) for (const sheet of out.sheets || []) if (sheet.props) delete sheet.props.comments;
     for (const sheet of out.sheets || []) for (const row of sheet.rows || []) {
         const cells = held.get(row.id);

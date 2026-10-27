@@ -63,6 +63,26 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     const a1 = await q('(function(){ var c = document.querySelector(\'.ks-cell[data-r="0"][data-c="0"]\').getBoundingClientRect(), g = document.querySelector(".ks-grid").getBoundingClientRect(); return [Math.round(c.left - g.left), Math.round(c.top - g.top)]; })()');
     check('A1 is in the corner of the grid', JSON.stringify(a1) === '[0,0]', a1);
 
+    // a client: only the Summary sheet, an area of it, what it may not do hidden (not greyed), some parts hidden by their id
+    await q(`${W}.addSheet('Summary')`);
+    await setAccess({ default: 'client', roles: { client: { can: ['format.bold'], ui: { disallowed: 'hide', hide: ['menu.Insert', 'tool.paint', 'feature.contextMenu', 'feature.fillHandle'], sheets: ['Summary'], area: { Summary: 'A1:C10' } } } } }, 'user:client');
+    check('only the Summary tab, and Summary is shown', (await q('Array.from(document.querySelectorAll(".ks-tab")).map(function(t){ return t.textContent; }).join(",")')) === 'Summary');
+    check('its area: column D has no width', (await q('Math.round(document.querySelector(\'.ks-colhead[data-c="3"]\') ? document.querySelector(\'.ks-colhead[data-c="3"]\').getBoundingClientRect().width : 0)')) === 0);
+    check('no Insert menu', !(await q('Array.from(document.querySelectorAll(".ks-menubar-item")).some(function(x){ return x.textContent === "Insert"; })')));
+    check('Bold shows; Italic (not allowed) and Paint format (hidden) are not drawn', (await has('.ks-toolbar [aria-label^="Bold"]')) && !(await has('.ks-toolbar [aria-label^="Italic"]')) && !(await has('.ks-toolbar [aria-label="Paint format"]')));
+    const data2 = await centerOf(`Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'Data'; })`);
+    if (data2) { await click(data2.x, data2.y); await wait(300); }
+    check('the Data menu leaves out what it may not do', !data2 || !(await q(`Array.from(document.querySelectorAll('.ks-menu-item')).some(function(x){ return /Create a filter|Sort sheet/.test(x.textContent); })`)));
+    await key('Escape', 'Escape', 27);
+    await wait(150);
+    await clickCell(1, 1);
+    const cell = await cellAt(1, 1);
+    await mouse('mouseMoved', cell.x, cell.y);
+    await mouse('mousePressed', cell.x, cell.y, { button: 'right', buttons: 2 });
+    await mouse('mouseReleased', cell.x, cell.y, { button: 'right', buttons: 2 });
+    await wait(250);
+    check('no right-click menu, no fill handle', !(await has('.ks-menu')) && !(await has('.ks-fill')));
+
     await setAccess(null, null);
     check('the policy taken away: everything is back', (await has('.ks-menubar')) && (await has('.ks-toolbar')) && (await has('.ks-line-h')) && !(await q('document.querySelector(\'.ks-toolbar [aria-label^="Italic"]\').disabled')));
 }, 'control.js');

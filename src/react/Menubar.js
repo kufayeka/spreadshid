@@ -158,6 +158,22 @@ export function Menubar(props) {
         return out;
     });
     for (const name of Object.keys(MENUS)) MENUS[name] = greyed(MENUS[name]);
+    // what the policy hides: a whole menu ('menu.Insert'), an item by its value ('menu.data:filter'), what is not allowed (ui.disallowed: 'hide'); a
+    // submenu left empty goes, and so do separators that are left at an edge or next to each other
+    const hideBad = wb.access().ui.disallowed === 'hide';
+    const keep = (items) => {
+        const out = [];
+        for (const item of items) {
+            if (item.separator) { if (out.length && !out[out.length - 1].separator) out.push(item); continue; }
+            if (item.value && !wb.shows('menu.' + item.value)) continue;
+            if (hideBad && item.disabled && item.value && actionOfMenu(item.value)) continue;
+            if (item.children) { const children = keep(item.children); if (!children.some((x) => !x.separator)) continue; out.push({ ...item, children }); continue; }
+            out.push(item);
+        }
+        while (out.length && out[out.length - 1].separator) out.pop();
+        return out;
+    };
+    for (const name of Object.keys(MENUS)) { if (!wb.shows('menu.' + name)) delete MENUS[name]; else { MENUS[name] = keep(MENUS[name]); if (!MENUS[name].length) delete MENUS[name]; } }
 
     const how = { source: 'user' };
     const run = (fn) => { try { fn(); } catch (err) { props.onError(err.message); } };

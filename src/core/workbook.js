@@ -633,7 +633,25 @@ export function createWorkbook(doc, options) {
         emit('access', accessInfo());
         emit('layout', {});
     }
-    const accessInfo = () => ({ owner: access.owner, roles: access.roles.slice(), ui: { ...access.ui }, message: access.message });
+    const accessInfo = () => ({ owner: access.owner, roles: access.roles.slice(), ui: clone(access.ui), message: access.message });
+
+    /**
+     * True when the part of the screen with this id (UI_ITEMS: 'tool.bold', 'menu.Insert', 'menu.data:filter', 'panel.comments', 'feature.contextMenu' ...)
+     * is shown to this person. A menu item's id is "menu." and its value; hiding 'menu.view:group' hides every item under it.
+     */
+    function shows(id) {
+        const hide = access.ui.hide;
+        if (!hide || !hide.length) return true;
+        return !hide.some((h) => h === id || (id.startsWith(h + ':') && h.startsWith('menu.')));
+    }
+
+    /** True when this person sees sheet s (ui.sheets lists them by name or id; none listed: every sheet). */
+    function sheetShown(s) {
+        const list = access.ui.sheets;
+        if (!list) return true;
+        s = sheetIdOf(s);
+        return list.includes(s) || list.includes(sheetOf(s).props.name);
+    }
 
     /**
      * What may be done with a cell for the person who has the workbook open: { mode: 'readonly' | 'hidden' | 'invisible', message } or null (it may be
@@ -1605,7 +1623,7 @@ export function createWorkbook(doc, options) {
         // the host's rules and types
         setRules, setTypes, modeAt, typeAt,
         // access control
-        setAccess, access: accessInfo, can: (action) => access.can(action),
+        setAccess, access: accessInfo, can: (action) => access.can(action), shows, sheetShown,
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
         // groups of rows and columns

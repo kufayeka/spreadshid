@@ -24,6 +24,14 @@ const LINES = { thin: { width: 1, style: 'solid' }, medium: { width: 2, style: '
  * @param {import('react').RefObject<HTMLElement>} props.container
  */
 // the action of the access policy each tool needs (policy.js), by the start of its label
+// the id of each tool for the access policy's ui.hide (UI_ITEMS), by the start of its label
+const TOOL_ID = {
+    'Undo': 'tool.undo', 'Redo': 'tool.redo', 'Paint format': 'tool.paint', 'Format as currency': 'tool.currency', 'Format as percent': 'tool.percent',
+    'Decrease decimal': 'tool.decimals', 'Increase decimal': 'tool.decimals', 'More formats': 'tool.formats', 'Bold': 'tool.bold', 'Italic': 'tool.italic',
+    'Strikethrough': 'tool.strike', 'Underline': 'tool.underline', 'Borders': 'tool.borders', 'Merge cells': 'tool.merge', 'Horizontal align': 'tool.align',
+    'Vertical align': 'tool.valign', 'Text wrapping': 'tool.wrap', 'Text rotation': 'tool.rotate', 'Insert link': 'tool.link', 'Functions': 'tool.functions', 'Clear formatting': 'tool.clear'
+};
+
 const TOOL_ACTION = {
     'Paint format': 'format', 'Format as': 'format.number', 'Decrease decimal': 'format.number', 'Increase decimal': 'format.number', 'More formats': 'format.number',
     'Bold': 'format.bold', 'Italic': 'format.italic', 'Strikethrough': 'format.strike', 'Underline': 'format.underline', 'Borders': 'format.borders', 'Merge cells': 'format.merge',
@@ -46,7 +54,11 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
     const open = (kind) => (e) => { const b = e.currentTarget.getBoundingClientRect(); setMenu({ kind, x: b.left, y: b.bottom + 2 }); };
     // a tool the access policy does not let this person use is greyed (the workbook would refuse it anyway, and say why)
     const allowed = (label) => { const action = Object.entries(TOOL_ACTION).find(([k]) => label.startsWith(k)); return !action || wb.can(action[1]); };
-    const tool = (label, icon, onClick, pressed, extra) => (
+    // a tool is not drawn when the policy hides it by its id (UI_ITEMS), or hides what is not allowed (ui.disallowed: 'hide')
+    const hideBad = wb.access().ui.disallowed === 'hide';
+    const drawn = (label) => { const id = Object.entries(TOOL_ID).find(([k]) => label.startsWith(k)); return (!id || wb.shows(id[1])) && !(hideBad && !allowed(label)); };
+    const shown = (id, action) => wb.shows(id) && !(hideBad && action && !wb.can(action));
+    const tool = (label, icon, onClick, pressed, extra) => !drawn(label) ? null : (
         <button type="button" className={'ks-tool' + (pressed ? ' ks-pressed' : '')} aria-label={label} title={label} aria-pressed={pressed === undefined ? undefined : !!pressed}
             onMouseDown={keep} onClick={onClick} {...extra} disabled={(extra && extra.disabled) || !allowed(label)}>{icon}</button>
     );
@@ -102,9 +114,9 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
             {tool('Undo (Ctrl+Z)', <Icon name="undo" />, () => wb.undo(), undefined, { disabled: !wb.canUndo() })}
             {tool('Redo (Ctrl+Y)', <Icon name="redo" />, () => wb.redo(), undefined, { disabled: !wb.canRedo() })}
             {tool('Paint format', <Icon name="paint" />, onPaint, painting)}
-            <select className="ks-tool-select ks-zoom" aria-label="Zoom" title="Zoom" value={zoom} onChange={(e) => { onZoom(Number(e.target.value)); onDone(); }}>
+            {wb.shows('tool.zoom') ? <select className="ks-tool-select ks-zoom" aria-label="Zoom" title="Zoom" value={zoom} onChange={(e) => { onZoom(Number(e.target.value)); onDone(); }}>
                 {ZOOMS.map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
-            </select>
+            </select> : null}
             {sep('a')}
             {tool('Format as currency', <span className="ks-tool-text">{symbol}</span>, () => setFormat(wb, s, sel, 'money'), format.type === 'money')}
             {tool('Format as percent', <span className="ks-tool-text">%</span>, () => setFormat(wb, s, sel, 'percent'), format.type === 'percent')}
@@ -112,25 +124,25 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
             {tool('Increase decimal places', <span className="ks-tool-text">.00&#8594;</span>, () => stepDecimals(wb, s, sel, 1))}
             {dropTool('More formats', <span className="ks-tool-text">123</span>, 'formats')}
             {sep('b')}
-            <select className="ks-tool-select ks-font" aria-label="Font" title="Font" disabled={!wb.can('format.font')} value={style.font || 'Arial'} onChange={(e) => { setPart(wb, s, sel, 'font', e.target.value === 'Arial' ? null : e.target.value); onDone(); }}>
+            {shown('tool.font', 'format.font') ? <select className="ks-tool-select ks-font" aria-label="Font" title="Font" disabled={!wb.can('format.font')} value={style.font || 'Arial'} onChange={(e) => { setPart(wb, s, sel, 'font', e.target.value === 'Arial' ? null : e.target.value); onDone(); }}>
                 {FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
-            </select>
-            <select className="ks-tool-select ks-size" aria-label="Font size" title="Font size" disabled={!wb.can('format.size')} value={style.fontSize || 10} onChange={(e) => { setPart(wb, s, sel, 'fontSize', Number(e.target.value) === 10 ? null : Number(e.target.value)); onDone(); }}>
+            </select> : null}
+            {shown('tool.size', 'format.size') ? <select className="ks-tool-select ks-size" aria-label="Font size" title="Font size" disabled={!wb.can('format.size')} value={style.fontSize || 10} onChange={(e) => { setPart(wb, s, sel, 'fontSize', Number(e.target.value) === 10 ? null : Number(e.target.value)); onDone(); }}>
                 {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
+            </select> : null}
             {sep('c')}
             {tool('Bold (Ctrl+B)', <Icon name="bold" />, () => toggle(wb, s, sel, 'bold'), style.bold)}
             {tool('Italic (Ctrl+I)', <Icon name="italic" />, () => toggle(wb, s, sel, 'italic'), style.italic)}
             {tool('Strikethrough (Alt+Shift+5)', <Icon name="strike" />, () => toggle(wb, s, sel, 'strike'), style.strike)}
             {tool('Underline (Ctrl+U)', <Icon name="underline" />, () => toggle(wb, s, sel, 'underline'), style.underline)}
-            <ColorPicker label="Text color" disabled={!wb.can('format.color')} icon={<Icon name="textColor" under={style.color || '#000000'} />} value={style.color || null} container={container}
-                onPick={(c) => setPart(wb, s, sel, 'color', c)} />
-            <ColorPicker label="Fill color" disabled={!wb.can('format.fill')} icon={<Icon name="fill" under={style.fill || '#ffffff'} />} value={style.fill || null} container={container}
-                onPick={(c) => setPart(wb, s, sel, 'fill', c)} />
+            {shown('tool.color', 'format.color') ? <ColorPicker label="Text color" disabled={!wb.can('format.color')} icon={<Icon name="textColor" under={style.color || '#000000'} />} value={style.color || null} container={container}
+                onPick={(c) => setPart(wb, s, sel, 'color', c)} /> : null}
+            {shown('tool.fill', 'format.fill') ? <ColorPicker label="Fill color" disabled={!wb.can('format.fill')} icon={<Icon name="fill" under={style.fill || '#ffffff'} />} value={style.fill || null} container={container}
+                onPick={(c) => setPart(wb, s, sel, 'fill', c)} /> : null}
             {sep('d')}
             {dropTool('Borders', <Icon name="borders" />, 'borders')}
-            <ColorPicker label="Border color" disabled={!wb.can('format.borders')} icon={<span className="ks-border-swatch" style={{ background: borderLine.color }} />} value={borderLine.color} container={container}
-                onPick={(c) => setBorderLine({ ...borderLine, color: c || '#000000' })} />
+            {shown('tool.borders', 'format.borders') ? <ColorPicker label="Border color" disabled={!wb.can('format.borders')} icon={<span className="ks-border-swatch" style={{ background: borderLine.color }} />} value={borderLine.color} container={container}
+                onPick={(c) => setBorderLine({ ...borderLine, color: c || '#000000' })} /> : null}
             {dropTool('Merge cells', <Icon name="merge" />, 'merge')}
             {sep('e')}
             {dropTool('Horizontal align', <Icon name={alignIcon} />, 'align')}

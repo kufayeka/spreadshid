@@ -20,4 +20,4 @@ export { mergePatch, checkPatch, viewFor } from './server.js';
 export { copyBlock, pasteClip, pasteText, fillBlock } from './transfer.js';
 export { findAll, replaceIn, sortRange } from './search.js';
 export { exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';
-export { resolveAccess, ACTIONS } from './policy.js';
+export { resolveAccess, ACTIONS, ACTION_INFO, UI_ITEMS, validatePolicy } from './policy.js';
