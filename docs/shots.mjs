@@ -49,14 +49,13 @@ export const SHOTS = [
     { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } },
     { name: 'kondisional', page: '06-kondisional.page.js', clip: { x: 0, y: 110, width: 1000, height: 330 } },
     { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
-    { name: 'data', page: '07-data.page.js', clip: { x: 0, y: 110, width: 900, height: 260 } },
-    { name: 'filter-menu', page: '07-data.page.js', act: async ({ js, click, wait }) => {
-        const p = await js('(function(){ var b = document.querySelector(\'.ks-filter-button[data-filter-col="3"]\').getBoundingClientRect(); return { x: Math.round(b.left + 10), y: Math.round(b.top + 10) }; })()');
+    { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {
+        const p = await js(`(function(){ var b = document.querySelector('.ks-filter-button[data-filter-col="2"]').getBoundingClientRect(); return { x: Math.round(b.left + 8), y: Math.round(b.top + 8) }; })()`);
         await click(p.x, p.y); await wait(500);
-    }, clip: { x: 0, y: 110, width: 900, height: 560 } },
-    { name: 'dropdown', page: '07-data.page.js', act: async ({ js, click, key, wait }) => {
-        const p = await cellAt(js, 3, 3); await click(p.x, p.y); await wait(200); await key('ArrowDown', 'ArrowDown', 40, 1); await wait(400);
-    }, clip: { x: 0, y: 110, width: 900, height: 330 } },
+    }, clip: { x: 0, y: 110, width: 1000, height: 560 } },
+    { name: 'dropdown', page: '07-validasi.page.js', act: async ({ js, click, key, wait }) => {
+        const p = await cellAt(js, 3, 2); await click(p.x, p.y); await wait(200); await key('ArrowDown', 'ArrowDown', 40, 1); await wait(400);
+    }, clip: { x: 0, y: 110, width: 1000, height: 420 } },
     { name: 'aturan', page: '10-aturan.page.js', act: async ({ js, click, type, wait }) => {
         const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(200); await type('1'); await wait(300);
     }, clip: { x: 0, y: 110, width: 900, height: 510 } }

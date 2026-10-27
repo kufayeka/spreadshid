@@ -1,380 +1,442 @@
-# 7. Data
+# 7. Data: sort, filter, grup, validasi, cari
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format dan locale](06-format.md) · Berikutnya: [8. Mengisi sheet dari data](08-populate.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format, locale, dan conditional formatting](06-format.md) · Berikutnya: [8. Pivot table](08-pivot.md)
 
-Sort, filter, grup, validasi, conditional formatting, cari dan ganti. Semua ada di menu (Data, View, Format, Edit) untuk orang di layar, dan ada
-fungsinya untuk kode.
+Alat untuk mengolah tabel data: mengurutkan, menyaring, melipat kelompok baris, membatasi isian, dan mencari. Semua yang ada di menu Data di layar juga
+bisa dilakukan lewat kode, dan semuanya bisa di-undo.
 
-![Filter, grup, dropdown, checkbox, conditional formatting](img/data.png)
+- [7.1 Sort](#71-sort)
+- [7.2 Filter](#72-filter)
+- [7.3 Grup baris dan kolom](#73-grup-baris-dan-kolom)
+- [7.4 Validasi data](#74-validasi-data)
+- [7.5 Cari dan ganti](#75-cari-dan-ganti)
 
-Gambar di atas dibuat oleh kode ini:
+## 7.1 Sort
 
-<!-- contoh: 07-data.page.js -->
+<!-- contoh: 07-sort-filter.js -->
+```js
+import { createWorkbook, sortRange } from '@kufayeka/sheet/core';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
+
+// 300 transaksi Oktober: diurutkan, lalu disaring dengan beberapa cara.
+const wb = createWorkbook();
+const jual = wb.sheet('Sheet1');
+jual.setSheetProps({ name: 'Penjualan', freezeRows: 1 });
+jual.setValues('A1', [KOLOM_PENJUALAN]);
+jual.setValues('A2', barisPenjualan(penjualan(300), 2));
+jual.setValues('M1', [['Ditampilkan', '=SUBTOTAL(103, A2:A301)'], ['Omzet tampil', '=SUBTOTAL(109, K2:K301)']]);
+const lima = () => [2, 3, 4, 5, 6].map((r) => jual.value('A' + r) + ':' + jual.value('C' + r).slice(0, 3) + ':' + jual.value('K' + r)).join('  ');
+
+// ---- sort: range tanpa judul kolom, kolom acuan, arah. Rumus Total ikut barisnya
+sortRange(wb, 'Penjualan', 'A2:K301', 'K', 'desc');
+console.log('total terbesar  :', lima());
+console.log('rumus K2        :', jual.input('K2'), '(baris transaksi', jual.value('A2') + ')');
+// sort bertahap: urutan yang sama dipertahankan, jadi urutkan dari kunci terakhir ke kunci pertama
+sortRange(wb, 'Penjualan', 'A2:K301', 'C', 'asc');
+console.log('cabang, lalu total:', lima());
+wb.undo(); wb.undo();
+console.log('dua kali undo   :', lima());
+
+// ---- filter: range dengan judul kolom di baris pertamanya. Satu sheet punya satu filter
+jual.createFilter('A1:K301');
+console.log('pilihan cabang  :', JSON.stringify(jual.filterValues('C')));
+// menurut nilai: yang disebut di hidden disembunyikan
+jual.setFilterColumn('C', { hidden: ['Bandung', 'Surabaya'] });
+console.log('hanya Jakarta   :', jual.value('N1'), 'baris | omzet', jual.value('N2'));
+// menurut kondisi, digabung dengan kolom lain: baris harus lolos semua kolom
+jual.setFilterColumn('K', { op: 'gt', a: 5000000 });
+console.log('+ total > 5 jt  :', jual.value('N1'), 'baris | omzet', jual.value('N2'));
+// menurut rumus, ditulis untuk baris pertama di bawah judul: transaksi dengan diskon, kategori semen atau besi
+jual.setFilterColumn('C', null);
+jual.setFilterColumn('K', null);
+jual.setFilterColumn('J', { op: 'formula', formula: '=AND(J2>0, OR(G2="Semen", G2="Besi"))' });
+console.log('diskon semen/besi:', jual.value('N1'), 'baris | omzet', jual.value('N2'));
+const tampil = [];
+for (let r = 1; r <= 300 && tampil.length < 4; r++) if (!jual.filteredOut(r)) tampil.push(jual.value(r, 0) + ' ' + jual.value(r, 6) + ' ' + jual.value(r, 9));
+console.log('contoh baris    :', tampil.join(' | '));
+console.log('filter disimpan :', Object.keys(jual.filterOf().columns).length, 'kolom, di props sheet');
+
+jual.removeFilter();
+console.log('filter dihapus  :', jual.value('N1'), 'baris');
+```
+<!-- /contoh -->
+
+<!-- hasil: 07-sort-filter.js -->
+```text
+total terbesar  : 48:Jak:12495000  218:Sur:12495000  112:Jak:11760000  282:Sur:11760000  176:Jak:11025000
+rumus K2        : =H2*I2*(1-J2) (baris transaksi 48)
+cabang, lalu total: 27:Ban:9760000  91:Ban:8692500  155:Ban:8540000  219:Ban:7930000  283:Ban:7320000
+dua kali undo   : 1:Jak:752400  2:Sur:1148000  3:Ban:795000  4:Jak:912000  5:Jak:290000
+pilihan cabang  : [{"text":"Bandung","count":75},{"text":"Jakarta","count":150},{"text":"Surabaya","count":75}]
+hanya Jakarta   : 150 baris | omzet 295305000
++ total > 5 jt  : 11 baris | omzet 99519000
+diskon semen/besi: 16 baris | omzet 21010000
+contoh baris    : 1 Semen 0.05 | 28 Semen 0.05 | 47 Besi 0.1 | 55 Semen 0.05
+filter disimpan : 1 kolom, di props sheet
+filter dihapus  : 300 baris
+```
+<!-- /hasil -->
+
+`sortRange(wb, sheet, range, kolom, arah)` dari `@kufayeka/sheet/core` mengurutkan baris di dalam range menurut satu kolom, `'asc'` (A ke Z, kecil ke
+besar) atau `'desc'`. Range-nya tanpa baris judul. Yang perlu diketahui:
+
+- **Baris dipindah utuh, rumus ikut.** Sort memindahkan baris, bukan menyalin isinya, jadi `=H2*I2*(1-J2)` tetap menghitung baris transaksinya sendiri.
+  Rumus di tempat lain yang membaca baris itu juga tetap benar.
+- **Sel kosong selalu di bawah**, apa pun arahnya. Nilai yang sama mempertahankan urutan lamanya.
+- **Sort bertahap.** Karena nilai yang sama tetap pada urutannya, urutkan dari kunci terakhir ke kunci pertama. Contohnya total dulu, baru cabang, maka
+  hasilnya diurutkan per cabang dan di dalam cabang menurut total.
+- Satu sort adalah satu perubahan.
+
+Di layar: Data → Sort range, atau menu di tombol filter.
+
+## 7.2 Filter
+
+Lanjutan contoh di atas. Filter menyembunyikan baris yang tidak memenuhi syarat, dan `SUBTOTAL(103, ...)` dan `SUBTOTAL(109, ...)` di kolom N langsung
+menghitung yang tampil saja:
+
+- **Menurut nilai**: `{ hidden: ['Bandung', 'Surabaya'] }`, yaitu nilai yang disembunyikan, sama seperti mencentang daftar di menu filter. `''` berarti
+  sel kosong. `filterValues(kolom)` memberi daftar nilai beserta jumlahnya, untuk menu buatanmu sendiri.
+- **Menurut kondisi**: syarat yang sama dengan conditional formatting ([6.4](06-format.md#64-conditional-formatting)), misalnya `{ op: 'gt', a: 5000000 }`,
+  `{ op: 'textContains', a: 'semen' }`, atau `{ op: 'between', a: 1, b: 10 }`.
+- **Menurut rumus**: `{ op: 'formula', formula: '=AND(J2>0, OR(G2="Semen", G2="Besi"))' }`, ditulis untuk baris pertama di bawah judul dan bergeser
+  untuk baris lain. Dengan rumus, syarat boleh membaca kolom mana saja.
+
+Satu baris tampil kalau lolos **semua** kolom yang disaring. Satu sheet hanya punya satu filter, dan filter baru menggantikan yang lama.
+
+Seperti di Google Sheets, baris disaring **saat filter diubah**, bukan saat nilai berubah. Baris yang diedit sampai tidak lagi memenuhi syarat tetap
+tampil sampai filter diubah atau diterapkan ulang. Dengan begitu baris yang sedang diedit orang tidak tiba-tiba hilang dari layar.
+
+![Menu filter di kolom Cabang](img/filter.png)
+
+<!-- contoh: 07-filter.page.js -->
 ```jsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
 
+// 60 transaksi dengan filter terpasang: tombol di setiap judul kolom membuka menu urut dan saring.
 function buat() {
     const wb = createWorkbook();
     wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-    const sh = wb.sheet('Sheet1');
-    sh.setValues('A1', [
-        ['Pekerjaan', 'Volume', 'Progres', 'Status', 'Selesai'],
-        ['1. Tanah', '', '', '', ''],
-        ['Galian', 120, 1, 'Selesai', true],
-        ['Urugan', 40, 0.4, 'Terlambat', false],
-        ['2. Beton', '', '', '', ''],
-        ['Pondasi', 18.5, 0.75, 'Jalan', false],
-        ['Kolom', 12, 0.1, 'Terlambat', false]
-    ]);
-    sh.setStyle('A1:E1', { bold: true, fill: '#e8f0fe' });
-    sh.setStyle('A2, A5', { bold: true });
-    sh.setStyle('C2:C7', { format: { type: 'percent', decimals: 0 } });
-    sh.setColProps('A', { width: 140 });
-    sh.groupRows('3:4');
-    sh.groupRows('6:7');
-    sh.addValidation('D2:D20', { kind: 'list', values: ['Jalan', 'Selesai', 'Terlambat'] });
-    sh.addValidation('E2:E20', { kind: 'checkbox' });
-    sh.addConditional('D2:D20', { op: 'textIs', a: 'terlambat', style: { fill: '#f4c7c3', color: '#a50e0e' } });
-    sh.addConditional('C2:C20', { kind: 'scale', min: { type: 'number', value: 0, color: '#ffffff' }, max: { type: 'number', value: 1, color: '#57bb8a' } });
-    sh.createFilter('A1:E7');
+    const jual = wb.sheet('Sheet1');
+    jual.setSheetProps({ name: 'Penjualan', freezeRows: 1 });
+    jual.setValues('A1', [KOLOM_PENJUALAN]);
+    jual.setValues('A2', barisPenjualan(penjualan(60), 2));
+    jual.setStyle('A1:K1', { bold: true, fill: '#e8f0fe' });
+    jual.setColProps('A', { width: 50 });
+    jual.setColProps('B', { format: { type: 'date' }, width: 95 });
+    jual.setColProps('F', { width: 170 });
+    jual.setColProps('I', { format: { type: 'money', decimals: 0 } });
+    jual.setColProps('J', { format: { type: 'percent', decimals: 0 }, width: 70 });
+    jual.setColProps('K', { format: { type: 'money', decimals: 0 }, width: 120 });
+    jual.createFilter('A1:K61');
+    jual.setFilterColumn('C', { hidden: ['Surabaya'] });
     return wb;
 }
 
-export default function HalamanData() {
+export default function HalamanFilter() {
     const [wb] = useState(buat);
     return <div style={{ height: 600 }}><Sheet workbook={wb} /></div>;
 }
 ```
 <!-- /contoh -->
 
-- [7.1 Sort](#71-sort)
-- [7.2 Filter](#72-filter)
-- [7.3 Grup baris dan kolom](#73-grup-baris-dan-kolom)
-- [7.4 Validasi data](#74-validasi-data)
-- [7.5 Conditional formatting](#75-conditional-formatting)
-- [7.6 Cari dan ganti](#76-cari-dan-ganti)
-
-## 7.1 Sort
-
-`sortRange(wb, sheet, range, kolom, arah)` dari `@kufayeka/sheet/core` mengurutkan baris-baris di range berdasarkan satu kolom. `arah` = `'asc'` atau
-`'desc'`. Range-nya **tanpa** baris judul. Isi dan gaya sel pindah ke baris barunya; rumus yang menunjuk ke range itu tetap menunjuk ke tempat yang
-sama, seperti di Google Sheets. Contohnya ada di 7.2.
-
-Di layar: Data → Sort sheet / Sort range, atau menu tombol filter.
-
-## 7.2 Filter
-
-<!-- contoh: 07-sort-filter.js -->
-```js
-import { createWorkbook, sortRange } from '@kufayeka/sheet/core';
-
-const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [
-    ['Pekerjaan', 'Volume', 'Status'],
-    ['Galian', 120, 'Approved'],
-    ['Urugan', 40, 'Draft'],
-    ['Beton', 18.5, 'Draft'],
-    ['Besi', 2400, 'Approved']
-]);
-const kolomA = () => [1, 2, 3, 4].map((r) => sh.value(r, 0)).join(', ');
-
-// sort: range tanpa header, kolom acuan, arah
-sortRange(wb, 'Sheet1', 'A2:C5', 'B', 'desc');
-console.log('urut volume turun :', kolomA());
-
-// filter: range dengan header di baris pertamanya
-sh.createFilter('A1:C5');
-console.log('nilai kolom C     :', JSON.stringify(sh.filterValues('C')));
-sh.setFilterColumn('C', { hidden: ['Draft'] });                    // berdasarkan nilai
-const tampil = () => [1, 2, 3, 4].filter((r) => !sh.filteredOut(r)).map((r) => sh.value(r, 0)).join(', ');
-console.log('hanya Approved    :', tampil());
-sh.setFilterColumn('C', null);
-sh.setFilterColumn('B', { op: 'between', a: 30, b: 200 });          // berdasarkan kondisi
-console.log('volume 30..200    :', tampil());
-console.log('filter            :', JSON.stringify(sh.filterOf().columns));
-sh.removeFilter();
-console.log('filter dihapus    :', tampil());
-```
-<!-- /contoh -->
-
-<!-- hasil: 07-sort-filter.js -->
-```text
-urut volume turun : Besi, Galian, Urugan, Beton
-nilai kolom C     : [{"text":"Approved","count":2},{"text":"Draft","count":2}]
-hanya Approved    : Besi, Galian
-volume 30..200    : Galian, Urugan
-filter            : {"1":{"op":"between","a":30,"b":200}}
-filter dihapus    : Besi, Galian, Urugan, Beton
-```
-<!-- /hasil -->
-
-Satu sheet punya satu filter. Range filter termasuk baris judulnya; baris di bawahnya yang tidak lolos disembunyikan.
-
 | Fungsi | Artinya |
 |---|---|
-| `createFilter(range)` | pasang filter (filter lama diganti) |
-| `removeFilter()` | lepas filter; semua baris tampil lagi |
-| `setFilterColumn(kolom, kriteria)` | kriteria satu kolom (`'C'` atau nomor). `null` = tampilkan semua |
-| `filterOf()` | `{ range, columns: { nomorKolom: kriteria } }`, atau `null` |
-| `filterValues(kolom)` | daftar nilai kolom itu dengan jumlahnya `[{ text, count }]`, urut; baris yang disembunyikan kolom lain tidak dihitung |
-| `filteredOut(baris)` | `true` kalau baris itu disembunyikan filter |
-| `dataRegion(at)` | blok data di sekitar sebuah sel (yang dipakai Data → Create a filter kalau cuma satu sel dipilih) |
-
-Kriteria:
-
-| Kunci | Artinya |
-|---|---|
-| `hidden: ['Draft', '']` | sembunyikan baris yang teksnya salah satu dari ini (`''` = sel kosong) |
-| `op`, `a`, `b` | kondisi, sama dengan conditional formatting (7.5): `gt`, `between`, `textContains`, `dateBefore`, ... |
-| `op: 'formula', formula` | rumus sendiri, ditulis untuk baris pertama di bawah judul |
-
-Sama seperti Google Sheets, baris disaring **saat kriteria diubah**, bukan tiap kali sel diedit. Baris yang diedit sampai tidak cocok lagi tetap
-tampil sampai filternya diterapkan lagi. Waktu workbook dibuka, filter diterapkan ke data saat itu.
-
-Di layar, tiap judul dapat tombol filter:
-
-![Menu filter](img/filter-menu.png)
+| `createFilter(range)` | pasang filter. Baris pertama range adalah judul kolom, dan setiap judul mendapat tombol filter |
+| `setFilterColumn(kolom, syarat)` | syarat untuk satu kolom (`'C'` atau nomor). `null` membuang syaratnya |
+| `removeFilter()` | lepas filter. Semua baris tampil lagi |
+| `filterOf()` | filter sheet: `{ r1, c1, r2, c2, columns }` dengan kolom sebagai id, atau `null` |
+| `filterValues(kolom)` | `[{ text, count }]`: nilai di kolom itu, untuk daftar centang |
+| `filteredOut(r)` | apakah baris nomor `r` sedang disembunyikan filter |
 
 ## 7.3 Grup baris dan kolom
+
+Daftar harga per kategori. Produk di bawah setiap kategori digrup supaya bisa dilipat, seluruh daftar digrup sekali lagi sebagai level di atasnya, dan
+kolom harga per cabang juga bisa dilipat:
 
 <!-- contoh: 07-grup.js -->
 ```js
 import { createWorkbook } from '@kufayeka/sheet/core';
+import { PRODUK } from './data/toko.js';
 
+// Daftar harga per kategori yang bisa dilipat: kategori sebagai judul, produknya di bawah, harga per cabang sebagai kolom yang bisa dilipat.
 const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [['1. Tanah'], ['Galian'], ['Urugan'], ['2. Beton'], ['Pile'], ['Balok'], ['Kolom']]);
-const terlihat = () => [0, 1, 2, 3, 4, 5, 6].filter((r) => sh.rowAxis().size(r) > 0).map((r) => sh.value(r, 0)).join(', ');
+const harga = wb.sheet('Sheet1');
+const kategori = [...new Set(PRODUK.map((p) => p[2]))];   // Semen, Besi, Cat, Keramik, Pipa, Bata, Pasir
+const baris = [['Kategori / produk', 'Harga jual', 'Jakarta', 'Bandung', 'Surabaya', 'Produk']];
+for (const k of kategori) {
+    baris.push([k]);
+    for (const p of PRODUK.filter((x) => x[2] === k)) baris.push(['  ' + p[1], p[5], p[5], Math.round(p[5] * 0.97), Math.round(p[5] * 1.02)]);
+}
+harga.setValues('A1', baris);
 
-// grup: baris di bawah judul bab. Tombol [-] muncul di baris judulnya
-sh.groupRows('2:3');
-sh.groupRows('5:7');
-sh.groupRows('6:7');                       // grup di dalam grup (level 2)
-console.log('grup  :', JSON.stringify(sh.rowGroups()));
+// grup baris: produk di bawah judul kategorinya. Tombol [-] tampil di baris judul
+let r = 2;
+for (const k of kategori) {
+    const n = PRODUK.filter((x) => x[2] === k).length;
+    harga.setValues(r - 1, 5, `=COUNTA(A${r + 1}:A${r + n})`);
+    harga.groupRows(`${r + 1}:${r + n}`);
+    r += n + 1;
+}
+// grup kolom: harga per cabang bisa dilipat, tinggal harga jual
+harga.groupCols('C:E');
+// grup di dalam grup: seluruh daftar di bawah judul kolom digrup sekali lagi. Daftar jadi level 1, produk per kategori jadi level 2
+harga.groupRows(`2:${baris.length}`);
 
-sh.foldRowGroup(1, 1, true);               // lipat grup yang mulai di baris nomor 1, level 1
-console.log('lipat :', terlihat());
-sh.showRowLevel(0);                        // tombol level "1": cuma yang di luar grup
-console.log('lvl 1 :', terlihat());
-sh.showRowLevel(1);                        // tombol level "2"
-console.log('lvl 2 :', terlihat());
-sh.showRowLevel(9);                        // semua terbuka
-sh.ungroupRows('6:7');                     // lepas satu level
-console.log('lepas :', JSON.stringify(sh.rowGroups().groups.map((g) => [g.level, g.from + 1, g.to + 1])));
+const terlihat = () => baris.map((_, i) => i).filter((i) => i > 0 && harga.rowAxis().size(i) > 0).map((i) => String(harga.value(i, 0)).trim()).join(', ');
+const g = harga.rowGroups();
+console.log('grup baris     :', g.groups.map((x) => `L${x.level} ${x.from + 1}-${x.to + 1}`).join(', '), '| level terdalam', g.maxLevel);
+console.log('kolom          :', JSON.stringify(harga.colGroups().groups.map((x) => [x.level, x.from, x.to])));
+
+harga.foldRowGroup(2, 2, true);                      // lipat produk Semen: grup level 2 yang mulai di nomor 2 (baris 3)
+console.log('semen dilipat  :', terlihat());
+harga.showRowLevel(1);                               // tombol level "2": isi level 1 terlihat, level 2 dilipat
+console.log('tombol 2       :', terlihat());
+harga.showRowLevel(0);                               // tombol level "1": semua grup dilipat
+console.log('tombol 1       :', terlihat() || '(hanya judul kolom)');
+harga.showRowLevel(9);                               // semua terbuka
+harga.foldColGroup(2, 1, true);
+console.log('kolom dilipat  :', [0, 1, 2, 3, 4, 5].map((c) => harga.colAxis().size(c) > 0 ? harga.value(0, c) : '-').join(' | '));
+
+// yang dilipat tetap dihitung oleh rumus biasa, dan dilewati oleh SUBTOTAL 10x
+harga.setValues('H1', [['SUM', '=SUM(B3:B4)', 'SUBTOTAL 109', '=SUBTOTAL(109, B3:B4)']]);
+harga.foldRowGroup(2, 2, true);
+console.log('rumus          :', 'SUM', harga.value('I1'), '| SUBTOTAL(109)', harga.value('K1'), '(baris semen sedang dilipat)');
+harga.ungroupRows(`2:${baris.length}`);
+console.log('lepas satu level:', harga.rowGroups().groups.length, 'grup tersisa, level terdalam', harga.rowGroups().maxLevel);
 ```
 <!-- /contoh -->
 
 <!-- hasil: 07-grup.js -->
 ```text
-grup  : {"groups":[{"level":1,"from":1,"to":2,"folded":false},{"level":1,"from":4,"to":6,"folded":false},{"level":2,"from":5,"to":6,"folded":false}],"maxLevel":2}
-lipat : 1. Tanah, 2. Beton, Pile, Balok, Kolom
-lvl 1 : 1. Tanah, 2. Beton
-lvl 2 : 1. Tanah, Galian, Urugan, 2. Beton, Pile
-lepas : [[1,2,3],[1,5,7]]
+grup baris     : L1 2-20, L2 3-4, L2 6-7, L2 9-10, L2 12-13, L2 15-16, L2 18-18, L2 20-20 | level terdalam 2
+kolom          : [[1,2,4]]
+semen dilipat  : Semen, Besi, Besi beton 10 mm, Besi beton 13 mm, Cat, Cat tembok 5 kg putih, Cat tembok 25 kg putih, Keramik, Keramik 60x60 abu, Keramik 40x40 putih, Pipa, Pipa PVC 3/4 inch, Pipa PVC 4 inch, Bata, Bata ringan 10 cm, Pasir, Pasir beton
+tombol 2       : Semen, Besi, Cat, Keramik, Pipa, Bata, Pasir
+tombol 1       : (hanya judul kolom)
+kolom dilipat  : Kategori / produk | Harga jual | - | - | - | Produk
+rumus          : SUM 184000 | SUBTOTAL(109) 0 (baris semen sedang dilipat)
+lepas satu level: 7 grup tersisa, level terdalam 1
 ```
 <!-- /hasil -->
 
-Grup bisa bertingkat sampai 7 level. Tombol [−]/[+] ada di baris tepat di atas grup (baris judulnya), dan tombol level 1, 2, 3 ada di pojok.
+- `groupRows('3:4')` membuat baris 3 dan 4 satu level lebih dalam. Tombol `[-]` tampil di baris di atasnya, yaitu baris judul kategori. Grup di dalam
+  grup dibuat dengan menggrup range yang lebih besar, sampai 7 level.
+- `foldRowGroup(nomor, level, true)` melipat satu grup, ditunjuk dengan nomor baris pertamanya (dihitung dari 0) dan levelnya. `false` membukanya.
+- `showRowLevel(n)` sama dengan tombol angka di pojok kiri atas: semua grup yang lebih dalam dari `n` dilipat. `0` melipat semuanya, angka besar
+  membuka semuanya.
+- Baris yang dilipat tetap dihitung `SUM`, tetapi dilewati `SUBTOTAL(10x, ...)` ([5.4](05-rumus.md#54-subtotal)).
+- Fungsi kolom sama persis: `groupCols`, `ungroupCols`, `foldColGroup`, `showColLevel`, `colGroups`.
 
 | Fungsi | Artinya |
 |---|---|
-| `groupRows(range)` | `'2:3'`, atau `(dari, sampai)` nomor dari 0. Tiap baris naik satu level |
-| `ungroupRows(range)` | turun satu level |
-| `foldRowGroup(dari, level, terlipat)` | lipat/buka grup yang mulai di baris `dari` (nomor dari 0) dengan level itu |
-| `showRowLevel(level)` | seperti tombol level: grup yang lebih dalam dari `level` dilipat, sisanya dibuka. `0` = lipat semua |
-| `rowGroups()` | `{ groups: [{ level, from, to, folded }], maxLevel }` |
-| `groupCols`, `ungroupCols`, `foldColGroup`, `showColLevel`, `colGroups` | sama, untuk kolom |
-
-Baris yang disisipkan di tengah grup ikut masuk grup. Di layar: View → Group, `Alt+Shift+→` / `Alt+Shift+←`.
+| `groupRows(baris)`, `groupCols(kolom)` | satu level lebih dalam |
+| `ungroupRows(baris)`, `ungroupCols(kolom)` | satu level lebih dangkal |
+| `foldRowGroup(nomor, level, lipat)`, `foldColGroup(...)` | lipat atau buka satu grup |
+| `showRowLevel(n)`, `showColLevel(n)` | tampilkan sampai level `n` |
+| `rowGroups()`, `colGroups()` | `{ groups: [{ level, from, to, folded }], maxLevel }` |
 
 ## 7.4 Validasi data
+
+Lembar pesanan yang setiap kolomnya punya aturan isian. Kode produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown:
 
 <!-- contoh: 07-validasi.js -->
 ```js
 import { createWorkbook } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK, CABANG } from './data/toko.js';
 
-const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-const pesan = [];
-wb.on('reject', (e) => pesan.push(e.reason));
-sh.setValues('A1', [['Pekerjaan', 'Status', 'Volume', 'Selesai', 'Satuan']]);
+// Lembar pesanan pelanggan: setiap kolom punya aturan isian. Pilihan produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown.
+export function buatPesanan() {
+    const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27, 9, 0) });
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const produk = wb.sheet(wb.addSheet('Produk'));
+    produk.setValues('A1', [KOLOM_PRODUK, ...PRODUK]);
 
-sh.addValidation('B2:B50', { kind: 'list', values: ['Draft', 'Approved', 'Rejected'], help: 'Pilih status' });
-sh.addValidation('C2:C50', { kind: 'number', op: 'gte', a: 0, reject: true });
-sh.addValidation('D2:D50', { kind: 'checkbox' });
-sh.setValues('G1', [['m3'], ['kg'], ['bh']]);
-sh.addValidation('E2:E50', { kind: 'listFrom', source: 'G1:G3', reject: false }); // nilai lain diterima tapi ditandai
+    const psn = wb.sheet('Sheet1');
+    psn.setSheetProps({ name: 'Pesanan', freezeRows: 1 });
+    psn.setValues('A1', [['Tanggal kirim', 'Cabang', 'Kode', 'Qty', 'Email pelanggan', 'Catatan', 'Lunas']]);
+    psn.setStyle('A1:G1', { bold: true, fill: '#e8f0fe' });
+    psn.setColProps('A', { format: { type: 'date' }, width: 110 });
+    psn.setColProps('E', { width: 200 });
+    psn.setColProps('F', { width: 180 });
 
-const user = { source: 'user' };
-sh.setValues('B2', 'Approved', user);
-sh.setValues('B3', 'Selesai', user);   // bukan pilihan: ditolak
-sh.setValues('C2', -5, user);          // < 0: ditolak
-sh.setValues('D2', true, user);
-sh.setValues('E2', 'liter', user);     // diterima, tapi ditandai
+    psn.addValidation('A2:A200', { kind: 'date', op: 'gte', a: 'today', reject: true, help: 'Tanggal kirim tidak boleh lewat' });
+    psn.addValidation('B2:B200', { kind: 'list', values: CABANG, help: 'Cabang yang mengirim' });
+    psn.addValidation('C2:C200', { kind: 'listFrom', source: 'Produk!A2:A50', reject: true, message: 'Kode di {cell} tidak ada di daftar produk' });
+    psn.addValidation('D2:D200', { kind: 'number', op: 'between', a: 1, b: 500, reject: true, help: 'Qty 1 sampai 500',
+        message: 'Qty di {cell} harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.' });
+    psn.addValidation('E2:E200', { kind: 'text', op: 'email', reject: false });   // salah ketik diterima tapi ditandai
+    psn.addValidation('F2:F200', { kind: 'textLength', op: 'lte', a: 40, reject: true });
+    psn.addValidation('G2:G200', { kind: 'checkbox' });
+    psn.setValues('A2', [[46324, 'Jakarta', 'SMN-01', 40, 'cv.bangunkarya@mail.com', 'Kirim pagi', true],
+        [46325, 'Bandung', 'BSI-13', 25, 'toko.maju@mail', '', false]]);
+    return wb;
+}
 
-console.log('B2, B3   :', sh.value('B2'), sh.value('B3'));
-console.log('C2       :', sh.value('C2'));
-console.log('ditolak  :', pesan.join(' | '));
-console.log('pilihan  :', sh.choicesAt('E2').join(', '));
-console.log('E2       :', sh.value('E2'), '-> tidak valid:', sh.invalidAt('E2'));
-console.log('aturan D2:', sh.validationAt('D2').kind);
+const wb = buatPesanan();
+const psn = wb.sheet('Pesanan');
+const ditolak = [];
+wb.on('reject', (e) => ditolak.push(e.reason));
+const orang = { source: 'user' };                          // seperti diketik di layar: aturan diperiksa
+
+psn.setValues('C3', 'XXX-99', orang);                      // bukan kode produk
+psn.setValues('D3', 0, orang);                             // di luar 1..500
+psn.setValues('A3', 46300, orang);                         // sebelum hari ini
+psn.setValues('F3', 'Tolong telepon dulu sebelum truk berangkat ke lokasi proyek', orang);
+psn.setValues('B3', 'Medan', orang);                       // list tanpa reject: ditolak juga (bawaannya menolak)
+console.log('ditolak:');
+for (const alasan of ditolak) console.log('  -', alasan);
+console.log('isi tetap    :', psn.value('C3'), psn.value('D3'), psn.value('B3'));
+
+// aturan yang hanya menandai: nilainya disimpan, sel diberi tanda
+console.log('E3           :', psn.value('E3'), '-> tidak valid:', psn.invalidAt('E3'));
+console.log('E2           :', psn.value('E2'), '-> tidak valid:', psn.invalidAt('E2'));
+
+// pilihan dropdown dibaca dari sheet Produk: produk baru langsung jadi pilihan
+console.log('pilihan C    :', psn.choicesAt('C2').length, 'kode, pertama', psn.choicesAt('C2').slice(0, 3).join(', '));
+wb.setValues('Produk', 'A14', [['GNT-01', 'Genteng metal', 'Atap', 'lembar', 38000, 45000, 500, 100]]);
+console.log('produk baru  :', psn.choicesAt('C2').length, 'kode, terakhir', psn.choicesAt('C2').slice(-1)[0]);
+psn.setValues('C3', 'GNT-01', orang);
+console.log('C3 sekarang  :', psn.value('C3'), '| bantuan D2:', psn.validationAt('D2').help);
+
+// kode tetap bisa menulis apa saja: aturan hanya untuk yang datang dari orang
+psn.setValues('D4', 9999);
+console.log('dari kode    :', psn.value('D4'), '| ditandai:', psn.invalidAt('D4'));
 ```
 <!-- /contoh -->
 
 <!-- hasil: 07-validasi.js -->
 ```text
-B2, B3   : Approved null
-C2       : null
-ditolak  : The value in B3 must be one of: Draft, Approved, Rejected | The value in C2 must be at least 0
-pilihan  : m3, kg, bh
-E2       : liter -> tidak valid: one of: m3, kg, bh
-aturan D2: checkbox
+ditolak:
+  - Kode di C3 tidak ada di daftar produk
+  - Qty di D3 harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.
+  - The value in A3 must be at least today
+  - The value in F3 must be a text whose length is at most 40
+  - The value in B3 must be one of: Jakarta, Bandung, Surabaya
+isi tetap    : BSI-13 25 Bandung
+E3           : toko.maju@mail -> tidak valid: an email address
+E2           : cv.bangunkarya@mail.com -> tidak valid: null
+pilihan C    : 12 kode, pertama SMN-01, SMN-02, BSI-10
+produk baru  : 13 kode, terakhir GNT-01
+C3 sekarang  : GNT-01 | bantuan D2: Qty 1 sampai 500
+dari kode    : 9999 | ditandai: between 1 and 500
 ```
 <!-- /hasil -->
 
-Aturan validasi ditempel ke range dan tersimpan bersama sheet. Yang tidak sesuai ditolak (bawaan), atau diterima tapi ditandai (`reject: false`).
+![Dropdown kode produk, dan tanda di email yang salah](img/dropdown.png)
 
-| `kind` | Pilihan | Di layar |
-|---|---|---|
-| `list` | `values: ['Draft', 'Approved']` | dropdown |
-| `listFrom` | `source: 'Harga!A2:A20'` | dropdown dari isi range |
-| `checkbox` | | kotak centang (`Space` untuk mencentang) |
-| `number` | `op`, `a`, `b`: `between`, `notBetween`, `gt`, `gte`, `lt`, `lte`, `eq`, `ne` | |
-| `date` | sama dengan `number`, nilainya tanggal | |
-| `textLength` | sama dengan `number`, untuk panjang teks | |
-| `text` | `op`: `contains`, `notContains` (dengan `a`), `email`, `url` | |
+<!-- contoh: 07-validasi.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatPesanan } from './07-validasi.js';
 
-Pilihan untuk semua jenis: `reject` (bawaan `true`), `help` (teks bantuan yang muncul di bawah sel yang dipilih).
-
-| Fungsi | Artinya |
-|---|---|
-| `addValidation(range, aturan)` | tambah aturan |
-| `setValidation(range, aturan)` | pasang aturan, menggantikan aturan lain yang kena range itu (seperti tombol Done di dialog) |
-| `removeValidation(range)` | hapus aturan yang kena range itu |
-| `validationAt(at)` | aturan sebuah sel, atau `null` |
-| `choicesAt(at)` | isi dropdown sel itu |
-| `invalidAt(at)` | apa yang dilanggar nilai sel itu (untuk `reject: false`), atau `null` |
-
-Pesan penolakannya dalam bahasa Inggris. Kalau mau bahasa lain, tangkap di `onReject` dan tampilkan pesanmu sendiri.
-
-![Dropdown dari validasi](img/dropdown.png)
-
-## 7.5 Conditional formatting
-
-<!-- contoh: 07-conditional.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-
-const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [['Pekerjaan', 'Progres', 'Status'], ['Galian', 1, 'Selesai'], ['Urugan', 0.4, 'Terlambat'], ['Beton', 0.75, 'Jalan']]);
-
-// satu warna: kondisi + gaya
-sh.addConditional('C2:C4', { op: 'textIs', a: 'terlambat', style: { fill: '#f4c7c3', color: '#a50e0e', bold: true } });
-// rumus sendiri, ditulis untuk sel kiri atas range; $C tetap kolom C, baris ikut geser
-sh.addConditional('A2:A4', { op: 'formula', formula: '=$C2="Selesai"', style: { strike: true } });
-// skala warna: merah ke hijau
-sh.addConditional('B2:B4', { kind: 'scale', min: { type: 'number', value: 0, color: '#e67c73' }, max: { type: 'number', value: 1, color: '#57bb8a' } });
-
-for (const a of ['C3', 'C4', 'A2', 'A3', 'B2', 'B3', 'B4']) console.log(a, JSON.stringify(sh.conditionalStyleAt(a)));
-
-// isi sel berubah: gaya ikut berubah, tanpa menulis apa pun ke sel
-sh.setValues('C3', 'Selesai');
-console.log('C3 sesudah:', JSON.stringify(sh.conditionalStyleAt('C3')), '| A3 sesudah:', JSON.stringify(sh.conditionalStyleAt('A3')));
-console.log('aturan    :', sh.conditionals().map((r) => r.op || r.kind).join(', '));
+export default function HalamanPesanan() {
+    const [wb] = useState(buatPesanan);
+    return <div style={{ height: 500 }}><Sheet workbook={wb} /></div>;
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 07-conditional.js -->
-```text
-C3 {"bold":true,"color":"#a50e0e","fill":"#f4c7c3"}
-C4 null
-A2 {"strike":true}
-A3 null
-B2 {"fill":"#57bb8a"}
-B3 {"fill":"#ad957c"}
-B4 {"fill":"#7bab84"}
-C3 sesudah: null | A3 sesudah: {"strike":true}
-aturan    : textIs, formula, scale
-```
-<!-- /hasil -->
+Yang perlu diketahui:
 
-Gaya dari conditional formatting dihitung waktu sel digambar. Tidak ada yang ditulis ke sel, jadi gaya sel sendiri tidak berubah. Aturan dicek
-berurutan, dan **yang pertama cocok menang** (seperti Google Sheets).
+- **Aturan diperiksa untuk yang datang dari orang**: diketik, di-paste, di-fill, atau ditulis kode dengan `{ source: 'user' }`. Kode yang menulis tanpa
+  `source` (bawaannya `'code'`) tidak diperiksa. Isi dari kode tetap ditandai kalau melanggar, seperti D4 di contoh.
+- **`reject: true`** (bawaan): yang melanggar ditolak. Sel tetap berisi nilai lama, pesannya tampil di layar, dan `wb.on('reject')` menerimanya.
+  **`reject: false`**: nilainya disimpan tetapi sel diberi tanda segitiga merah, seperti email di E3.
+- **`message`**: pesan penolakanmu sendiri, dalam bahasa aplikasimu. `{cell}` diganti alamat selnya. Tanpa `message`, pesannya dibuat dari aturan, dalam
+  bahasa Inggris.
+- **`help`**: teks bantuan yang tampil saat sel di range itu dipilih.
+- Kalau dua aturan menimpa sel yang sama, aturan yang terakhir dibuat yang berlaku.
 
-Aturan satu warna: `{ op, a, b, style }`. Kondisi (`op`):
-
-| `op` | Artinya |
-|---|---|
-| `empty`, `notEmpty` | kosong / ada isi |
-| `textContains`, `textNotContains`, `textStarts`, `textEnds`, `textIs` | teks (huruf besar-kecil sama saja) |
-| `dateIs`, `dateBefore`, `dateAfter` | tanggal; `a` = nomor hari, atau `'today'`, `'yesterday'`, `'tomorrow'`, `'pastWeek'`, `'pastMonth'`, `'pastYear'` |
-| `gt`, `gte`, `lt`, `lte`, `eq`, `ne`, `between`, `notBetween` | angka (`eq`/`ne` juga untuk teks) |
-| `formula` | `formula: '=$C2="Selesai"'`: rumus sendiri untuk sel kiri atas range; `$` mengunci kolom |
-
-`style` boleh berisi `bold`, `italic`, `underline`, `strike`, `color`, `fill`.
-
-Skala warna: `{ kind: 'scale', min, mid?, max }`, tiap titik `{ type, value, color }` dengan `type` = `'min'`, `'max'`, `'number'`, `'percent'`,
-`'percentile'`.
+| `kind` | Isinya | Pilihan |
+|---|---|---|
+| `list` | dropdown dari daftar tetap | `values: ['Jakarta', 'Bandung']` |
+| `listFrom` | dropdown dari isi range lain, termasuk sheet lain | `source: 'Produk!A2:A50'`. Sel kosong di range dilewati |
+| `checkbox` | kotak centang. Isinya `true` atau `false` | |
+| `number` | angka dengan syarat | `op`: `between`, `notBetween`, `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, lalu `a`, `b` |
+| `date` | tanggal dengan syarat | `op` sama dengan angka. `a` boleh nomor hari atau `'today'` |
+| `textLength` | panjang teks dengan syarat | `op` sama dengan angka |
+| `text` | teks dengan syarat | `op`: `contains`, `notContains` (dengan `a`), `email`, `url` |
 
 | Fungsi | Artinya |
 |---|---|
-| `addConditional(range, aturan)` | tambah di urutan paling belakang. Range boleh beberapa: `'A2:A20, D2:D20'`. Mengembalikan id |
-| `setConditional(id, range \| null, aturan)` | ubah aturan (`null` = range-nya tetap) |
-| `removeConditional(id)` | hapus |
-| `moveConditional(id, ke)` | ubah urutan |
-| `conditionals()` | semua aturan sheet, urut |
-| `conditionalStyleAt(at)` | gaya yang diberikan aturan ke sel itu, atau `null` |
-| `shownStyle(at)` | gaya sel sendiri ditimpa gaya dari aturan: yang benar-benar digambar |
+| `addValidation(range, aturan)` | tambah aturan. Mengembalikan id |
+| `setValidation(range, aturan)` | pasang aturan menggantikan aturan yang menimpa range itu (yang dilakukan tombol Done di dialog) |
+| `removeValidation(range)` | buang aturan yang menimpa range |
+| `validationAt(alamat)` | aturan sebuah sel, atau `null` |
+| `choicesAt(alamat)` | pilihan dropdown sebuah sel |
+| `invalidAt(alamat)` | apa yang dilanggar nilai sel itu (teks), atau `null` kalau sesuai |
 
-Di layar: Format → Conditional formatting membuka panel di kanan.
+Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([2.5](02-konsep.md#25-perubahan-event-dan-undo))
+atau aturan dan tipe kolom ([bab 10](10-aturan.md)).
 
-## 7.6 Cari dan ganti
+## 7.5 Cari dan ganti
 
 <!-- contoh: 07-cari.js -->
 ```js
 import { createWorkbook, findAll, replaceIn } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK } from './data/toko.js';
 
+// Mencari di daftar produk, dan mengganti nama merek dagang sekaligus di semua sel.
 const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [['Beton K-300', '=B1*2'], ['beton K-250', 5], ['Besi', 'Beton']]);
+const p = wb.sheet('Sheet1');
+p.setSheetProps({ name: 'Produk' });
+p.setValues('A1', [[...KOLOM_PRODUK, 'Nilai stok'], ...PRODUK.map((x, i) => [...x, `=E${i + 2}*G${i + 2}`])]);
+const alamat = (list) => list.map((x) => wb.address(x.r, x.c)).join(', ') || '(tidak ada)';
 
-const alamat = (list) => list.map((p) => wb.address(p.r, p.c)).join(', ');
-console.log('"beton"                :', alamat(findAll(wb, 'Sheet1', 'beton')));
-console.log('huruf besar-kecil sama :', alamat(findAll(wb, 'Sheet1', 'beton', { matchCase: true })));
-console.log('seluruh isi sel        :', alamat(findAll(wb, 'Sheet1', 'beton', { wholeCell: true })));
-console.log('regex                  :', alamat(findAll(wb, 'Sheet1', 'K-\\d+', { regex: true })));
-console.log('di dalam rumus         :', alamat(findAll(wb, 'Sheet1', 'B1', { inFormulas: true })));
+console.log('"semen"               :', alamat(findAll(wb, 'Produk', 'semen')));
+console.log('huruf besar-kecil     :', alamat(findAll(wb, 'Produk', 'semen', { matchCase: true })));
+console.log('seluruh isi sel       :', alamat(findAll(wb, 'Produk', 'semen', { wholeCell: true })));
+console.log('regex kode ...-0x     :', alamat(findAll(wb, 'Produk', '^[A-Z]{3}-0\\d$', { regex: true })));
+console.log('di dalam rumus        :', findAll(wb, 'Produk', '*G', { inFormulas: true }).length, 'sel rumusnya memuat "*G" (dikali stok) | tanpa inFormulas:', findAll(wb, 'Produk', '*G').length);
+console.log('angka seperti tampil  :', alamat(findAll(wb, 'Produk', '64000', { wholeCell: true })));
 
-const hasil = findAll(wb, 'Sheet1', 'K-300');
-replaceIn(wb, 'Sheet1', hasil, 'K-300', 'K-350');
-console.log('setelah ganti          :', sh.value('A1'));
+// ganti: "Cat tembok" menjadi "Cat dinding" di semua sel yang cocok, satu perubahan (satu undo)
+const ketemu = findAll(wb, 'Produk', 'Cat tembok');
+const diganti = replaceIn(wb, 'Produk', ketemu, 'Cat tembok', 'Cat dinding');
+console.log('diganti               :', diganti, 'sel ->', p.value('B6'), '|', p.value('B7'));
+// ganti dengan regex dan grup: "Pipa PVC 3/4 inch" -> "Pipa PVC 3/4\""
+const inch = findAll(wb, 'Produk', '(\\S+) inch$', { regex: true });
+replaceIn(wb, 'Produk', inch, '(\\S+) inch$', '$1"', { regex: true });
+console.log('regex                 :', p.value('B10'), '|', p.value('B11'));
+wb.undo();
+console.log('undo                  :', p.value('B10'));
 ```
 <!-- /contoh -->
 
 <!-- hasil: 07-cari.js -->
 ```text
-"beton"                : A1, A2, B3
-huruf besar-kecil sama : A2
-seluruh isi sel        : B3
-regex                  : A1, A2
-di dalam rumus         : B1
-setelah ganti          : Beton K-350
+"semen"               : B2, C2, B3, C3
+huruf besar-kecil     : (tidak ada)
+seluruh isi sel       : C2, C3
+regex kode ...-0x     : A2, A3, A6, A11, A12, A13
+di dalam rumus        : 12 sel rumusnya memuat "*G" (dikali stok) | tanpa inFormulas: 0
+angka seperti tampil  : E2
+diganti               : 2 sel -> Cat dinding 5 kg putih | Cat dinding 25 kg putih
+regex                 : Pipa PVC 3/4" | Pipa PVC 4"
+undo                  : Pipa PVC 3/4 inch
 ```
 <!-- /hasil -->
 
-| Fungsi | Artinya |
+`findAll(wb, sheet, cari, pilihan)` memberi semua sel yang cocok, urut dari kiri ke kanan dan dari atas ke bawah, sebagai `[{ r, c }]`. Yang dicari
+adalah teks seperti tampil di sel (`64000` cocok dengan sel berisi angka 64000), kecuali dengan `inFormulas`.
+
+| Pilihan | Artinya |
 |---|---|
-| `findAll(wb, sheet, teks, pilihan)` | semua sel yang cocok, urut baris lalu kolom: `[{ r, c }]` |
-| `replaceIn(wb, sheet, sel, teks, pengganti, pilihan)` | ganti di sel-sel itu, satu perubahan. Isi diganti seperti diketik ulang. Rumus tidak disentuh kecuali `inFormulas` |
+| `matchCase` | huruf besar dan kecil dibedakan |
+| `wholeCell` | seluruh isi sel harus sama, bukan sebagian |
+| `inFormulas` | cari di rumus (`=E2*G2`), bukan di hasilnya |
+| `regex` | yang dicari adalah regular expression JavaScript |
 
-Pilihan: `matchCase` (huruf besar-kecil dibedakan), `wholeCell` (seluruh isi sel harus sama), `regex` (teksnya regular expression), `inFormulas` (cari
-di rumus, bukan di hasilnya). Tanpa `inFormulas`, pencarian melihat teks yang tampil di sel.
+`replaceIn(wb, sheet, sel, cari, ganti, pilihan)` mengganti bagian yang cocok di sel-sel hasil `findAll`, lalu menulis sel itu lagi seperti diketik.
+Dengan `regex`, `$1`, `$2`, dan seterusnya di teks pengganti adalah grup tangkapan. Semua penggantian adalah satu perubahan, jadi satu undo membatalkan
+semuanya. Fungsi ini mengembalikan jumlah sel yang berubah.
 
-Di layar: `Ctrl+F` (cari), `Ctrl+H` (cari dan ganti).
+Di layar: Ctrl+F untuk mencari, Ctrl+H untuk mencari dan mengganti.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format dan locale](06-format.md) · Berikutnya: [8. Mengisi sheet dari data](08-populate.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format, locale, dan conditional formatting](06-format.md) · Berikutnya: [8. Pivot table](08-pivot.md)

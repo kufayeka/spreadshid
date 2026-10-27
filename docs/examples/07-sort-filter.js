@@ -1,29 +1,43 @@
 import { createWorkbook, sortRange } from '@kufayeka/sheet/core';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
 
+// 300 transaksi Oktober: diurutkan, lalu disaring dengan beberapa cara.
 const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [
-    ['Pekerjaan', 'Volume', 'Status'],
-    ['Galian', 120, 'Approved'],
-    ['Urugan', 40, 'Draft'],
-    ['Beton', 18.5, 'Draft'],
-    ['Besi', 2400, 'Approved']
-]);
-const kolomA = () => [1, 2, 3, 4].map((r) => sh.value(r, 0)).join(', ');
+const jual = wb.sheet('Sheet1');
+jual.setSheetProps({ name: 'Penjualan', freezeRows: 1 });
+jual.setValues('A1', [KOLOM_PENJUALAN]);
+jual.setValues('A2', barisPenjualan(penjualan(300), 2));
+jual.setValues('M1', [['Ditampilkan', '=SUBTOTAL(103, A2:A301)'], ['Omzet tampil', '=SUBTOTAL(109, K2:K301)']]);
+const lima = () => [2, 3, 4, 5, 6].map((r) => jual.value('A' + r) + ':' + jual.value('C' + r).slice(0, 3) + ':' + jual.value('K' + r)).join('  ');
 
-// sort: range tanpa header, kolom acuan, arah
-sortRange(wb, 'Sheet1', 'A2:C5', 'B', 'desc');
-console.log('urut volume turun :', kolomA());
+// ---- sort: range tanpa judul kolom, kolom acuan, arah. Rumus Total ikut barisnya
+sortRange(wb, 'Penjualan', 'A2:K301', 'K', 'desc');
+console.log('total terbesar  :', lima());
+console.log('rumus K2        :', jual.input('K2'), '(baris transaksi', jual.value('A2') + ')');
+// sort bertahap: urutan yang sama dipertahankan, jadi urutkan dari kunci terakhir ke kunci pertama
+sortRange(wb, 'Penjualan', 'A2:K301', 'C', 'asc');
+console.log('cabang, lalu total:', lima());
+wb.undo(); wb.undo();
+console.log('dua kali undo   :', lima());
 
-// filter: range dengan header di baris pertamanya
-sh.createFilter('A1:C5');
-console.log('nilai kolom C     :', JSON.stringify(sh.filterValues('C')));
-sh.setFilterColumn('C', { hidden: ['Draft'] });                    // berdasarkan nilai
-const tampil = () => [1, 2, 3, 4].filter((r) => !sh.filteredOut(r)).map((r) => sh.value(r, 0)).join(', ');
-console.log('hanya Approved    :', tampil());
-sh.setFilterColumn('C', null);
-sh.setFilterColumn('B', { op: 'between', a: 30, b: 200 });          // berdasarkan kondisi
-console.log('volume 30..200    :', tampil());
-console.log('filter            :', JSON.stringify(sh.filterOf().columns));
-sh.removeFilter();
-console.log('filter dihapus    :', tampil());
+// ---- filter: range dengan judul kolom di baris pertamanya. Satu sheet punya satu filter
+jual.createFilter('A1:K301');
+console.log('pilihan cabang  :', JSON.stringify(jual.filterValues('C')));
+// menurut nilai: yang disebut di hidden disembunyikan
+jual.setFilterColumn('C', { hidden: ['Bandung', 'Surabaya'] });
+console.log('hanya Jakarta   :', jual.value('N1'), 'baris | omzet', jual.value('N2'));
+// menurut kondisi, digabung dengan kolom lain: baris harus lolos semua kolom
+jual.setFilterColumn('K', { op: 'gt', a: 5000000 });
+console.log('+ total > 5 jt  :', jual.value('N1'), 'baris | omzet', jual.value('N2'));
+// menurut rumus, ditulis untuk baris pertama di bawah judul: transaksi dengan diskon, kategori semen atau besi
+jual.setFilterColumn('C', null);
+jual.setFilterColumn('K', null);
+jual.setFilterColumn('J', { op: 'formula', formula: '=AND(J2>0, OR(G2="Semen", G2="Besi"))' });
+console.log('diskon semen/besi:', jual.value('N1'), 'baris | omzet', jual.value('N2'));
+const tampil = [];
+for (let r = 1; r <= 300 && tampil.length < 4; r++) if (!jual.filteredOut(r)) tampil.push(jual.value(r, 0) + ' ' + jual.value(r, 6) + ' ' + jual.value(r, 9));
+console.log('contoh baris    :', tampil.join(' | '));
+console.log('filter disimpan :', Object.keys(jual.filterOf().columns).length, 'kolom, di props sheet');
+
+jual.removeFilter();
+console.log('filter dihapus  :', jual.value('N1'), 'baris');
