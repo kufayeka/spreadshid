@@ -150,5 +150,23 @@ sh.setValues('A1', [
     ok('a pivot table in a workbook: values, another sheet, formulas read it, worked out again, locked, smaller, undone, saved, taken away');
 }
 
+// dates grouped by month and ISO week, and groups sorted by a value (the biggest first) with ties by name
+{
+    const records = [
+        { Tanggal: 46296, Produk: 'Semen', Total: 100 },   // 1 Oct 2026, a Thursday: ISO week 40
+        { Tanggal: 46300, Produk: 'Besi', Total: 300 },    // 5 Oct 2026, a Monday: week 41
+        { Tanggal: 46327, Produk: 'Cat', Total: 300 },     // 1 Nov 2026
+        { Tanggal: 46328, Produk: 'Semen', Total: 50 }
+    ];
+    const byMonth = pivot(records, { rows: ['Tanggal'], group: { Tanggal: 'month' }, values: [{ field: 'Total' }], totals: false });
+    assert.deepStrictEqual(byMonth.cells.slice(1), [['2026-10', 400], ['2026-11', 350]]);
+    const byWeek = pivot(records, { rows: ['Tanggal'], group: { Tanggal: 'week' }, values: [{ field: 'Total' }], totals: false });
+    assert.deepStrictEqual(byWeek.cells.slice(1).map((r) => r[0]), ['2026-W40', '2026-W41', '2026-W44']);
+    const ranked = pivot(records, { rows: ['Produk'], values: [{ field: 'Total', as: 'Omzet' }], sort: { Produk: { by: 'Omzet', dir: 'desc' } }, totals: false });
+    assert.deepStrictEqual(ranked.cells.slice(1), [['Besi', 300], ['Cat', 300], ['Semen', 150]]);
+    assert.throws(() => pivot(records, { rows: ['Produk'], values: [{ field: 'Total' }], sort: { Produk: { by: 'Qty' } } }), /sorts by a value it has/);
+    ok('dates grouped by month and week, groups sorted by a value');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');

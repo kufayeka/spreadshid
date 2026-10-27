@@ -84,8 +84,19 @@ export function PivotPanel({ workbook: wb, sheetId: s, id, revision, onError, on
     const change = (next) => { try { wb.setPivot(s, id, { spec: { ...spec, ...next } }, how); } catch (err) { onError(err.message); } };
     const rows = spec.rows || [], cols = spec.columns || [], values = spec.values || [], filters = spec.filters || {};
     const unused = (list) => data.fields.filter((f) => !list.includes(f));
-    const dirOf = (f) => (spec.sort && spec.sort[f]) || 'asc';
-    const setDir = (f, dir) => change({ sort: { ...(spec.sort || {}), [f]: dir } });
+    // the order of a field's groups: by their names ('asc' | 'desc'), or by a value ({ by, dir }: the biggest totals first)
+    const sortOf = (f) => (spec.sort && spec.sort[f]) || 'asc';
+    const dirOf = (f) => { const h = sortOf(f); return (typeof h === 'object' ? h.dir : h) || 'asc'; };
+    const byOf = (f) => { const h = sortOf(f); return typeof h === 'object' && h.by ? h.by : ''; };
+    const setSort = (f, dir, by) => change({ sort: { ...(spec.sort || {}), [f]: by ? { by, dir } : dir } });
+    // dates put together by year, quarter, month or week: offered for a field that holds numbers (a date is a day number)
+    const holdsNumbers = (f) => data.records.some((r) => typeof r[f] === 'number');
+    const groupOf = (f) => (spec.group && spec.group[f]) || '';
+    const setGroup = (f, unit) => {
+        const next = { ...(spec.group || {}) };
+        if (unit) next[f] = unit; else delete next[f];
+        change({ group: Object.keys(next).length ? next : undefined });
+    };
 
     // a list of group fields (Rows or Columns): each with its order and a remove button, and a select to add one
     const groups = (label, key, list) => (
@@ -94,9 +105,19 @@ export function PivotPanel({ workbook: wb, sheetId: s, id, revision, onError, on
             {list.map((f) => (
                 <div key={f} className="ks-pivot-item">
                     <b>{f}</b>
-                    <select aria-label={'Order of ' + f} value={dirOf(f)} onChange={(e) => setDir(f, e.target.value)}>
+                    <select aria-label={'Order of ' + f} value={dirOf(f)} onChange={(e) => setSort(f, e.target.value, byOf(f))}>
                         <option value="asc">Ascending</option><option value="desc">Descending</option>
                     </select>
+                    <select aria-label={'Sort ' + f + ' by'} value={byOf(f)} onChange={(e) => setSort(f, dirOf(f), e.target.value)}>
+                        <option value="">by {f}</option>
+                        {values.map((v) => <option key={v.as || v.field} value={v.as || v.field}>by {String(v.fn || 'SUM').toUpperCase()} of {v.field}</option>)}
+                    </select>
+                    {holdsNumbers(f) || groupOf(f) ? (
+                        <select aria-label={'Group ' + f} value={groupOf(f)} onChange={(e) => setGroup(f, e.target.value)}>
+                            <option value="">No date groups</option><option value="year">Year</option><option value="quarter">Quarter</option>
+                            <option value="month">Month</option><option value="week">Week</option>
+                        </select>
+                    ) : null}
                     <button type="button" className="ks-tool" aria-label={'Remove ' + f + ' from ' + label} title="Remove" onClick={() => change({ [key]: list.filter((x) => x !== f) })}>✕</button>
                 </div>
             ))}

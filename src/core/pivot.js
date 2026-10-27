@@ -10,11 +10,14 @@
 //       values: [{ field: 'Jumlah', fn: 'SUM' }],          what is summed in each (SUM, COUNT, COUNTA, COUNTUNIQUE, AVERAGE, MAX, MIN, MEDIAN, PRODUCT)
 //       filters: { Status: { hidden: ['Draft'] } },        records left out
 //       sort: { Bab: 'asc' },                              the order of the groups of a field ('asc' | 'desc'), by their names; the default is 'asc'
+//       sort: { Produk: { by: 'Omzet', dir: 'desc' } },    or by a value: the groups with the biggest Omzet first (by: a value's `as`, or its field)
+//       group: { Tanggal: 'month' },                       dates put together: 'year', 'quarter', 'month' (2026-10), 'week' (2026-W43, ISO)
 //       totals: true                                       a row and a column of grand totals (and subtotals under each outer group)
 //   })
 //   -> { cells: [[...]], header: n, rows: [...], ... }    cells is the table as it is written in a sheet
 
 import { rangeOf } from './addressing.js';
+import { serialToDate } from './format.js';
 
 /** The fields of a record table: the texts of its first row (an empty one is "Column B" ...). */
 function fieldNames(first, c1) {
@@ -95,6 +98,27 @@ function compareKeys(a, b) {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }
 
+// a date (a day number, as a date cell holds it) as the group it falls in: 2026, "2026-Q4", "2026-10", "2026-W44" (ISO weeks start on Monday). The
+// texts sort in time order. What is not a date is grouped as it is.
+const pad2 = (n) => String(n).padStart(2, '0');
+function dateGroup(v, unit) {
+    if (!isNum(v)) return keyOf(v);
+    const d = serialToDate(Math.floor(v));
+    const y = d.getUTCFullYear(), m = d.getUTCMonth();
+    if (unit === 'year') return y;
+    if (unit === 'quarter') return y + '-Q' + (Math.floor(m / 3) + 1);
+    if (unit === 'month') return y + '-' + pad2(m + 1);
+    if (unit === 'week') {
+        // ISO 8601: the week that holds the year's first Thursday is week 1
+        const t = new Date(Date.UTC(y, m, d.getUTCDate()));
+        const day = t.getUTCDay() || 7;
+        t.setUTCDate(t.getUTCDate() + 4 - day);
+        const first = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+        return t.getUTCFullYear() + '-W' + pad2(Math.ceil(((t - first) / 86400000 + 1) / 7));
+    }
+    throw new Error('a pivot groups dates by year, quarter, month or week, not by ' + unit);
+}
+
 /** True when a record passes the filters ({ field: { hidden: [values] } }). */
 function passes(rec, filters) {
     for (const [field, f] of Object.entries(filters || {})) {
@@ -111,7 +135,7 @@ function passes(rec, filters) {
  * The first `header` rows of cells are the header (the names of the value fields, and the column groups); the first rows.length columns of each row
  * under it are the row groups.
  * @param {object[]} records
- * @param {{ rows?: string[], columns?: string[], values: { field: string, fn?: string, as?: string }[], filters?: object, sort?: object, totals?: boolean }} spec
+ * @param {{ rows?: string[], columns?: string[], values: { field: string, fn?: string, as?: string }[], filters?: object, sort?: object, group?: object, totals?: boolean }} spec
  */
 export function pivot(records, spec) {
     const rowFields = spec.rows || [], colFields = spec.columns || [];
@@ -131,24 +155,42 @@ export function pivot(records, spec) {
     };
     const rowKeySet = new Map(), colKeySet = new Map();
     for (const rec of kept) {
-        const rk = rowFields.map((f) => keyOf(rec[f])), ck = colFields.map((f) => keyOf(rec[f]));
+        const keyFor = (f) => (spec.group && spec.group[f] ? dateGroup(rec[f], spec.group[f]) : keyOf(rec[f]));
+        const rk = rowFields.map(keyFor), ck = colFields.map(keyFor);
         rowKeySet.set(JSON.stringify(rk), rk);
         colKeySet.set(JSON.stringify(ck), ck);
         // every level of the groups gets the record: the subtotals and the totals are worked out from the records, not from other sums (an average of
         // averages would be wrong)
         for (let i = 0; i <= rk.length; i++) for (let j = 0; j <= ck.length; j++) put(rk.slice(0, i), ck.slice(0, j), rec);
     }
-    const order = (fields) => (a, b) => {
+    // a group's total of one value (all the columns together), for groups sorted by a value
+    const totalOf = (rk, ck, i) => { const bucket = buckets.get(JSON.stringify([rk, ck])); return PIVOT_FUNCTIONS[values[i].fn](bucket ? bucket[i] : []); };
+    const valueIndex = (by) => {
+        const i = values.findIndex((v) => v.as === by || v.field === by || v.fn + ' of ' + v.field === by);
+        if (i < 0) throw new Error('a pivot sorts by a value it has: "' + by + '" is not one of ' + values.map((v) => v.as || v.field).join(', '));
+        return i;
+    };
+    const order = (fields, rows) => (a, b) => {
         for (let i = 0; i < fields.length; i++) {
-            const dir = (spec.sort && spec.sort[fields[i]]) === 'desc' ? -1 : 1;
-            const c = compareKeys(a[i], b[i]);
-            if (c) return c * dir;
+            const how = spec.sort && spec.sort[fields[i]];
+            const dir = (how && typeof how === 'object' ? how.dir : how) === 'desc' ? -1 : 1;
+            let c;
+            if (how && typeof how === 'object' && how.by) {
+                // by a value: the totals of the two groups at this level (the same outer groups, as the earlier fields are equal here)
+                const at = valueIndex(how.by);
+                const ka = a.slice(0, i + 1), kb = b.slice(0, i + 1);
+                const va = rows ? totalOf(ka, [], at) : totalOf([], ka, at), vb = rows ? totalOf(kb, [], at) : totalOf([], kb, at);
+                c = (isNum(va) && isNum(vb) ? va - vb : compareKeys(va, vb)) * dir;
+                // two groups with the same total stand by their names, A to Z
+                if (!c) c = compareKeys(a[i], b[i]);
+            } else c = compareKeys(a[i], b[i]) * dir;
+            if (c) return c;
         }
         return 0;
     };
-    const rowKeys = [...rowKeySet.values()].sort(order(rowFields));
+    const rowKeys = [...rowKeySet.values()].sort(order(rowFields, true));
     // no column fields: one column group, there even when no record is left (the table still has its value columns)
-    const colKeys = colFields.length ? [...colKeySet.values()].sort(order(colFields)) : [[]];
+    const colKeys = colFields.length ? [...colKeySet.values()].sort(order(colFields, false)) : [[]];
     // a row group and a column group that have no record together are blank (as in Google Sheets); a total with no record is what its function makes
     // of nothing (0 for SUM and COUNT), as the grand total of a table whose records are all filtered out
     const value = (rk, ck, i) => { const b = buckets.get(JSON.stringify([rk, ck])); if (!b && rk.length && ck.length) return null; return PIVOT_FUNCTIONS[values[i].fn](b ? b[i] : []); };
