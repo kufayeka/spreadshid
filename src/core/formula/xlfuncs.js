@@ -128,6 +128,28 @@ def("COUNT", 1, Infinity, (a) => {
     return n;
 }, { errors: true });
 def("COUNTA", 1, Infinity, (a) => { let n = 0; a.forEach((x) => { (isRange(x) ? x.values() : [x]).forEach((v) => { if (v !== null && v !== undefined) n++; }); }); return n; }, { errors: true });
+// SUBTOTAL(code, ranges...): the function of the code over the ranges, leaving out the cells that are SUBTOTALs themselves (so totals of totals do not
+// count twice), and the rows a filter hides; 101-111 leave out every hidden row (by hand, or in a folded group) too. As in Excel and Google Sheets.
+const SUBTOTAL_OF = { 1: "AVERAGE", 2: "COUNT", 3: "COUNTA", 4: "MAX", 5: "MIN", 6: "PRODUCT", 7: "STDEV", 8: "STDEV.P", 9: "SUM", 10: "VAR", 11: "VAR.P" };
+def("SUBTOTAL", 2, Infinity, (a, env) => {
+    const code = int(isRange(a[0]) ? a[0].at(0, 0) : a[0]);
+    if (isError(code)) return code;
+    const all = code > 100, name = SUBTOTAL_OF[all ? code - 100 : code];
+    if (!name) return ERR.VALUE;
+    const kept = a.slice(1).map((x) => {
+        if (!isRange(x)) return x;
+        // a range that does not know its sheet (no sheet: a formula that is not kept by ids) is taken whole
+        const values = [];
+        for (let r = x.r1; r <= x.r2; r++) {
+            if (x.s && env.rowHidden && env.rowHidden(x.s, r, all)) continue;
+            for (let c = x.c1; c <= x.c2; c++) if (!(x.s && env.isSubtotal && env.isSubtotal(x.s, r, c))) values.push(x._get(r, c));
+        }
+        return new XlRange(0, 0, values.length - 1, 0, (r) => values[r]);
+    });
+    const f = FUNCTIONS[name];
+    if (!f.errors) { const bad = kept.find((x) => isError(x)); if (bad) return bad; }
+    return f.fn(kept, env);
+}, { refs: true, errors: true });
 def("COUNTBLANK", 1, 1, (a) => (isRange(a[0]) ? a[0].values() : [a[0]]).filter((v) => v === null || v === "").length, { errors: true });
 def("ROUND", 2, 2, (a) => { const n = toNumber(a[0]), d = int(a[1]); return isError(n) ? n : isError(d) ? d : roundTo(n, d, "half"); });
 def("ROUNDUP", 2, 2, (a) => { const n = toNumber(a[0]), d = int(a[1]); return isError(n) ? n : isError(d) ? d : roundTo(n, d, "up"); });

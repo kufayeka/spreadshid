@@ -172,6 +172,17 @@ export function createWorkbook(doc, options) {
             return fmt && fmt.type === 'money' ? (fmt.decimals === undefined ? 2 : fmt.decimals) : null;
         },
         now: () => (opt.now ? opt.now() : new Date()),
+        // is row r hidden by the filter, or (byHand) also hidden by hand or in a folded group (for SUBTOTAL)
+        rowHidden(s, r, byHand) {
+            const sheet = sheets.get(s);
+            const rid = sheet && sheet.rowOrder[r];
+            if (!rid) return false;
+            if (filteredOf(sheet).has(rid)) return true;
+            if (!byHand) return false;
+            if (sheet.rows.get(rid).props.hidden) return true;
+            if (!sheet.rowAxis) rowAxis(s);
+            return sheet.rowOutline.hidden.has(r);
+        },
         // named ranges (kept in the settings, so they are saved, undone and checked as the workbook's own): found by id, else by the text typed
         nameId: (text) => { const n = findName(text); return n ? n.id : null; },
         nameRect(ref) {
@@ -364,6 +375,8 @@ export function createWorkbook(doc, options) {
         rowProps(op) {
             const sheet = sheetOf(op.sheet);
             for (const ch of op.changes) { sheet.rows.get(ch.id).props = clone(ch.after || {}); touchRow(ch.id); }
+            // a row hidden or shown (by hand, or a group folded): SUBTOTAL works out again
+            if (op.changes.some((ch) => ['hidden', 'level', 'fold'].some((k) => JSON.stringify((ch.before || {})[k]) !== JSON.stringify((ch.after || {})[k])))) engine.visibilityChanged();
         },
         colProps(op) {
             const sheet = sheetOf(op.sheet);
@@ -380,10 +393,13 @@ export function createWorkbook(doc, options) {
         },
         sheetProps(op) {
             const sheet = sheetOf(op.sheet);
+            let changedFilter = false;
             // a filter changed: its rows are filtered again when the rows are next laid out
-            if (JSON.stringify(sheet.props.filter || null) !== JSON.stringify((op.after && op.after.filter) || null)) sheet.rowAxis = null;
+            if (JSON.stringify(sheet.props.filter || null) !== JSON.stringify((op.after && op.after.filter) || null)) { sheet.rowAxis = null; sheet.filteredKey = undefined; changedFilter = true; }
             sheet.props = clone(op.after || {});
             dirty.sheets.set(sheet.id, changeNo);
+            // the filter changed: SUBTOTAL works out again (after the props are in, so it reads the new filter)
+            if (changedFilter) engine.visibilityChanged();
             // a renamed sheet changes no value: the formulas into it keep it by id, and only read with its new name
         },
         addSheet(op) {

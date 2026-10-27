@@ -75,6 +75,7 @@ export function createEngine(host) {
     const pendingInColumn = new Map();// column id -> Set of entries in that column that have no value
     const volatile = new Set();       // entries that read the clock (NOW, TODAY, RAND)
     const nameReaders = new Set();    // entries that read a named range (it can point into any sheet, and be moved to another range)
+    const hiddenReaders = new Set();  // entries that ask which rows are hidden (SUBTOTAL): worked out again when a filter or a group changes
     let structure = 0;                // raised whenever rows or columns move: the positions kept for ranges are old after it
 
     function entryAt(row, col) { const m = entries.get(row); return m ? m.get(col) : undefined; }
@@ -130,6 +131,7 @@ export function createEngine(host) {
         }
         for (const set of positional.values()) set.delete(e);
         volatile.delete(e);
+        hiddenReaders.delete(e);
     }
 
     /** Where reference number i of a formula points now (kept until rows or columns move), or null for #REF!. */
@@ -248,17 +250,28 @@ export function createEngine(host) {
                 // ROW(A5) and the like ask where the cell stands: the answer changes when rows move
                 if (asRange) mark(rect.s);
                 const rows = host.rowOrder(rect.s), cols = host.colOrder(rect.s);
-                return new XlRange(rect.r1, rect.c1, rect.r2, rect.c2, (r, c) => {
+                const range = new XlRange(rect.r1, rect.c1, rect.r2, rect.c2, (r, c) => {
                     const row = rows[r], col = cols[c];
                     return row === undefined || col === undefined ? ERR.REF : valueOfIds(rect.s, row, col);
                 });
+                // the sheet it is in, for what asks about its rows (SUBTOTAL)
+                range.s = rect.s;
+                return range;
             },
             // a formula that could not be kept by ids (it did not read) has no references; these two are here for completeness
             cell: () => ERR.REF,
             range: () => ERR.REF,
             get now() { return host.now(); },
             get at() { mark(e.s); return { s: e.s, r: host.rowIndexOf(e.s, e.row), c: host.colIndexOf(e.s, e.col) }; },
-            volatile() { volatile.add(e); }
+            volatile() { volatile.add(e); },
+            // is row r of sheet s hidden: by a filter, or (byHand) also by hand or in a folded group; the formula is worked out again when that changes
+            rowHidden(s, r, byHand) { hiddenReaders.add(e); return host.rowHidden ? host.rowHidden(s, r, byHand) : false; },
+            // is the cell (s, r, c) a SUBTOTAL itself (a total of totals leaves it out)
+            isSubtotal(s, r, c) {
+                const row = host.rowOrder(s)[r], col = host.colOrder(s)[c];
+                const x = row !== undefined && col !== undefined ? entryAt(row, col) : null;
+                return !!x && /SUBTOTAL\s*\(/i.test(x.formula.f);
+            }
         };
         return e.env;
     }
@@ -362,6 +375,8 @@ export function createEngine(host) {
             structure++;
             loseAll([...nameReaders]);
         },
+        /** Rows were hidden or shown (a filter, a group folded, a row hidden by hand): what asks about hidden rows is worked out again. */
+        visibilityChanged() { loseAll([...hiddenReaders]); },
         /** The clock moved on: NOW, TODAY and RAND are worked out again, and what reads them. */
         tick() { loseAll([...volatile]); },
         /** The formula of a cell, or undefined. */
