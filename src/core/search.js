@@ -87,6 +87,9 @@ export function replaceIn(wb, s, at, query, replacement, options) {
  * @param {'asc'|'desc'} dir
  */
 export function sortRange(wb, s, rect, by, dir) {
+    // the range and the column as a person writes them too: sortRange(wb, s, 'A2:F50', 'C', 'asc')
+    if (typeof rect === 'string') rect = rangeOf(rect);
+    if (typeof by === 'string') by = colIndex(by.toUpperCase());
     const n = rect.r2 - rect.r1 + 1;
     if (n < 2) return [];
     const perm = sortPerm(n, (i) => {

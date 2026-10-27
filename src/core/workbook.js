@@ -18,6 +18,7 @@ import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { makeConditional, conditionalStyleOf } from './conditional.js';
 import { outlineOf, MAX_LEVEL } from './outline.js';
+import { addressable } from './addressing.js';
 import { resolveAccess, actionsOfOp, refusalOf } from './policy.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
@@ -1755,5 +1756,5 @@ export function createWorkbook(doc, options) {
         /** @internal the key of a sheet's place (for excel/index.js) */
         _sheetKey: (s) => sheetOf(s).key
     };
-    return api;
+    return addressable(api);
 }
