@@ -1,17 +1,20 @@
 import { createWorkbook } from '@kufayeka/sheet/core';
 
-// angka, uang dan tanggal yang sama di tiga locale; ketikan juga dibaca sesuai locale
-const coba = [
-    { locale: 'id-ID', currency: 'IDR', angka: '1.250,5', tanggal: '26/10/2026' },
-    { locale: 'en-US', currency: 'USD', angka: '1,250.5', tanggal: '10/26/2026' },
-    { locale: 'de-DE', currency: 'EUR', angka: '1.250,5', tanggal: '26.10.2026' }
+// Nota yang sama untuk cabang di negara lain: tampilan dan cara membaca ketikan ikut locale workbook.
+const negara = [
+    { locale: 'id-ID', currency: 'IDR', ketikHarga: '72.000', ketikTanggal: '27/10/2026', ketikDiskon: '1,5%' },
+    { locale: 'en-US', currency: 'USD', ketikHarga: '72,000', ketikTanggal: '10/27/2026', ketikDiskon: '1.5%' },
+    { locale: 'de-DE', currency: 'EUR', ketikHarga: '72.000', ketikTanggal: '27.10.2026', ketikDiskon: '1,5%' },
+    { locale: 'ja-JP', currency: 'JPY', ketikHarga: '72,000', ketikTanggal: '2026/10/27', ketikDiskon: '1.5%' }
 ];
-for (const { locale, currency, angka, tanggal } of coba) {
+for (const { locale, currency, ketikHarga, ketikTanggal, ketikDiskon } of negara) {
     const wb = createWorkbook();
     wb.setSettings({ locale, currency });
-    const sh = wb.sheet('Sheet1');
-    sh.setValues('A1', [[angka, 1250000, tanggal]]);
-    sh.setStyle('B1', { format: { type: 'money', decimals: 2 } });
-    console.log(locale, '| ketik', angka.padEnd(7), '->', String(sh.value('A1')).padEnd(6), '| uang:', sh.display('B1').text.padEnd(16),
-        '| ketik', tanggal, '->', sh.value('C1'), '->', sh.display('C1').text);
+    const nota = wb.sheet('Sheet1');
+    nota.setColProps('B', { format: { type: 'money', decimals: 2 } });
+    // seperti orang mengetik di sel: teks dibaca menurut locale (source 'user' sama dengan mengetik di layar)
+    nota.setValues('A1', [[ketikTanggal, ketikHarga, ketikDiskon]], { source: 'user' });
+    nota.setValues('B2', '=B1*40');
+    console.log(locale, '| ketik', ketikTanggal.padEnd(10), '->', nota.value('A1'), nota.display('A1').text.padEnd(10),
+        '| ketik', ketikHarga, '->', String(nota.value('B1')).padEnd(5), '| x 40 =', nota.display('B2').text.padEnd(16), '| diskon', nota.value('C1'), nota.display('C1').text);
 }

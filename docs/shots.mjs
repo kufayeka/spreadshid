@@ -47,6 +47,7 @@ export const SHOTS = [
         const q = await cellAt(js, 1, 1); await click(q.x, q.y); await wait(150); await type('Besi'); await key('Enter', 'Enter', 13); await wait(400);
     }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
     { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } },
+    { name: 'kondisional', page: '06-kondisional.page.js', clip: { x: 0, y: 110, width: 1000, height: 330 } },
     { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'data', page: '07-data.page.js', clip: { x: 0, y: 110, width: 900, height: 260 } },
     { name: 'filter-menu', page: '07-data.page.js', act: async ({ js, click, wait }) => {
