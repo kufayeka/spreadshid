@@ -18,6 +18,7 @@ import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
 import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { makeConditional, conditionalStyleOf } from './conditional.js';
 import { outlineOf, MAX_LEVEL } from './outline.js';
+import { resolveAccess, actionsOfOp, refusalOf } from './policy.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
@@ -601,6 +602,9 @@ export function createWorkbook(doc, options) {
     // ---- the host's rules and the types of columns (see access.js and types.js): not part of the workbook, never saved or undone -----------------
 
     let rules = [];
+    // the host's rules (setRules) and what the access policy gives this person (setAccess): the policy's ranges join the host's rules
+    let hostRules = [];
+    let access = resolveAccess(null);
     const types = new Map(); // sheet id -> Map(column id -> type)
 
     /**
@@ -608,9 +612,38 @@ export function createWorkbook(doc, options) {
      * @param {object[]} list
      */
     function setRules(list) {
-        rules = resolveRules(api, list || []);
+        hostRules = list || [];
+        rules = resolveRules(api, hostRules.concat(access.ranges));
         revision++;
         emit('layout', {});
+    }
+
+    /**
+     * The access policy of the workbook and the person who has it open (policy.js): what they may do, what they see, and the rules of their ranges.
+     * It is the host's (kept in its database, given again on every open); null takes it away (everything is allowed).
+     * @param {object|null} policy
+     * @param {string|{ user?: string, groups?: string[] }} who
+     */
+    function setAccess(policy, who) {
+        access = resolveAccess(policy, who);
+        rules = resolveRules(api, hostRules.concat(access.ranges));
+        revision++;
+        emit('access', accessInfo());
+        emit('layout', {});
+    }
+    const accessInfo = () => ({ owner: access.owner, roles: access.roles.slice(), ui: { ...access.ui }, message: access.message });
+
+    /**
+     * What may be done with a cell for the person who has the workbook open: { mode: 'readonly' | 'hidden' | 'invisible', message } or null (it may be
+     * changed). The host's rules and the policy's ranges decide where they say something (an 'edit' range opens it); anywhere else a person who may not
+     * edit only reads.
+     */
+    function cellMode(s, r, c, action) {
+        const m = rules.length ? modeOf(api, rules, s, r, c, revision) : null;
+        if (m) return m.mode === 'edit' ? null : m;
+        // a change made for an action of its own (a sort) needs that action, not 'edit'
+        if (!access.can('edit') && !(action && access.can(action))) return { mode: 'readonly', message: access.message || 'You can only view this sheet' };
+        return null;
     }
 
     /** The types of the columns of a sheet ({ headerRow, fields } or { columns }), or null to take them away. */
@@ -620,7 +653,7 @@ export function createWorkbook(doc, options) {
     }
 
     /** What the rules make of a cell: { mode: 'readonly'|'hidden', message } or null. */
-    const modeAt = (s, r, c) => (rules.length ? modeOf(api, rules, sheetIdOf(s), r, c, revision) : null);
+    const modeAt = (s, r, c) => cellMode(sheetIdOf(s), r, c);
 
     /** The type of a cell's column, or null (the header row of a typed sheet has none). */
     function typeAt(s, r, c) {
@@ -635,12 +668,12 @@ export function createWorkbook(doc, options) {
     const PROTECTED = 'This cell is protected: it cannot be changed here';
 
     // the first op of a change that breaks a rule, with the rule's message, or null
-    function brokenRule(ops) {
+    function brokenRule(ops, action) {
         for (const op of ops) {
             const s = typeof op.sheet === 'string' ? op.sheet : op.sheet && op.sheet.id;
             if (!s || !sheets.has(s)) continue;
             const sheet = sheets.get(s);
-            const at = (rid, cid) => { const r = grid.rowIndexOf(s, rid), c = grid.colIndexOf(s, cid); return r < 0 || c < 0 ? null : modeOf(api, rules, s, r, c, revision); };
+            const at = (rid, cid) => { const r = grid.rowIndexOf(s, rid), c = grid.colIndexOf(s, cid); return r < 0 || c < 0 ? null : cellMode(s, r, c, action); };
             if (op.t === 'cells' || op.t === 'styles') {
                 for (const ch of op.changes) { const m = at(ch.row, ch.col); if (m) return { op, message: m.message || PROTECTED }; }
             } else if (op.t === 'deleteRows') {
@@ -648,7 +681,7 @@ export function createWorkbook(doc, options) {
             } else if (op.t === 'deleteCols') {
                 for (const col of op.cols) for (const rid of sheet.rowOrder) { const m = at(rid, col.id); if (m) return { op, message: m.message || 'These columns hold protected cells: they cannot be deleted here' }; }
             } else if (op.t === 'removeSheet') {
-                if (rules.some((rule) => rule.s === op.sheet.id)) return { op, message: 'This sheet holds protected cells: it cannot be deleted here' };
+                if (rules.some((rule) => rule.s === op.sheet.id && rule.mode !== 'edit')) return { op, message: 'This sheet holds protected cells: it cannot be deleted here' };
             }
         }
         return null;
@@ -986,9 +1019,23 @@ export function createWorkbook(doc, options) {
             if (answer) accepted.push(answer);
         }
         if (!accepted.length) return [];
-        // a person's change must keep the host's rules (read-only and hidden cells); the host's own code is not stopped by them
-        if (source === 'user' && rules.length) {
-            const broken = brokenRule(accepted);
+        // a person's change must be one the access policy lets them do (the host's own code is not stopped by it): the actions it asks for, each
+        // allowed; a change made for one action (a sort writes its cells again) asks only for that one
+        if (source === 'user' && !access.owner) {
+            const asked = new Set();
+            if (how && how.action) asked.add(how.action);
+            for (const op of accepted) {
+                if (how && how.action && (op.t === 'cells' || op.t === 'styles')) continue;
+                for (const a of actionsOfOp(op)) asked.add(a);
+            }
+            // writing cells is decided per cell (an 'edit' range opens cells to a person who may not edit elsewhere): see cellMode
+            asked.delete('edit');
+            for (const a of asked) if (!access.can(a)) { emit('reject', { op: accepted[0], reason: refusalOf(a, access.message), source }); return null; }
+        }
+        // a person's change must keep the host's rules and the policy's ranges (read-only and hidden cells), and a person who may not edit writes only
+        // in the ranges open to them; the host's own code is not stopped by them
+        if (source === 'user' && (rules.length || !access.can('edit'))) {
+            const broken = brokenRule(accepted, how && how.action);
             if (broken) { emit('reject', { op: broken.op, reason: broken.message, source }); return null; }
         }
         changeNo++;
@@ -1462,6 +1509,8 @@ export function createWorkbook(doc, options) {
         rowAxis, colAxis, merges, mergeCells, unmergeCells, setAutoHeights, forEachFilledRow, rowContent,
         // the host's rules and types
         setRules, setTypes, modeAt, typeAt,
+        // access control
+        setAccess, access: accessInfo, can: (action) => access.can(action),
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
         // groups of rows and columns
@@ -1510,7 +1559,7 @@ export function createWorkbook(doc, options) {
             s = sheetIdOf(s);
             const v = api.raw(s, r, c);
             if (v === undefined || v === null) return '';
-            if (rules.length) { const m = modeOf(api, rules, s, r, c, revision); if (m && m.mode === 'hidden') return ''; }
+            if (rules.length) { const m = modeOf(api, rules, s, r, c, revision); if (m && (m.mode === 'hidden' || m.mode === 'invisible')) return ''; }
             if (isStoredFormula(v)) return formulaText(v, s, grid);
             if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
             const sheet = sheetOf(s);
@@ -1542,7 +1591,12 @@ export function createWorkbook(doc, options) {
         display(s, r, c) {
             s = sheetIdOf(s);
             // a hidden cell shows dots: its content is not read, copied or found (see access.js)
-            if (rules.length) { const m = modeOf(api, rules, s, r, c, revision); if (m && m.mode === 'hidden' && api.raw(s, r, c) !== undefined) return { text: '•••', align: 'center', kind: 'text' }; }
+            if (rules.length) {
+                const m = modeOf(api, rules, s, r, c, revision);
+                if (m && m.mode === 'hidden' && api.raw(s, r, c) !== undefined) return { text: '•••', align: 'center', kind: 'text' };
+                // an invisible cell shows nothing: nothing tells it holds anything
+                if (m && m.mode === 'invisible') return { text: '', align: 'left', kind: 'empty' };
+            }
             const value = api.value(s, r, c);
             const fmt = api.cellFormat(s, r, c);
             let extra;

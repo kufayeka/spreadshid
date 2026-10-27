@@ -110,5 +110,6 @@ export function sortRange(wb, s, rect, by, dir) {
             entries.push({ r: rect.r1 + to, c: rect.c1 + j, value: value === '' ? null : value, style: cell.style || null });
         });
     });
-    return wb.setBlock(s, entries, { source: 'user' });
+    // a sort is its own action: a person may be let sort who may not edit
+    return wb.setBlock(s, entries, { source: 'user', action: 'sort' });
 }

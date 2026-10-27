@@ -21,6 +21,7 @@ import { shiftFormula } from './formula/formula.js';
 import { colIndex } from './formula/address.js';
 import { storeFormula } from './refs.js';
 import { checkValue } from './types.js';
+import { strongerMode } from './policy.js';
 
 function parseRange(text) {
     const m = /^\s*([A-Za-z]{1,3})(\d+)\s*:\s*([A-Za-z]{1,3})(\d+)\s*$/.exec(text || '');
@@ -73,7 +74,9 @@ export function resolveRules(wb, rules) {
             const baseRow = rect ? rect.r1 : headerRow + 1;
             // the header row names the columns, it is not data: a rule given by columns leaves it alone (the name of a hidden column still shows)
             const headerRowId = cols ? wb.rowId(s, headerRow) : null;
-            out.push({ s, corners, cols, headerRowId, when: rule.when || null, baseRow, mode: rule.mode === 'hidden' ? 'hidden' : 'readonly', message: rule.message || null, cache: new Map() });
+            // the modes of access control (policy.js): edit, readonly, hidden, invisible; anything else is read only
+            const mode = ['edit', 'hidden', 'invisible'].includes(rule.mode) ? rule.mode : 'readonly';
+            out.push({ s, corners, cols, headerRowId, when: rule.when || null, baseRow, mode, message: rule.message || null, cache: new Map() });
         }
     }
     return out;
@@ -96,7 +99,8 @@ export function modeOf(wb, rules, s, r, c, revision) {
         }
         if (rule.cols && (!rule.cols.has(wb.colId(s, c)) || wb.rowId(s, r) === rule.headerRowId)) continue;
         if (rule.when && !conditionHolds(wb, rule, s, r, revision)) continue;
-        if (!found || (rule.mode === 'hidden' && found.mode !== 'hidden')) found = { mode: rule.mode, message: rule.message };
+        // where rules meet, the stronger mode wins (edit < readonly < hidden < invisible)
+        found = strongerMode(found, { mode: rule.mode, message: rule.message });
     }
     return found;
 }
