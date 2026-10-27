@@ -271,7 +271,8 @@ export function formatValue(value, format, settings, extra) {
         }
     }
     const suffix = f.suffixFrom !== undefined ? (extra && extra.suffixText ? (f.suffix || ' ') + extra.suffixText : f.suffix || '') : f.suffix || '';
-    if (text !== '' && (f.prefix || suffix)) text = (f.prefix || '') + text + suffix;
+    // the prefix and the suffix belong to the number: the title "Stok" in a column of quantities stays "Stok", not "Stok zak"
+    if (text !== '' && typeof value === 'number' && (f.prefix || suffix)) text = (f.prefix || '') + text + suffix;
     return { text, color };
 }
 

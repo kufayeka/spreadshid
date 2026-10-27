@@ -43,7 +43,8 @@
 /* the grid lines, one per row and one per column */
 .ks-line-h { position: absolute; height: 1px; background: var(--ks-grid); }
 .ks-line-v { position: absolute; width: 1px; background: var(--ks-grid); }
-.ks-text { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+/* the text stops at the edge of its cell; a text that may run on gets a wider cell from the grid (into empty neighbours), never more */
+.ks-text { display: block; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
 .ks-borders { position: absolute; inset: -1px -1px -1px -1px; pointer-events: none; }
 
 /* the headers */
