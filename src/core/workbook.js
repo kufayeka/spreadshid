@@ -1180,7 +1180,15 @@ export function createWorkbook(doc, options) {
     }
 
     /** The named ranges: { id, name, sheetId, range } (range null when what it pointed at is gone), in the order they were made. */
-    const names = () => namesOf().map((n) => { const at = nameRectOf(n); return { id: n.id, name: n.name, sheetId: n.s, range: at ? { r1: at.r1, c1: at.c1, r2: at.r2, c2: at.c2 } : null }; });
+    // `ref` is the range as a person writes it ("Penjualan!C2:C301", "'Data Toko'!A1"), for lists and logs; `range` is the same by numbers
+    const names = () => namesOf().map((n) => {
+        const at = nameRectOf(n);
+        if (!at) return { id: n.id, name: n.name, sheetId: n.s, range: null, ref: null };
+        const sheetName = sheets.has(n.s) ? String(sheets.get(n.s).props.name || '') : '';
+        const quoted = /^[A-Za-z_][A-Za-z0-9_.]*$/.test(sheetName) ? sheetName : "'" + sheetName.replace(/'/g, "''") + "'";
+        const corner = colName(at.c1) + (at.r1 + 1), other = colName(at.c2) + (at.r2 + 1);
+        return { id: n.id, name: n.name, sheetId: n.s, range: { r1: at.r1, c1: at.c1, r2: at.r2, c2: at.c2 }, ref: quoted + '!' + corner + (other === corner ? '' : ':' + other) };
+    });
 
     /** Where a name points: { sheetId, range }, or null. */
     const nameRange = (name) => { const n = findName(name); const at = n && nameRectOf(n); return at ? { sheetId: at.s, range: { r1: at.r1, c1: at.c1, r2: at.r2, c2: at.c2 } } : null; };

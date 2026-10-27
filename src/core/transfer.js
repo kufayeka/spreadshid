@@ -9,6 +9,11 @@ import { shiftFormula } from './formula/formula.js';
 import { formatTsv, parseTsv } from './clipboard.js';
 import { seriesValues } from './fill.js';
 import { displayOf } from './display.js';
+import { rangeOf } from './addressing.js';
+
+// the sheet and the rectangles as a person writes them too: copyBlock(wb, 'Penjualan', 'A2:K2'), fillBlock(wb, 'Penjualan', 'L2', 'L3:L300', 'down')
+const sheetOf = (wb, s) => (wb.sheetIds().includes(s) ? s : wb.sheetIdByName(s) || s);
+const rectOf = (rect) => (typeof rect === 'string' ? rangeOf(rect) : rect);
 
 /**
  * @typedef {object} Clip
@@ -22,6 +27,8 @@ import { displayOf } from './display.js';
 
 /** A copy of the rectangle `rect` of sheet `s`. */
 export function copyBlock(wb, s, rect, cut) {
+    s = sheetOf(wb, s);
+    rect = rectOf(rect);
     const cells = [];
     for (let r = rect.r1; r <= rect.r2; r++) {
         const row = [];
@@ -87,6 +94,8 @@ export function pastePlaces(rect, h, w, size) {
  * @returns {{ r1: number, c1: number, r2: number, c2: number }}  the cells that were pasted on (the grid selects them).
  */
 export function pasteClip(wb, s, rect, clip, only) {
+    s = sheetOf(wb, s);
+    rect = rectOf(rect);
     const places = pastePlaces(rect, clip.h, clip.w, wb.size(s));
     const entries = [];
     // a cut moves: the cells it came from are emptied (in the same change), unless the paste lands on them
@@ -108,6 +117,8 @@ export function pasteClip(wb, s, rect, clip, only) {
 
 /** Pastes text from elsewhere (tab-separated, as Excel and Google Sheets copy): each piece is read as if it was typed. */
 export function pasteText(wb, s, rect, text) {
+    s = sheetOf(wb, s);
+    rect = rectOf(rect);
     const matrix = parseTsv(text);
     if (!matrix.length) return rect;
     const w = Math.max(...matrix.map((row) => row.length));
@@ -127,6 +138,9 @@ export function pasteText(wb, s, rect, text) {
  * @param {'down'|'up'|'right'|'left'} dir
  */
 export function fillBlock(wb, s, source, target, dir, copy) {
+    s = sheetOf(wb, s);
+    source = rectOf(source);
+    target = rectOf(target);
     const vertical = dir === 'down' || dir === 'up';
     const backward = dir === 'up' || dir === 'left';
     const lines = vertical ? [source.c1, source.c2] : [source.r1, source.r2];
