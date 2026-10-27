@@ -3,13 +3,14 @@ import { Sheet } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
-// Workbook dibuat oleh kode Anda, lalu diberikan ke <Sheet>.
+// Isi workbook disiapkan oleh kode, lalu workbook-nya dikasih ke <Sheet>.
 function buatBoq() {
     const wb = createWorkbook();
-    const [s] = wb.sheetIds();
     wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-    wb.setSheetProps(s, { name: 'BOQ', freezeRows: 1 });
-    wb.setValues(s, 0, 0, [
+
+    const boq = wb.sheet('Sheet1');
+    boq.setSheetProps({ name: 'BOQ', freezeRows: 1 });
+    boq.setValues('A1', [
         ['No', 'Pekerjaan', 'Volume', 'Satuan', 'Harga satuan', 'Jumlah'],
         [1, 'Galian tanah', 120, 'm3', 85000, '=C2*E2'],
         [2, 'Urugan pasir', 40, 'm3', 210000, '=C3*E3'],
@@ -17,16 +18,16 @@ function buatBoq() {
         [4, 'Besi tulangan', 2400, 'kg', 14500, '=C5*E5'],
         ['', 'Total', '', '', '', '=SUM(F2:F5)']
     ]);
-    wb.setStyle(s, { r1: 0, c1: 0, r2: 0, c2: 5 }, { bold: true, fill: '#e8f0fe' });
-    wb.setStyle(s, { r1: 1, c1: 4, r2: 5, c2: 5 }, { format: { type: 'money', decimals: 0 } });
-    wb.setStyle(s, { r1: 5, c1: 0, r2: 5, c2: 5 }, { bold: true });
-    wb.setColProps(s, [1], { width: 160 });
-    wb.setColProps(s, [4, 5], { width: 130 });
+    boq.setStyle('A1:F1', { bold: true, fill: '#e8f0fe' });
+    boq.setStyle('E2:F6', { format: { type: 'money', decimals: 0 } });
+    boq.setStyle('A6:F6', { bold: true });
+    boq.setColProps('B', { width: 160 });
+    boq.setColProps('E:F', { width: 130 });
     return wb;
 }
 
 export default function HalamanBoq() {
-    // useState dengan fungsi: workbook dibuat sekali saja, tidak setiap render
+    // useState dengan fungsi: workbook dibuat sekali, bukan tiap render
     const [wb] = useState(buatBoq);
     return (
         <div style={{ height: 600 }}>

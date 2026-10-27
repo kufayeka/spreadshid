@@ -2,32 +2,29 @@
 
 [Daftar isi](../README.md#daftar-isi) · Berikutnya: [2. Konsep dasar](02-konsep.md)
 
-Bab ini membawa Anda dari nol sampai punya halaman dengan sheet BOQ yang berjalan: memasang paket, memasang komponen, membuat isi sheet dari kode,
-dan memakainya di Next.js.
+Dari nol sampai punya halaman dengan sheet BOQ: pasang paket, taruh komponen, isi sheet dari kode, pakai di Next.js.
 
-- [1.1 Memasang](#11-memasang)
+- [1.1 Pasang](#11-pasang)
 - [1.2 Halaman pertama](#12-halaman-pertama)
-- [1.3 Mengenal bagian layar](#13-mengenal-bagian-layar)
-- [1.4 Workbook buatan Anda sendiri](#14-workbook-buatan-anda-sendiri)
+- [1.3 Bagian-bagian layar](#13-bagian-bagian-layar)
+- [1.4 Workbook dari kode](#14-workbook-dari-kode)
 - [1.5 Next.js](#15-nextjs)
-- [1.6 Hal yang sering terlewat](#16-hal-yang-sering-terlewat)
+- [1.6 Yang sering kelewat](#16-yang-sering-kelewat)
 
-## 1.1 Memasang
+## 1.1 Pasang
 
 ```bash
 npm install @kufayeka/sheet
 ```
 
-Paket ini membutuhkan **React 18 atau lebih baru** (`react` dan `react-dom`) yang sudah ada di aplikasi Anda. Library ini tidak membawa React sendiri,
-supaya tidak ada dua salinan React di satu halaman.
+Butuh **React 18 ke atas** (`react` dan `react-dom`) yang sudah ada di aplikasimu. Library ini tidak bawa React sendiri, jadi tidak ada dua React di
+satu halaman.
 
-Ada tiga hal yang bisa di-import:
-
-| Import | Dipakai untuk |
+| Import | Buat apa |
 |---|---|
-| `import { Sheet } from '@kufayeka/sheet'` | menampilkan spreadsheet di halaman |
-| `import { createWorkbook, ... } from '@kufayeka/sheet/core'` | membuat dan mengubah isi workbook lewat kode, di browser maupun di server |
-| `import '@kufayeka/sheet/style.css'` | tampilan; cukup sekali di aplikasi Anda |
+| `import { Sheet } from '@kufayeka/sheet'` | menampilkan spreadsheet |
+| `import { createWorkbook, ... } from '@kufayeka/sheet/core'` | bikin dan ubah isi workbook dari kode, di browser atau di server |
+| `import '@kufayeka/sheet/style.css'` | tampilan; cukup sekali di aplikasi |
 
 ## 1.2 Halaman pertama
 
@@ -48,35 +45,29 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Hasilnya:
-
 ![Sheet kosong](img/mulai-cepat.png)
 
-Tanpa prop apa pun, `<Sheet>` membuat workbook kosong sendiri: satu sheet dengan 1000 baris dan 26 kolom (A sampai Z). Orang bisa langsung mengetik,
-menulis rumus, memformat, menambah sheet, dan seterusnya. Isinya hilang saat halaman ditutup, karena belum ada yang menyimpannya. Cara menyimpan ada
-di [bab 2](02-konsep.md#26-menyimpan).
+Tanpa props, `<Sheet>` bikin workbook kosong sendiri: satu sheet, 1000 baris, kolom A sampai Z. Orang langsung bisa ngetik, nulis rumus, format, nambah
+sheet. Isinya hilang begitu halaman ditutup karena belum ada yang menyimpan. Cara menyimpan ada di [2.6](02-konsep.md#26-menyimpan).
 
-## 1.3 Mengenal bagian layar
+## 1.3 Bagian-bagian layar
 
 ![Bagian-bagian layar](img/bagian-layar.png)
 
-Dari atas ke bawah:
-
 | Bagian | Isinya |
 |---|---|
-| **Menu bar** | File, Edit, View, Insert, Format, Data, seperti di Google Sheets |
-| **Toolbar** | undo/redo, paint format, zoom, format angka (Rp, %, desimal), huruf, tebal/miring/coret/garis bawah, warna, border, merge, rata, wrap, rotasi, link, fungsi, hapus format |
-| **Formula bar** | kotak nama di kiri (alamat sel atau nama range; ketik alamat lalu Enter untuk pindah), lalu isi sel aktif yang bisa diedit |
-| **Grid** | huruf kolom, nomor baris, sel; baris dan kolom bisa dibekukan (freeze), diubah ukurannya, dikelompokkan |
-| **Tab sheet** | `+` untuk sheet baru, `☰` untuk daftar semua sheet, lalu satu tab per sheet (klik kanan untuk ganti nama, duplikat, sembunyikan, geser kiri/kanan, hapus; tab juga bisa diseret) |
+| **Menu bar** | File, Edit, View, Insert, Format, Data, mirip Google Sheets |
+| **Toolbar** | undo/redo, paint format, zoom, format angka (Rp, %, desimal), font, tebal/miring/coret/garis bawah, warna, border, merge, rata, wrap, rotasi, link, fungsi, hapus format |
+| **Formula bar** | kotak nama di kiri (alamat sel atau nama range; ketik alamat lalu Enter untuk loncat), lalu isi sel aktif |
+| **Grid** | huruf kolom, nomor baris, sel. Baris dan kolom bisa dibekukan, diubah ukurannya, dikelompokkan |
+| **Tab sheet** | `+` untuk sheet baru, `☰` daftar semua sheet, lalu satu tab per sheet (klik kanan: ganti nama, duplikat, sembunyikan, geser, hapus; tab juga bisa diseret) |
 
-Setiap bagian bisa disembunyikan per orang lewat access control (bab 11), misalnya mandor di lapangan yang hanya mengisi kolom realisasi tanpa menu
-dan toolbar.
+Tiap bagian bisa disembunyikan per orang lewat access control (bab 11). Misalnya mandor di lapangan cuma isi kolom realisasi, tanpa menu dan toolbar.
 
-## 1.4 Workbook buatan Anda sendiri
+## 1.4 Workbook dari kode
 
-Biasanya isi sheet datang dari aplikasi Anda: dari database, dari template, atau dari data proyek. Untuk itu, buat **workbook** dengan
-`createWorkbook()`, isi lewat kode, lalu berikan ke `<Sheet workbook={...}>`:
+Biasanya isi sheet datang dari aplikasimu: database, template, data proyek. Bikin **workbook** pakai `createWorkbook()`, isi lewat kode, lalu kasih
+ke `<Sheet workbook={...}>`:
 
 <!-- contoh: 01-boq.page.js -->
 ```jsx
@@ -85,13 +76,14 @@ import { Sheet } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
-// Workbook dibuat oleh kode Anda, lalu diberikan ke <Sheet>.
+// Isi workbook disiapkan oleh kode, lalu workbook-nya dikasih ke <Sheet>.
 function buatBoq() {
     const wb = createWorkbook();
-    const [s] = wb.sheetIds();
     wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-    wb.setSheetProps(s, { name: 'BOQ', freezeRows: 1 });
-    wb.setValues(s, 0, 0, [
+
+    const boq = wb.sheet('Sheet1');
+    boq.setSheetProps({ name: 'BOQ', freezeRows: 1 });
+    boq.setValues('A1', [
         ['No', 'Pekerjaan', 'Volume', 'Satuan', 'Harga satuan', 'Jumlah'],
         [1, 'Galian tanah', 120, 'm3', 85000, '=C2*E2'],
         [2, 'Urugan pasir', 40, 'm3', 210000, '=C3*E3'],
@@ -99,16 +91,16 @@ function buatBoq() {
         [4, 'Besi tulangan', 2400, 'kg', 14500, '=C5*E5'],
         ['', 'Total', '', '', '', '=SUM(F2:F5)']
     ]);
-    wb.setStyle(s, { r1: 0, c1: 0, r2: 0, c2: 5 }, { bold: true, fill: '#e8f0fe' });
-    wb.setStyle(s, { r1: 1, c1: 4, r2: 5, c2: 5 }, { format: { type: 'money', decimals: 0 } });
-    wb.setStyle(s, { r1: 5, c1: 0, r2: 5, c2: 5 }, { bold: true });
-    wb.setColProps(s, [1], { width: 160 });
-    wb.setColProps(s, [4, 5], { width: 130 });
+    boq.setStyle('A1:F1', { bold: true, fill: '#e8f0fe' });
+    boq.setStyle('E2:F6', { format: { type: 'money', decimals: 0 } });
+    boq.setStyle('A6:F6', { bold: true });
+    boq.setColProps('B', { width: 160 });
+    boq.setColProps('E:F', { width: 130 });
     return wb;
 }
 
 export default function HalamanBoq() {
-    // useState dengan fungsi: workbook dibuat sekali saja, tidak setiap render
+    // useState dengan fungsi: workbook dibuat sekali, bukan tiap render
     const [wb] = useState(buatBoq);
     return (
         <div style={{ height: 600 }}>
@@ -119,31 +111,27 @@ export default function HalamanBoq() {
 ```
 <!-- /contoh -->
 
-Hasilnya:
-
 ![Sheet BOQ](img/boq.png)
-
-Penjelasan baris per baris:
 
 | Kode | Artinya |
 |---|---|
 | `createWorkbook()` | workbook baru dengan satu sheet kosong bernama `Sheet1` |
-| `wb.sheetIds()` | daftar id sheet; `[s]` mengambil yang pertama. Hampir semua fungsi butuh id sheet sebagai parameter pertama |
 | `setSettings({ locale: 'id-ID', currency: 'IDR' })` | angka ditulis `1.250,5`, uang `Rp 1.250`, tanggal `26/10/2026` |
-| `setSheetProps(s, { name: 'BOQ', freezeRows: 1 })` | nama tab, dan baris pertama dibekukan (tetap terlihat saat menggulir) |
-| `setValues(s, 0, 0, [...])` | menulis mulai dari baris 0 kolom 0 (sel **A1**); satu array per baris. Teks yang diawali `=` adalah rumus |
-| `setStyle(s, { r1, c1, r2, c2 }, {...})` | memberi gaya ke satu kotak sel. `r` = baris, `c` = kolom, semuanya mulai dari 0 |
-| `setColProps(s, [1], { width: 160 })` | lebar kolom B dalam piksel |
-| `useState(buatBoq)` | **penting:** workbook adalah objek yang menyimpan semua isi dan riwayat undo. Buat sekali, simpan di state atau ref, jangan dibuat ulang setiap render |
-| `fileName="BOQ Gedung A"` | nama file saat orang memilih File → Download |
+| `wb.sheet('Sheet1')` | ambil satu sheet (pakai nama atau id). Hasilnya punya fungsi yang sama dengan workbook, tapi tanpa perlu nyebut sheet lagi |
+| `setSheetProps({ name: 'BOQ', freezeRows: 1 })` | nama tab, dan baris pertama dibekukan (tetap kelihatan waktu scroll) |
+| `setValues('A1', [...])` | tulis mulai dari A1, satu array per baris. Teks yang diawali `=` jadi rumus |
+| `setStyle('A1:F1', {...})` | kasih gaya ke range. Beberapa range sekaligus juga bisa: `'A1:F1, A6:F6'` |
+| `setColProps('E:F', { width: 130 })` | lebar kolom E sampai F, dalam piksel |
+| `useState(buatBoq)` | workbook menyimpan semua isi dan riwayat undo. Bikin sekali, simpan di state atau ref, jangan dibikin ulang tiap render |
+| `fileName="BOQ Gedung A"` | nama file waktu orang pilih File → Download |
 
-> **Baris dan kolom dihitung dari 0 di kode, dari 1 di layar.** Sel `C2` di layar adalah baris 1, kolom 2 di kode. Ini sama seperti indeks array
-> JavaScript. Alamat dalam teks (rumus, `select('B2:C4')`) tetap memakai cara layar.
+Semua fungsi juga bisa dipanggil dengan nomor baris dan kolom (mulai dari 0) kalau lebih enak, misalnya waktu looping. Penjelasannya di
+[2.2](02-konsep.md#22-alamat-sel).
 
 ## 1.5 Next.js
 
-`<Sheet>` adalah **client component**: ia memakai state, event mouse dan keyboard, dan DOM. Berkas `@kufayeka/sheet` sudah diawali `"use client"`,
-jadi di App Router Anda bisa memakainya langsung di halaman server tanpa `dynamic(..., { ssr: false })`:
+`<Sheet>` itu **client component**: pakai state, event mouse dan keyboard, dan DOM. File `@kufayeka/sheet` sudah diawali `"use client"`, jadi di App
+Router bisa langsung dipakai di halaman, tidak perlu `dynamic(..., { ssr: false })`:
 
 <!-- contoh: 01-next-page.js -->
 ```js
@@ -162,21 +150,21 @@ export default function Page() {
 ```
 <!-- /contoh -->
 
-Next.js tetap merender client component sekali di server untuk HTML awal. Sheet aman di tahap itu: ia tidak menyentuh `window` atau `document`
-saat render (test `ssr.test.js` dan `docs.test.js` memeriksanya). Ukuran layar diukur setelah halaman tampil di browser.
+Next.js tetap merender client component sekali di server buat HTML awal. Sheet aman di tahap itu karena tidak menyentuh `window` atau `document` waktu
+render (dicek oleh `ssr.test.js` dan `docs.test.js`). Ukuran layar baru diukur setelah halaman tampil di browser.
 
-Kalau workbook Anda dibuat dengan `createWorkbook()` di dalam komponen (seperti contoh BOQ), komponen itu juga harus client component. Tambahkan
-`'use client';` di baris pertama berkasnya.
+Kalau workbook dibikin di dalam komponen (seperti contoh BOQ), komponen itu juga harus client component: tambahkan `'use client';` di baris pertama
+filenya.
 
-Untuk **Vite, Create React App, atau React biasa**, tidak ada yang perlu diatur. Pakai seperti contoh di 1.2.
+Vite, Create React App, atau React biasa: tidak ada yang perlu diatur.
 
-## 1.6 Hal yang sering terlewat
+## 1.6 Yang sering kelewat
 
-| Gejala | Sebab | Perbaikan |
+| Gejala | Sebab | Solusi |
 |---|---|---|
-| Sheet tidak terlihat, tingginya 0 | pembungkusnya tidak punya tinggi | beri tinggi: `style={{ height: 600 }}`, `100vh`, atau `flex: 1` di dalam kolom flex yang punya tinggi |
+| Sheet tidak kelihatan, tingginya 0 | pembungkusnya tidak punya tinggi | kasih tinggi: `style={{ height: 600 }}`, `100vh`, atau `flex: 1` di kolom flex yang punya tinggi |
 | Tampilan berantakan, tanpa garis | CSS belum di-import | `import '@kufayeka/sheet/style.css'` sekali di aplikasi |
-| Isi kembali kosong / undo hilang setiap render | `createWorkbook()` dipanggil langsung di badan komponen | `const [wb] = useState(createWorkbook)` atau `useState(buatBoq)` |
+| Isi balik kosong / undo hilang tiap render | `createWorkbook()` dipanggil langsung di badan komponen | `const [wb] = useState(createWorkbook)` atau `useState(buatBoq)` |
 | Angka tampil `1250.5`, bukan `1.250,5` | locale bawaan `en-US` | `wb.setSettings({ locale: 'id-ID', currency: 'IDR' })` |
 
 [Daftar isi](../README.md#daftar-isi) · Berikutnya: [2. Konsep dasar](02-konsep.md)

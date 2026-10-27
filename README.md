@@ -1,13 +1,13 @@
 # @kufayeka/sheet
 
-Spreadsheet untuk React yang terasa seperti Google Sheets. Orang yang memakainya membuat dan merapikan sheet sendiri lewat toolbar dan menu: rumus,
-format Rupiah, merge, filter, grup baris, komentar, import dan download Excel. Sementara itu, **kode aplikasi Anda tetap memegang kendali penuh**:
-setiap perubahan bisa diizinkan, diubah, atau ditolak, dan setiap orang hanya bisa melakukan apa yang diberikan perannya.
+Spreadsheet untuk React yang rasanya seperti Google Sheets. Orang bisa bikin dan merapikan sheet sendiri lewat toolbar dan menu: rumus, format
+Rupiah, merge, filter, grup baris, komentar, import dan download Excel. Kode aplikasimu tetap pegang kendali: tiap perubahan bisa diizinkan, diubah,
+atau ditolak, dan tiap orang cuma bisa melakukan apa yang dikasih perannya.
 
 ![Sheet BOQ dengan rumus dan format Rupiah](docs/img/boq.png)
 
-Library ini ditulis dalam JavaScript dengan komentar JSDoc. Deklarasi tipe untuk TypeScript (`.d.ts`) dibuat dari komentar itu saat build, jadi editor
-Anda tetap memberi saran nama fungsi dan parameter.
+Ditulis dalam JavaScript dengan JSDoc. File `.d.ts` untuk TypeScript dibuat dari situ waktu build, jadi editor tetap kasih saran nama fungsi dan
+parameter.
 
 ## Pasang
 
@@ -15,7 +15,7 @@ Anda tetap memberi saran nama fungsi dan parameter.
 npm install @kufayeka/sheet
 ```
 
-Butuh `react` dan `react-dom` versi 18 atau lebih baru di aplikasi Anda.
+Butuh `react` dan `react-dom` versi 18 ke atas.
 
 ## Contoh terkecil
 
@@ -41,15 +41,14 @@ export default function Halaman() {
 | Import | Isinya | Jalan di |
 |---|---|---|
 | `@kufayeka/sheet` | komponen `<Sheet>`: grid, toolbar, menu, panel | browser (sudah bertanda `"use client"` untuk Next.js) |
-| `@kufayeka/sheet/core` | workbook, rumus, format, Excel, access control, tanpa React | browser **dan** server Node, dengan kode yang sama |
+| `@kufayeka/sheet/core` | workbook, rumus, format, Excel, access control, tanpa React | browser dan server Node, kodenya sama |
 | `@kufayeka/sheet/style.css` | tampilan; semua warna dan ukuran berupa variabel CSS | |
 
-Pembagian ini penting: server Anda (misalnya Nexa API Maker) memakai `@kufayeka/sheet/core` untuk memeriksa setiap simpanan dengan aturan yang sama
-persis dengan yang dipakai browser.
+Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa tiap simpanan dengan aturan yang sama dengan di browser.
 
 ## Daftar isi
 
-1. [Mulai cepat](docs/01-mulai-cepat.md): memasang, halaman pertama, workbook buatan sendiri, Next.js
+1. [Mulai cepat](docs/01-mulai-cepat.md): pasang, halaman pertama, workbook buatan sendiri, Next.js
 2. [Konsep dasar](docs/02-konsep.md): workbook, sheet, alamat sel, id baris dan kolom, perubahan (op), undo, menyimpan
 3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): semua props, event, handle (`ref`), keyboard, tema
 4. API workbook *(menyusul)*
@@ -65,8 +64,8 @@ persis dengan yang dipakai browser.
 14. Performa *(menyusul)*
 15. Referensi lengkap *(menyusul)*
 
-## Tentang dokumentasi ini
+## Soal dokumentasi ini
 
-Semua contoh kode di dokumentasi ini adalah file sungguhan di [`docs/examples/`](docs/examples/). Kode dan hasil yang tercetak di halaman disisipkan
-oleh `node docs/build.mjs`, dan gambar diambil dari contoh yang sama di Chrome oleh `node docs/shots.mjs`. Test `test/docs.test.js` gagal kalau ada
-contoh yang tidak lagi berjalan atau halaman yang tidak sama dengan hasil terbarunya. Jadi yang Anda baca di sini memang yang terjadi.
+Semua contoh kode di sini adalah file di [`docs/examples/`](docs/examples/). Kode dan hasil cetaknya dimasukkan ke halaman oleh `npm run docs`, dan
+gambarnya diambil dari contoh yang sama di Chrome oleh `npm run docs:shots`. `test/docs.test.js` gagal kalau ada contoh yang sudah tidak jalan atau
+halaman yang beda dengan hasil terbaru.

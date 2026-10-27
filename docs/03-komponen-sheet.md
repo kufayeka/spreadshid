@@ -2,8 +2,8 @@
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md)
 
-`<Sheet>` adalah satu-satunya komponen React di library ini. Bab ini menjelaskan semua props-nya, event-nya, apa yang bisa diminta kode Anda lewat
-`ref`, tombol keyboard, dan cara mengubah tampilannya.
+`<Sheet>` adalah satu-satunya komponen React di library ini. Isinya: semua props, event, apa yang bisa diminta kodemu lewat `ref`, tombol keyboard, dan cara
+mengubah tampilan.
 
 - [3.1 Props](#31-props)
 - [3.2 Event](#32-event)
@@ -13,31 +13,31 @@
 
 ## 3.1 Props
 
-Semua props boleh dikosongkan.
+Semua props boleh tidak diisi.
 
 | Prop | Tipe | Bawaan | Artinya |
 |---|---|---|---|
-| `workbook` | workbook dari `createWorkbook()` | workbook kosong baru | workbook yang ditampilkan dan diubah. Dengan prop ini kode Anda memegang isinya: membaca, mengubah, mendengarkan, menyimpan (bab 2) |
-| `sheet` | id sheet | (diatur tab) | sheet yang ditampilkan. Kalau diisi, Anda yang mengatur sheet aktif: ubah prop ini dari `onSheetChange` |
+| `workbook` | workbook dari `createWorkbook()` | workbook kosong baru | workbook yang ditampilkan dan diubah. Dengan ini kodemu pegang isinya: membaca, mengubah, mendengarkan, menyimpan (bab 2) |
+| `sheet` | id sheet | (diatur tab) | sheet yang ditampilkan. Kalau diisi, kamu yang mengatur sheet aktif: ubah prop ini dari `onSheetChange` |
 | `onSheetChange` | `(sheetId) => void` | | sheet aktif berganti: tab diklik, sheet ditambah atau diduplikat, hasil pencarian di sheet lain |
 | `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (dari orang, kode, atau undo). Sama dengan `wb.on('op', ...)` |
-| `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak. Sheet sudah menampilkan `reason` sebagai pemberitahuan; prop ini untuk log atau tampilan Anda sendiri |
+| `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak. Sheet sudah menampilkan `reason` sebagai pemberitahuan; prop ini buat log atau tampilanmu sendiri |
 | `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak sesuai tipe kolomnya (bab 10) |
 | `onSelectionChange` | `(sel) => void` | | seleksi berubah. `sel.active` adalah sel aktif `{ r, c }`, `sel.ranges` daftar kotak yang dipilih |
 | `fileName` | string | `'Spreadsheet'` | nama file (tanpa ekstensi) saat orang memilih File → Download |
-| `access` | `{ policy, who }` | tanpa batasan | access policy dan orang yang membuka sheet (bab 11). Sheet menerapkannya; kebijakannya tetap milik aplikasi Anda |
+| `access` | `{ policy, who }` | tanpa batasan | access policy dan orang yang membuka sheet (bab 11). Sheet cuma menerapkan; kebijakannya tetap milik aplikasimu |
 | `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya (bab 12) |
 | `showProtected` | boolean | `false` | sel yang dilindungi aturan digambar bergaris-garis (berguna saat membuat aturan) |
 | `className` | string | | class tambahan di elemen terluar |
 | `style` | objek style | | style elemen terluar. Tinggi bisa diatur di sini; variabel tema juga (3.5) |
-| `ref` | ref React | | handle untuk kode Anda (3.3) |
+| `ref` | ref React | | handle untuk kodemu (3.3) |
 
-> **Workbook milik Anda, bukan milik `<Sheet>`.** Mengganti prop `workbook` dengan workbook lain menampilkan workbook itu. Mengubah isi workbook lewat
-> kode (`wb.setValues(...)`) langsung terlihat di layar, tanpa perlu `setState`. Sheet mendengarkan perubahan workbook sendiri.
+> **Workbook itu milikmu, bukan milik `<Sheet>`.** Mengganti prop `workbook` dengan workbook lain menampilkan workbook itu. Mengubah isi workbook lewat
+> kode (`wb.setValues(...)`) langsung kelihatan di layar, tidak perlu `setState`. Sheet mendengarkan workbook sendiri.
 
 ## 3.2 Event
 
-Contoh berikut mencatat tiga event, dan menolak teks di kolom Volume lewat `beforeOp` (2.5):
+Contoh ini mencatat tiga event, dan menolak teks di kolom Volume lewat `beforeOp` (2.5):
 
 <!-- contoh: 03-events.page.js -->
 ```jsx
@@ -47,7 +47,7 @@ import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
 function buat() {
-    // kolom Volume (B) hanya menerima angka: aturan Anda sendiri, lewat beforeOp
+    // kolom Volume (B) hanya menerima angka: aturanmu sendiri, lewat beforeOp
     const wb = createWorkbook(null, {
         beforeOp(op, ctx) {
             if (op.t !== 'cells' || ctx.source !== 'user') return op;
@@ -55,8 +55,7 @@ function buat() {
             return salah ? { reject: 'Volume harus angka' } : op;
         }
     });
-    const [s] = wb.sheetIds();
-    wb.setValues(s, 0, 0, [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3']]);
+    wb.sheet('Sheet1').setValues('A1', [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3']]);
     return wb;
 }
 
@@ -79,8 +78,8 @@ export default function HalamanEvent() {
 ```
 <!-- /contoh -->
 
-Di screenshot di bawah, orang mengetik `15` di C2 (diterima), lalu mengetik `Besi` di B2 (ditolak). Catatan terbaru ada di paling atas. Sheet
-sendiri menampilkan alasan penolakan sebagai pemberitahuan di bawah grid:
+Di gambar ini orang ngetik `15` di C2 (diterima), lalu `Besi` di B2 (ditolak). Catatan terbaru paling atas. Sheet sendiri menampilkan
+alasan penolakannya sebagai pemberitahuan di bawah grid:
 
 ![Event onOp, onReject, onSelectionChange](img/events.png)
 
@@ -89,7 +88,7 @@ mengubahnya menjadi nomor kolom. Daftar lengkap jenis op ada di bab 4.
 
 ## 3.3 Handle (`ref`)
 
-Dengan `ref`, kode Anda bisa meminta sheet melakukan sesuatu, misalnya dari tombol di luar sheet:
+Lewat `ref`, kodemu bisa minta sheet melakukan sesuatu, misalnya dari tombol di luar sheet:
 
 <!-- contoh: 03-handle.page.js -->
 ```jsx
@@ -100,12 +99,11 @@ import '@kufayeka/sheet/style.css';
 
 function buat() {
     const wb = createWorkbook();
-    const [s] = wb.sheetIds();
-    wb.setValues(s, 0, 0, [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3'], ['Beton', 18.5, 'm3']]);
+    wb.sheet('Sheet1').setValues('A1', [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3'], ['Beton', 18.5, 'm3']]);
     return wb;
 }
 
-// ref memberi "handle": hal yang bisa diminta kode Anda dari sheet
+// ref memberi "handle": hal-hal yang bisa diminta kodemu dari sheet
 export default function HalamanHandle() {
     const [wb] = useState(buat);
     const sheet = useRef(null);
@@ -139,13 +137,13 @@ Setelah tombol **Pilih B2:C4** diklik:
 | `select(target)` | memilih sel atau range lalu menggulir ke sana. `target` berupa teks (`'B2'`, `'B2:C4'`) atau kotak `{ r1, c1, r2, c2 }` (`r2`/`c2` boleh kosong untuk satu sel). Melempar error kalau teksnya bukan alamat |
 | `scrollTo(address)` | memilih satu sel dan menggulir ke sana |
 | `startEdit(text?)` | membuka editor di sel aktif berisi `text` (tanpa `text`: isi sel sekarang), seperti orang mulai mengetik |
-| `focus()` | mengembalikan keyboard ke grid (misalnya setelah dialog Anda ditutup) |
+| `focus()` | balikin keyboard ke grid (misalnya setelah dialogmu ditutup) |
 | `showSheet(id)` | menampilkan sheet lain |
 | `getSelection()` | seleksi sekarang: `{ ranges, active }` |
 | `workbook` | workbook yang sedang ditampilkan |
 
-> **Seleksi berubah di render berikutnya.** `select()` mengubah state React, jadi `getSelection()` yang dipanggil tepat sesudahnya pada baris yang
-> sama masih memberikan seleksi lama. Untuk tahu seleksi yang baru, dengarkan `onSelectionChange` seperti contoh di atas.
+> **Seleksi baru berubah di render berikutnya.** `select()` mengubah state React, jadi `getSelection()` yang dipanggil tepat sesudahnya masih
+> kasih seleksi lama. Untuk tahu seleksi yang baru, dengarkan `onSelectionChange` seperti contoh di atas.
 
 ## 3.4 Keyboard
 
@@ -179,7 +177,7 @@ Sama seperti Google Sheets. Di Mac, `Ctrl` adalah `⌘`.
 
 ## 3.5 Tema dan CSS
 
-Semua warna dan huruf adalah **variabel CSS** di elemen `.ks-sheet`. Ganti lewat prop `style` atau lewat CSS Anda sendiri
+Semua warna dan huruf berupa **variabel CSS** di elemen `.ks-sheet`. Ganti lewat prop `style` atau lewat CSS-mu sendiri
 (`.ks-sheet { --ks-accent: ... }`):
 
 <!-- contoh: 03-tema.page.js -->
@@ -189,7 +187,7 @@ import { Sheet } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
-// semua warna dan huruf adalah variabel CSS (--ks-...): ganti lewat style atau CSS Anda sendiri
+// semua warna dan huruf adalah variabel CSS (--ks-...): ganti lewat style atau CSS-mu sendiri
 const temaHijau = {
     '--ks-accent': '#188038',
     '--ks-head-bg': '#e6f4ea',
@@ -200,8 +198,7 @@ const temaHijau = {
 
 function buat() {
     const wb = createWorkbook();
-    const [s] = wb.sheetIds();
-    wb.setValues(s, 0, 0, [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3']]);
+    wb.sheet('Sheet1').setValues('A1', [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3']]);
     return wb;
 }
 
@@ -232,6 +229,6 @@ export default function HalamanTema() {
 | `--ks-font` | `10pt/1.25 Arial, …` | huruf di dalam sel (bawaan; sel bisa punya huruf sendiri) |
 | `--ks-ui-font` | `13px/1.4 "IBM Plex Sans", system-ui, sans-serif` | huruf menu, toolbar, panel, dialog |
 
-Semua class library diawali `ks-`, jadi tidak bertabrakan dengan CSS aplikasi Anda.
+Semua class library diawali `ks-`, jadi tidak bentrok dengan CSS aplikasimu.
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md)

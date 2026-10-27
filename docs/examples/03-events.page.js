@@ -4,7 +4,7 @@ import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
 function buat() {
-    // kolom Volume (B) hanya menerima angka: aturan Anda sendiri, lewat beforeOp
+    // kolom Volume (B) hanya menerima angka: aturanmu sendiri, lewat beforeOp
     const wb = createWorkbook(null, {
         beforeOp(op, ctx) {
             if (op.t !== 'cells' || ctx.source !== 'user') return op;
@@ -12,8 +12,7 @@ function buat() {
             return salah ? { reject: 'Volume harus angka' } : op;
         }
     });
-    const [s] = wb.sheetIds();
-    wb.setValues(s, 0, 0, [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3']]);
+    wb.sheet('Sheet1').setValues('A1', [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3']]);
     return wb;
 }
 

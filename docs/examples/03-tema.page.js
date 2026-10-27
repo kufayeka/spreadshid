@@ -3,7 +3,7 @@ import { Sheet } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
-// semua warna dan huruf adalah variabel CSS (--ks-...): ganti lewat style atau CSS Anda sendiri
+// semua warna dan huruf adalah variabel CSS (--ks-...): ganti lewat style atau CSS-mu sendiri
 const temaHijau = {
     '--ks-accent': '#188038',
     '--ks-head-bg': '#e6f4ea',
@@ -14,8 +14,7 @@ const temaHijau = {
 
 function buat() {
     const wb = createWorkbook();
-    const [s] = wb.sheetIds();
-    wb.setValues(s, 0, 0, [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3']]);
+    wb.sheet('Sheet1').setValues('A1', [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3']]);
     return wb;
 }
 

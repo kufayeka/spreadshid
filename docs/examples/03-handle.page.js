@@ -5,12 +5,11 @@ import '@kufayeka/sheet/style.css';
 
 function buat() {
     const wb = createWorkbook();
-    const [s] = wb.sheetIds();
-    wb.setValues(s, 0, 0, [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3'], ['Beton', 18.5, 'm3']]);
+    wb.sheet('Sheet1').setValues('A1', [['Pekerjaan', 'Volume', 'Satuan'], ['Galian', 120, 'm3'], ['Urugan', 40, 'm3'], ['Beton', 18.5, 'm3']]);
     return wb;
 }
 
-// ref memberi "handle": hal yang bisa diminta kode Anda dari sheet
+// ref memberi "handle": hal-hal yang bisa diminta kodemu dari sheet
 export default function HalamanHandle() {
     const [wb] = useState(buat);
     const sheet = useRef(null);
