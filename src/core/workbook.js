@@ -1535,6 +1535,52 @@ export function createWorkbook(doc, options) {
     }
 
     /** Deletes `count` rows from row `at`. */
+    // A range whose first or last row (or column) is deleted shrinks to the rows that stay, as in Excel: =SUM(A2:A9) with row 2 deleted becomes
+    // =SUM(A2:A8), not =SUM(#REF!). The formulas are rewritten by a cells op that goes in the same change as the delete, so one undo puts the rows
+    // back and the formulas as they were, and every copy of the workbook that applies the change rewrites the same way. A range whose rows all go
+    // is left alone and shows #REF!, which is what Excel does too.
+    function shrinkRanges(s, axis, at, count) {
+        const isRow = axis === 'row';
+        const end = at + count - 1;
+        const gone = (i) => i >= at && i <= end;
+        const idAt = (i) => (isRow ? grid.rowIdAt(s, i) : grid.colIdAt(s, i));
+        const indexOf = (id) => (isRow ? grid.rowIndexOf(s, id) : grid.colIndexOf(s, id));
+        const [k1, k2] = isRow ? ['r1', 'r2'] : ['c1', 'c2'];
+        const changes = [];
+        const bySheet = new Map();
+        for (const e of engine.rangeReaderCells(s)) {
+            const home = sheets.get(e.s);
+            const row = home && home.rows.get(e.row);
+            const before = row && row.cells[e.col];
+            if (!isStoredFormula(before)) continue;
+            // the formula's own row (or column) goes too: nothing to rewrite
+            if (e.s === s && gone(isRow ? grid.rowIndexOf(s, e.row) : grid.colIndexOf(s, e.col))) continue;
+            let refs = null;
+            before.refs.forEach((ref, i) => {
+                if ((ref.s || e.s) !== s || ref[k1] == null || ref[k2] == null) return;
+                if (ref.k !== 'range' && ref.k !== (isRow ? 'rows' : 'cols')) return;
+                const a = indexOf(ref[k1]), b = indexOf(ref[k2]);
+                if (a < 0 || b < 0) return;
+                const lo = Math.min(a, b), hi = Math.max(a, b);
+                if (!gone(lo) && !gone(hi)) return;
+                let newLo = lo, newHi = hi;
+                while (newLo <= hi && gone(newLo)) newLo++;
+                while (newHi >= lo && gone(newHi)) newHi--;
+                if (newLo > newHi) return;
+                // keep which corner was the first one: a range turned around by a sort stays turned around
+                const next = { ...ref };
+                next[a <= b ? k1 : k2] = idAt(newLo);
+                next[a <= b ? k2 : k1] = idAt(newHi);
+                if (!refs) refs = before.refs.slice();
+                refs[i] = next;
+            });
+            if (!refs) continue;
+            if (!bySheet.has(e.s)) bySheet.set(e.s, []);
+            bySheet.get(e.s).push({ row: e.row, col: e.col, before, after: { ...before, refs } });
+        }
+        for (const [sheet, list] of bySheet) changes.push({ t: 'cells', sheet, changes: list });
+        return changes;
+    }
     function deleteRows(s, at, count, how) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
@@ -1542,7 +1588,8 @@ export function createWorkbook(doc, options) {
             const row = sheet.rows.get(rid);
             return { id: rid, key: row.key, cells: clone(row.cells), style: clone(row.style), props: clone(row.props) };
         });
-        return rows.length ? apply([{ t: 'deleteRows', sheet: s, rows }], how) : [];
+        if (!rows.length) return [];
+        return apply([...shrinkRanges(s, 'row', at, rows.length), { t: 'deleteRows', sheet: s, rows }], how);
     }
 
     /** Inserts `count` empty columns before column `at`. */
@@ -1562,7 +1609,8 @@ export function createWorkbook(doc, options) {
         s = sheetIdOf(s);
         const sheet = sheetOf(s);
         const cols = sheet.colOrder.slice(at, at + count).map((cid) => { const col = sheet.cols.get(cid); return { id: cid, key: col.key, props: clone(col.props) }; });
-        return cols.length ? apply([{ t: 'deleteCols', sheet: s, cols }], how) : [];
+        if (!cols.length) return [];
+        return apply([...shrinkRanges(s, 'col', at, cols.length), { t: 'deleteCols', sheet: s, cols }], how);
     }
 
     /** Moves `count` rows from row `from` so that they stand before row `to` (counted before the move). */

@@ -48,17 +48,18 @@ const text = (v) => (isError(v) ? v.code : v);
     assert.strictEqual(wb.value(undefined, 4, 2), 126);
     ok('a formula follows its rows when rows are inserted above, and a range grows with a row inserted inside it');
 
-    // a row a formula points at is deleted: #REF!, and undo brings it back
+    // the first row of a range is deleted: the range shrinks to the rows that stay (Excel does the same), undo brings the row and the range back
     wb.deleteRows(undefined, 1, 1);
     assert.strictEqual(wb.input(undefined, 1, 2), '100', 'the rows moved up');
     assert.strictEqual(text(wb.value(undefined, 2, 2)), 20, '=A3*B3 (old row 2) is untouched');
-    assert.strictEqual(wb.input(undefined, 3, 2), '=SUM(#REF!)', 'the range lost its first corner');
-    assert.strictEqual(text(wb.value(undefined, 3, 2)), '#REF!');
+    assert.strictEqual(wb.input(undefined, 3, 2), '=SUM(C2:C3)', 'the range starts at the next row');
+    assert.strictEqual(wb.value(undefined, 3, 2), 120);
     wb.undo();
+    assert.strictEqual(wb.input(undefined, 4, 2), '=SUM(C2:C4)');
     assert.strictEqual(wb.value(undefined, 4, 2), 126, 'undo gives the row and the sum back');
     wb.redo();
-    assert.strictEqual(text(wb.value(undefined, 3, 2)), '#REF!', 'redo takes it again');
-    ok('deleting a row that a formula reads gives #REF!, undo and redo go back and forth');
+    assert.strictEqual(wb.value(undefined, 3, 2), 120, 'redo takes it again');
+    ok('deleting the first row of a range shrinks the range, undo and redo go back and forth');
 }
 
 // ---- a value that changes reaches every formula that reads it, also through others
@@ -219,6 +220,39 @@ const text = (v) => (isError(v) ? v.code : v);
     while (wb.redo());
     assert.strictEqual(JSON.stringify(wb.toJSON()), after, 'every change redone: the workbook is as it was after them');
     ok('every kind of change undoes and redoes back to exactly the same workbook');
+}
+
+// ---- deleting the first or last row (or column) of a range shrinks the range, as in Excel, instead of turning it into #REF!
+{
+    const wb = createWorkbook();
+    const s = wb.sheet('Sheet1');
+    s.setValues('A1', [['h'], [1], [2], [3]]);
+    s.setValues('B1', [['=COUNTA(A2:A4)', '=SUM(A2:A4)']]);
+    wb.addSheet('Other');
+    wb.setValues('Other', 'A1', '=SUM(Sheet1!A2:A4)');
+
+    s.deleteRows('2');
+    assert.strictEqual(s.input('B1'), '=COUNTA(A2:A3)');
+    assert.strictEqual(s.value('B1'), 2);
+    assert.strictEqual(wb.input('Other', 'A1'), '=SUM(Sheet1!A2:A3)', 'a formula on another sheet shrinks too');
+    s.deleteRows('3');
+    assert.strictEqual(s.value('C1'), 2, 'the last row went: the range ends one row higher');
+    wb.undo();
+    wb.undo();
+    assert.strictEqual(s.input('C1'), '=SUM(A2:A4)', 'one undo per delete puts the rows and the formula back');
+    assert.strictEqual(s.value('C1'), 6);
+
+    s.deleteRows('2:4');
+    assert.strictEqual(text(s.value('C1')), '#REF!', 'every row of the range gone: #REF!, as in Excel');
+    wb.undo();
+
+    const w2 = createWorkbook();
+    const t = w2.sheet('Sheet1');
+    t.setValues('A1', [[1, 2, 3, '=SUM(A1:C1)']]);
+    t.deleteCols('A');
+    assert.strictEqual(t.input('C1'), '=SUM(A1:B1)');
+    assert.strictEqual(t.value('C1'), 5);
+    ok('a range loses the deleted rows or columns at its edges and keeps the rest, undo brings it back');
 }
 
 console.log('\n' + passed + ' passed');

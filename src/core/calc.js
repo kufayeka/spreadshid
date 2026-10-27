@@ -369,6 +369,8 @@ export function createEngine(host) {
             loseAll([...(inSheet.get(s) || []), ...(sheetReaders.get(s) || []), ...nameReaders]);
         },
         /** The formulas that read a named range: { s, row, col, formula } (for the workbook, when a name is made: see addName). */
+        /** The formulas that read a range (or whole rows or columns) of sheet s: where each sits and what it keeps. */
+        rangeReaderCells(s) { return [...(rangeReaders.get(s) || [])].map((e) => ({ s: e.s, row: e.row, col: e.col, formula: e.formula })); },
         nameReaderCells() { return [...nameReaders].map((e) => ({ s: e.s, row: e.row, col: e.col, formula: e.formula })); },
         /** A named range was made, changed, renamed or taken away: every formula that reads a name is worked out again. */
         namesChanged() {
