@@ -93,6 +93,26 @@ export function buildXlsxFiles(book) {
     fills.get({ none: true }); fills.get({ gray125: true });
     borders.get({});
     xfs.get({ f: 0, fi: 0, b: 0, n: 0, a: null });
+    // the styles of the rules of conditional formatting (Excel keeps them apart from the cells' styles)
+    const dxfs = registry();
+    let priority = 0;
+    const cfXml = (model) => (model.conditionals || []).map((rule) => {
+        const sqref = rule.rects.map((b) => colName(b.c1) + (b.r1 + 1) + (b.r2 > b.r1 || b.c2 > b.c1 ? ':' + colName(b.c2) + (b.r2 + 1) : '')).join(' ');
+        priority++;
+        if (rule.type === 'colorScale') {
+            const cfvo = rule.scale.map((p) => '<cfvo type="' + p.type + '"' + (p.value !== undefined ? ' val="' + xmlEsc(String(p.value)) + '"' : '') + '/>').join('');
+            const colors = rule.scale.map((p) => '<color rgb="' + (cssToArgb(p.color) || 'FFFFFFFF') + '"/>').join('');
+            return '<conditionalFormatting sqref="' + sqref + '"><cfRule type="colorScale" priority="' + priority + '"><colorScale>' + cfvo + colors + '</colorScale></cfRule></conditionalFormatting>';
+        }
+        const dxf = dxfs.get(rule.style);
+        return '<conditionalFormatting sqref="' + sqref + '"><cfRule type="' + rule.type + '" dxfId="' + dxf + '" priority="' + priority + '" stopIfTrue="1"'
+            + (rule.operator ? ' operator="' + rule.operator + '"' : '') + (rule.text !== undefined ? ' text="' + xmlEsc(rule.text) + '"' : '') + '>'
+            + (rule.formulas || []).map((f) => '<formula>' + xmlEsc(f) + '</formula>').join('') + '</cfRule></conditionalFormatting>';
+    }).join('');
+    const dxfXml = (s) => {
+        const font = (s.bold ? '<b/>' : '') + (s.italic ? '<i/>' : '') + (s.strike ? '<strike/>' : '') + (s.underline ? '<u/>' : '') + (s.color ? '<color rgb="' + cssToArgb(s.color) + '"/>' : '');
+        return '<dxf>' + (font ? '<font>' + font + '</font>' : '') + (s.fill ? '<fill><patternFill patternType="solid"><bgColor rgb="' + cssToArgb(s.fill) + '"/></patternFill></fill>' : '') + '</dxf>';
+    };
 
     const xfOf = (cell) => {
         const font = cell.font && Object.keys(cell.font).some((k) => cell.font[k]) ? fonts.get(cell.font) : 0;
@@ -144,7 +164,7 @@ export function buildXlsxFiles(book) {
         const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + dim
             + '<sheetViews><sheetView' + (model.active ? ' tabSelected="1"' : "") + ' workbookViewId="0">' + pane + "</sheetView></sheetViews>"
             + '<sheetFormatPr defaultRowHeight="' + pxToPoints(model.defaultRow || 28) + '"' + (model.defaultRow ? ' customHeight="1"' : "") + "/>" + colsXml
-            + "<sheetData>" + rowsXml + "</sheetData>" + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + "</worksheet>";
+            + "<sheetData>" + rowsXml + "</sheetData>" + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + cfXml(model) + "</worksheet>";
         return { sheetName, hidden: !!model.hidden, sheet };
     };
     const rendered = models.map(renderSheet);
@@ -160,7 +180,8 @@ export function buildXlsxFiles(book) {
         + '<borders count="' + borders.list.length + '">' + borders.list.map(borderXml).join("") + "</borders>"
         + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
         + '<cellXfs count="' + xfs.list.length + '">' + xfs.list.map(xfXml).join("") + "</cellXfs>"
-        + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+        + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        + (dxfs.list.length ? '<dxfs count="' + dxfs.list.length + '">' + dxfs.list.map(dxfXml).join("") + "</dxfs>" : "") + "</styleSheet>";
 
     const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     const sheetParts = rendered.map((x, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("");

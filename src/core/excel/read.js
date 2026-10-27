@@ -7,6 +7,8 @@
 import { unzip, parseXml, kid, kids, BUILTIN_FORMATS } from './read-base.js';
 import { colIndex } from '../formula/address.js';
 import { shiftFormula, formulaProblem } from '../formula/formula.js';
+import { fromExcelRule } from './conditional.js';
+import { colName } from '../formula/address.js';
 
 const MAX_SHEETS = 100;
 
@@ -137,6 +139,23 @@ function readStyles(files) {
         out.xfs.push(style);
     });
     out.baseFontSize = base.size || 11;
+    // the styles of the rules of conditional formatting: a font and a fill, nothing more
+    out.dxfs = kids(kid(root, 'dxfs'), 'dxf').map((d) => {
+        const style = {};
+        const f = kid(d, 'font');
+        if (f) {
+            if (on(f, 'b')) style.bold = true;
+            if (on(f, 'i')) style.italic = true;
+            if (on(f, 'u')) style.underline = true;
+            if (on(f, 'strike')) style.strike = true;
+            const color = colorOf(kid(f, 'color'));
+            if (color) style.color = color;
+        }
+        const p = kid(kid(d, 'fill'), 'patternFill');
+        const fill = p ? colorOf(kid(p, 'bgColor')) || colorOf(kid(p, 'fgColor')) : '';
+        if (fill) style.fill = fill;
+        return style;
+    });
     return out;
 }
 
@@ -221,9 +240,28 @@ function readSheet(root, shared, styles, info, warnings) {
     const freeze = pane && pane.attrs.state === 'frozen' ? { rows: Number(pane.attrs.ySplit) || 0, cols: Number(pane.attrs.xSplit) || 0 } : null;
     if (unknown.size) warnings.push('"' + info.name + '": formulas with ' + [...unknown].slice(0, 6).join(', ') + (unknown.size > 6 ? ' …' : '') + ' are not in the sheet: the values Excel worked out were kept');
     if (kid(sheet, 'drawing') || kid(sheet, 'legacyDrawing')) warnings.push('"' + info.name + '": pictures, charts and comments were not imported');
-    if (kid(sheet, 'conditionalFormatting')) warnings.push('"' + info.name + '": conditional formatting was not imported');
+    // the rules of conditional formatting, in Excel's order (its priority); what the sheet has no rule for is said
+    const conditionals = [], skipped = new Set();
+    const cfRules = [];
+    for (const block of kids(sheet, 'conditionalFormatting')) {
+        const rects = String(block.attrs.sqref || '').split(/\s+/).filter(Boolean).map((ref) => {
+            const [a, b] = ref.split(':').map(addressOf);
+            const z = b || a;
+            return a && z ? { r1: Math.min(a.r, z.r), c1: Math.min(a.c, z.c), r2: Math.max(a.r, z.r), c2: Math.max(a.c, z.c) } : null;
+        }).filter(Boolean);
+        if (!rects.length) continue;
+        for (const rule of kids(block, 'cfRule')) cfRules.push({ rule, rects });
+    }
+    cfRules.sort((x, y) => (Number(x.rule.attrs.priority) || 0) - (Number(y.rule.attrs.priority) || 0));
+    for (const { rule, rects } of cfRules) {
+        const dxf = rule.attrs.dxfId !== undefined ? styles.dxfs[Number(rule.attrs.dxfId)] : null;
+        const made = fromExcelRule(rule, dxf, colName(rects[0].c1) + (rects[0].r1 + 1), kid, kids);
+        if (made.skip) skipped.add(made.skip);
+        else conditionals.push({ rects, spec: made.spec });
+    }
+    if (skipped.size) warnings.push('"' + info.name + '": conditional formatting with ' + [...skipped].join(', ') + ' was not imported');
     if (kid(sheet, 'dataValidations')) warnings.push('"' + info.name + '": data validation was not imported');
-    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow };
+    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals };
 }
 
 /**

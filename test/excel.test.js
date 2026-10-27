@@ -141,6 +141,55 @@ function excelPackage(files) {
     ok('a package as Excel writes it: deflated, shared and inline strings, number formats, 1904 dates, shared formulas, unknown functions, errors, sizes, merges');
 }
 
+// ---- conditional formatting out and back in ----------------------------------------------------------------------------------------------------
+{
+    const wb = createWorkbook();
+    const [s] = wb.sheetIds();
+    wb.setValues(s, 0, 0, [['Item', 'Qty', 'Status', 'Due'], ['Pile', 120, 'Late', 1], ['Beam', 40, 'Done', 99999], ['Slab', 80, 'Late "B"', 2]]);
+    wb.addConditional(s, { r1: 1, c1: 2, r2: 3, c2: 2 }, { op: 'textContains', a: 'late', style: { fill: '#f4c7c3', bold: true } });
+    wb.addConditional(s, [{ r1: 1, c1: 0, r2: 3, c2: 0 }, { r1: 1, c1: 3, r2: 3, c2: 3 }], { op: 'formula', formula: '=$B2>100', style: { italic: true, color: '#a50e0e' } });
+    wb.addConditional(s, { r1: 1, c1: 1, r2: 3, c2: 1 }, { op: 'between', a: 50, b: 100, style: { underline: true } });
+    wb.addConditional(s, { r1: 1, c1: 3, r2: 3, c2: 3 }, { op: 'dateBefore', a: 'today', style: { strike: true } });
+    wb.addConditional(s, { r1: 1, c1: 2, r2: 3, c2: 2 }, { op: 'textIs', a: 'Late "B"', style: { fill: '#000000' } });
+    wb.addConditional(s, { r1: 1, c1: 1, r2: 3, c2: 1 }, { kind: 'scale', min: { type: 'number', value: 0, color: '#ffffff' }, mid: { type: 'percentile', value: 50, color: '#ffd666' }, max: { type: 'max', color: '#57bb8a' } });
+    const before = [[1, 0], [2, 0], [1, 1], [3, 1], [1, 2], [3, 2], [1, 3], [2, 3]].map(([r, c]) => wb.conditionalStyleAt(s, r, c));
+
+    const { workbook: back, warnings } = await importXlsx(exportXlsx(wb));
+    const b = back.sheetIds()[0];
+    assert.deepStrictEqual(warnings, []);
+    const after = [[1, 0], [2, 0], [1, 1], [3, 1], [1, 2], [3, 2], [1, 3], [2, 3]].map(([r, c]) => back.conditionalStyleAt(b, r, c));
+    assert.deepStrictEqual(after, before, 'every cell looks the same after .xlsx and back');
+    assert.deepStrictEqual(back.conditionals(b).map((x) => x.op || x.kind), ['textContains', 'formula', 'between', 'formula', 'formula', 'scale'], 'the rules in their order (the date and exact text rules come back as the formulas Excel keeps)');
+    assert.strictEqual(back.conditionals(b)[1].ranges.length, 2, 'a rule on two ranges');
+    ok('conditional formatting out to .xlsx and back: texts, a custom formula on two ranges, between, a date, a colour scale, the order');
+}
+{
+    const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const files = {
+        '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+        'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns="' + ns + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Opname" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        'xl/_rels/workbook.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="x" Target="worksheets/sheet1.xml"/></Relationships>',
+        'xl/styles.xml': '<?xml version="1.0"?><styleSheet xmlns="' + ns + '"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><cellXfs count="1"><xf numFmtId="0" fontId="0"/></cellXfs>'
+            + '<dxfs count="2"><dxf><font><b/><color rgb="FF9C0006"/></font><fill><patternFill><bgColor rgb="FFFFC7CE"/></patternFill></fill></dxf><dxf><font><i/></font></dxf></dxfs></styleSheet>',
+        'xl/worksheets/sheet1.xml': '<?xml version="1.0"?><worksheet xmlns="' + ns + '"><sheetData>'
+            + '<row r="1"><c r="A1"><v>5</v></c><c r="B1"><v>45000</v></c></row><row r="2"><c r="A2"><v>15</v></c></row><row r="3"><c r="A3"><v>25</v></c></row></sheetData>'
+            + '<conditionalFormatting sqref="A1:A3"><cfRule type="cellIs" dxfId="0" priority="2" operator="greaterThan"><formula>$D$1</formula></cfRule></conditionalFormatting>'
+            + '<conditionalFormatting sqref="A1:A3"><cfRule type="cellIs" dxfId="1" priority="1" operator="lessThan"><formula>10</formula></cfRule></conditionalFormatting>'
+            + '<conditionalFormatting sqref="B1"><cfRule type="timePeriod" dxfId="1" priority="3" timePeriod="last7Days"><formula>AND(TODAY()-FLOOR(B1,1)&lt;=6,FLOOR(B1,1)&lt;=TODAY())</formula></cfRule></conditionalFormatting>'
+            + '<conditionalFormatting sqref="A1:A3"><cfRule type="dataBar" priority="4"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF638EC6"/></dataBar></cfRule><cfRule type="iconSet" priority="5"><iconSet><cfvo type="percent" val="0"/></iconSet></cfRule></conditionalFormatting>'
+            + '</worksheet>'
+    };
+    const { workbook: wb, warnings } = await importXlsx(excelPackage(files));
+    const s = wb.sheetIds()[0];
+    assert.deepStrictEqual(wb.conditionals(s).map((x) => x.op), ['lt', 'formula', 'dateIs'], 'in Excel\'s priority, not the order in the file');
+    assert.deepStrictEqual(wb.conditionalStyleAt(s, 0, 0), { italic: true }, 'a style of the rule (dxf)');
+    wb.setValues(s, 0, 3, 20);
+    assert.deepStrictEqual([wb.conditionalStyleAt(s, 1, 0), wb.conditionalStyleAt(s, 2, 0)], [null, { bold: true, color: '#9c0006', fill: '#ffc7ce' }], 'greater than a cell: a custom formula that reads it');
+    assert.strictEqual(wb.conditionals(s)[2].a, 'pastWeek', 'the last 7 days of Excel is the past week');
+    assert.ok(warnings.some((w) => /data bars, icon sets/.test(w)), 'what the sheet has not is said: ' + warnings.join(' | '));
+    ok('conditional formatting from Excel: priority, its styles, a bound that is a cell, a time period; data bars and icon sets said');
+}
+
 // ---- sheets added to a workbook ---------------------------------------------------------------------------------------------------------------------
 {
     const src = createWorkbook();

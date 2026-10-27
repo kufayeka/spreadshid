@@ -17,6 +17,9 @@ import { currencySymbol, localeInfo } from '../format.js';
 import { buildXlsxFiles, cssToArgb } from './write.js';
 import { zipStore } from './zip.js';
 import { readXlsx } from './read.js';
+import { toExcelRule } from './conditional.js';
+import { conditionalRects, conditionalFormulaText } from '../conditional.js';
+import { formulaProblem } from '../formula/formula.js';
 
 // ---- out ------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -109,13 +112,25 @@ export function exportXlsx(wb) {
         return {
             name: props.name, hidden: !!props.hidden, cells, rows, cols, hiddenRows, hiddenCols,
             defaultCol: props.colWidth || 100, defaultRow: props.rowHeight || 21,
-            merges: wb.merges(s), freeze: { rows: props.freezeRows || 0, cols: props.freezeCols || 0 }
+            merges: wb.merges(s), freeze: { rows: props.freezeRows || 0, cols: props.freezeCols || 0 },
+            conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean)
         };
     });
     return zipStore(buildXlsxFiles({ sheets, active: 0 }));
 }
 
 // ---- in -------------------------------------------------------------------------------------------------------------------------------------------
+
+// the rules of conditional formatting read from a file, put on the sheets once they stand (a custom formula is kept by ids, as a cell's is); a rule
+// whose formula has a function the sheet has not is left out and said
+function addRules(wb, docs, read) {
+    read.sheets.forEach((sh, i) => {
+        for (const { rects, spec } of sh.conditionals || []) {
+            if (spec.op === 'formula') { const problem = formulaProblem(spec.formula); if (problem) { read.warnings.push('"' + sh.name + '": a rule of conditional formatting with ' + problem + ' was not imported'); continue; } }
+            try { wb.addConditional(docs[i].id, rects, spec, { source: 'remote' }); } catch (err) { read.warnings.push('"' + sh.name + '": a rule of conditional formatting was not imported (' + err.message + ')'); }
+        }
+    });
+}
 
 // the documents of sheets read from a file, their formulas still as texts (put in once the sheets are in a workbook, where they can be kept by ids)
 function sheetDocs(read) {
@@ -171,6 +186,7 @@ export async function importXlsx(bytes, options) {
     const { docs, formulas } = sheetDocs(read);
     const wb = createWorkbook({ sheets: docs, settings: (options && options.settings) || {} }, { ...options, fresh: true });
     docs.forEach((d, i) => { if (formulas[i].length) wb.setBlock(d.id, formulas[i], { source: 'remote' }); });
+    addRules(wb, docs, read);
     return { workbook: wb, warnings: read.warnings, active: docs[read.active] ? docs[read.active].id : docs[0].id };
 }
 
@@ -185,6 +201,7 @@ export async function importXlsxInto(wb, bytes, how) {
     // the formulas are put in the sheets in a workbook of their own (they read one another by name), then the finished sheets move over
     const temp = createWorkbook({ sheets: docs, settings: wb.settings() });
     docs.forEach((d, i) => { if (formulas[i].length) temp.setBlock(d.id, formulas[i], { source: 'remote' }); });
+    addRules(temp, docs, read);
     const sheetIds = addFinishedSheets(wb, temp.toJSON().sheets, how);
     return { sheetIds, warnings: read.warnings };
 }
