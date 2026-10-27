@@ -15,6 +15,7 @@ import { colName } from './formula/address.js';
 import { formatDate, formatValue, localeInfo } from './format.js';
 import { displayOf } from './display.js';
 import { resolveRules, modeOf, resolveTypes, checkValue } from './access.js';
+import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
 
@@ -625,6 +626,56 @@ export function createWorkbook(doc, options) {
         return out;
     }
 
+    // ---- data validation (validation.js): rules a person makes on ranges, kept in the sheet's props ------------------------------------------------
+
+    /** Adds a rule of data validation to a rectangle (one change). Returns its id. */
+    function addValidation(s, rect, spec, how) {
+        s = sheetIdOf(s);
+        const rule = makeRule(api, s, rect, spec);
+        setSheetProps(s, { validations: (sheetOf(s).props.validations || []).concat([rule]) }, how);
+        return rule.id;
+    }
+
+    /** Takes away the rules of data validation that overlap a rectangle (one change). */
+    function removeValidation(s, rect, how) {
+        s = sheetIdOf(s);
+        const all = sheetOf(s).props.validations || [];
+        const kept = all.filter((rule) => { const at = ruleRect(api, s, rule); return at && !(at.r1 <= rect.r2 && at.r2 >= rect.r1 && at.c1 <= rect.c2 && at.c2 >= rect.c1); });
+        return kept.length === all.length ? [] : setSheetProps(s, { validations: kept.length ? kept : null }, how);
+    }
+
+    /** Puts a rule on a rectangle in place of the rules it overlaps (what the dialog's Done does): one change. Returns its id. */
+    function setValidation(s, rect, spec, how) {
+        s = sheetIdOf(s);
+        const kept = (sheetOf(s).props.validations || []).filter((rule) => { const at = ruleRect(api, s, rule); return at && !(at.r1 <= rect.r2 && at.r2 >= rect.r1 && at.c1 <= rect.c2 && at.c2 >= rect.c1); });
+        const rule = makeRule(api, s, rect, spec);
+        setSheetProps(s, { validations: kept.concat([rule]) }, how);
+        return rule.id;
+    }
+
+    /** The rule of data validation of a cell, or null. */
+    const validationAt = (s, r, c) => ruleAt(api, sheetIdOf(s), r, c);
+    /** The choices of a cell's dropdown (empty when it has none). */
+    const choicesAt = (s, r, c) => { const rule = validationAt(s, r, c); return rule ? choicesOf(api, sheetIdOf(s), rule) : []; };
+    /** What a cell's value breaks of its rule (a rule that only warns keeps the value, and the grid marks it), or null. */
+    const invalidAt = (s, r, c) => { const rule = validationAt(s, r, c); return rule ? breaks(api, sheetIdOf(s), rule, api.value(s, r, c)) : null; };
+
+    // the first cell of a change (already applied) whose value a refusing rule does not take
+    function refusedByValidation(ops) {
+        for (const op of ops) {
+            if (op.t !== 'cells' || !(sheets.get(op.sheet) && sheets.get(op.sheet).props.validations)) continue;
+            for (const ch of op.changes) {
+                const r = grid.rowIndexOf(op.sheet, ch.row), c = grid.colIndexOf(op.sheet, ch.col);
+                if (r < 0 || c < 0) continue;
+                const rule = ruleAt(api, op.sheet, r, c);
+                if (!rule || rule.reject === false) continue;
+                const wanted = breaks(api, op.sheet, rule, engine.value(op.sheet, ch.row, ch.col));
+                if (wanted) return { op, message: 'The value in ' + colName(c) + (r + 1) + ' must be ' + wanted };
+            }
+        }
+        return null;
+    }
+
     /**
      * Applies a change: a list of ops that belong together (one paste, one insert, one undo). The host's beforeOp sees each op first; if it refuses one,
      * nothing of the change is applied. Returns the ops that were applied (after beforeOp), or null when the change was refused.
@@ -667,6 +718,15 @@ export function createWorkbook(doc, options) {
                 for (const op of done.reverse()) APPLY[invert(op).t](invert(op));
                 for (const w of wrong) emit('cellError', w);
                 emit('reject', { op: wrong[0].op, reason: 'Expected ' + wrong[0].expected + ' in ' + wrong[0].address + (wrong[0].field ? ' (' + wrong[0].field + ')' : ''), source });
+                return null;
+            }
+        }
+        // the sheet's own data validation (made by a person, saved with the sheet): a rule that refuses takes the change back whole
+        if (source === 'user') {
+            const refused = refusedByValidation(accepted);
+            if (refused) {
+                for (const op of done.reverse()) APPLY[invert(op).t](invert(op));
+                emit('reject', { op: refused.op, reason: refused.message, source });
                 return null;
             }
         }
@@ -1107,6 +1167,8 @@ export function createWorkbook(doc, options) {
         rowAxis, colAxis, merges, mergeCells, unmergeCells, setAutoHeights, forEachFilledRow, rowContent,
         // the host's rules and types
         setRules, setTypes, modeAt, typeAt,
+        // data validation
+        addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
         // reading
         sheetIds: () => [...sheetOrder],
         sheetProps: (s) => clone(sheetOf(sheetIdOf(s)).props),

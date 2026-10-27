@@ -67,6 +67,8 @@ export function Menubar(props) {
             { label: 'Rows', children: [{ value: 'insert:rowsAbove', label: 'Insert ' + nr + (nr === 1 ? ' row' : ' rows') + ' above' }, { value: 'insert:rowsBelow', label: 'Insert ' + nr + (nr === 1 ? ' row' : ' rows') + ' below' }] },
             { label: 'Columns', children: [{ value: 'insert:colsLeft', label: 'Insert ' + nc + (nc === 1 ? ' column' : ' columns') + ' left' }, { value: 'insert:colsRight', label: 'Insert ' + nc + (nc === 1 ? ' column' : ' columns') + ' right' }] },
             { value: 'insert:sheet', label: 'Sheet' },
+            { value: 'insert:checkbox', label: 'Checkbox' },
+            { value: 'insert:dropdown', label: 'Dropdown' },
             { separator: true },
             { label: 'Function', children: ['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN'].map((f) => ({ value: 'insert:fn:' + f, label: f })) },
             { value: 'insert:link', label: 'Link', hint: 'Ctrl+K' }
@@ -98,6 +100,8 @@ export function Menubar(props) {
         ],
         Data: [
             { label: 'Sort sheet', children: [{ value: 'data:sortSheet:asc', label: 'Sort sheet by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortSheet:desc', label: 'Sort sheet by column ' + colName(sel.active.c) + ' (Z to A)' }] },
+            { value: 'data:validation', label: 'Data validation' },
+            { separator: true },
             { label: 'Sort range', disabled: nr < 2, children: [{ value: 'data:sortRange:asc', label: 'Sort range by column ' + colName(sel.active.c) + ' (A to Z)' }, { value: 'data:sortRange:desc', label: 'Sort range by column ' + colName(sel.active.c) + ' (Z to A)' }] }
         ]
     };
@@ -141,6 +145,9 @@ export function Menubar(props) {
                 else if (what === 'sheet') run(() => { const id = wb.addSheet(undefined, how); if (id) props.onShow(id); });
                 else if (what === 'fn') props.onStartEdit(functionText(wb, s, sel, extra));
                 else if (what === 'link') props.onLink();
+                // a checkbox in every cell of the selection (an empty one shows unticked): one change
+                else if (what === 'checkbox') run(() => wb.setValidation(s, b, { kind: 'checkbox' }, how));
+                else if (what === 'dropdown') props.onValidation('list');
                 break;
             case 'format': if (what === 'clear') clearFormatting(wb, s, sel); else setFormat(wb, s, sel, what); break;
             case 'style': toggle(wb, s, sel, what); break;
@@ -151,6 +158,7 @@ export function Menubar(props) {
             case 'size': setPart(wb, s, sel, 'fontSize', Number(what) === 10 ? null : Number(what)); break;
             case 'merge': run(() => merge(wb, s, sel, what)); break;
             case 'data': {
+                if (what === 'validation') { props.onValidation(null); break; }
                 const dir = extra;
                 if (what === 'sortRange') run(() => sortRange(wb, s, b, sel.active.c, dir));
                 else {

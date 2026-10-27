@@ -11,6 +11,8 @@ import { Toolbar } from './Toolbar.js';
 import { LinkDialog } from './LinkDialog.js';
 import { Menubar } from './Menubar.js';
 import { SettingsDialog } from './SettingsDialog.js';
+import { ValidationDialog } from './ValidationDialog.js';
+import { parseRangeText } from '../core/validation.js';
 import { copyBlock, pasteClip } from '../core/transfer.js';
 import { useAutoHeights } from './autoHeights.js';
 
@@ -88,6 +90,8 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
     // the link of the active cell (Ctrl+K, the toolbar)
     const [linking, setLinking] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    // the data validation dialog: open for the selection, with the rule of the active cell (or a new one of a kind)
+    const [validating, setValidating] = useState(null);
 
     // the formula bar's edit ends as the cell's does: the text is written, and Enter, Tab move on
     function commitFromBar(move) {
@@ -197,6 +201,11 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => setSettingsOpen(true)} onShow={show} onError={setNotice}
+                onValidation={(kind) => {
+                    const b = rectsOf(sel)[rectsOf(sel).length - 1];
+                    const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);
+                    setValidating({ range: rectText(b), rule: kind ? { kind } : own });
+                }}
                 onStartEdit={(text) => setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit' })}
                 onReveal={() => setRevealTick((t) => t + 1)} container={root} />
             <Toolbar workbook={wb} sheetId={sheetId} sel={sel} revision={revision} zoom={zoom} onZoom={setZoom} painting={!!paint} onPaint={onPaint}
@@ -231,6 +240,17 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
             </div>
             <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} />
+            {validating ? (
+                <ValidationDialog container={root} range={validating.range} rule={validating.rule}
+                    onClose={() => { setValidating(null); toGrid(); }}
+                    onSave={(rangeText, spec) => {
+                        const b = parseRangeText(rangeText);
+                        if (!b || b.sheet) return 'Write a range of this sheet, for example B2:B200';
+                        wb.setValidation(sheetId, b, spec, { source: 'user' });
+                        return null;
+                    }}
+                    onRemove={(rangeText) => { const b = parseRangeText(rangeText); if (b) wb.removeValidation(sheetId, b, { source: 'user' }); }} />
+            ) : null}
             {settingsOpen ? <SettingsDialog settings={wb.settings()} container={root} onClose={() => { setSettingsOpen(false); toGrid(); }}
                 onApply={(patch) => wb.setSettings(patch, { source: 'user' })} /> : null}
             {linking ? (

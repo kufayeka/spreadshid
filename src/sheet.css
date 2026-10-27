@@ -229,3 +229,13 @@
 /* a protected cell, when the host asks to see them */
 .ks-cell.ks-guarded { background-image: repeating-linear-gradient(-45deg, rgba(95, 99, 104, 0.10) 0 2px, transparent 2px 6px); }
 .ks-own { position: absolute; top: 0; left: 0; bottom: 0; pointer-events: none; }
+
+/* data validation in the grid: checkboxes, a dropdown's arrow, the mark of a value that breaks a rule, the help text of a rule */
+.ks-checkbox { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid #5f6368; border-radius: 2px; cursor: pointer; background: var(--ks-bg); }
+.ks-checkbox.ks-checked { background: var(--ks-accent); border-color: var(--ks-accent); }
+.ks-checkbox.ks-checked::after { content: ''; position: absolute; left: 3px; top: 0; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.ks-drop { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; line-height: 18px; text-align: center; color: #444746; font: 16px/18px Arial, sans-serif; cursor: pointer; border-radius: 3px; }
+.ks-drop:hover { background: #e8eaed; }
+.ks-invalid { position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent #d93025 transparent transparent; }
+.ks-hint { position: absolute; z-index: 7; max-width: 260px; padding: 6px 10px; background: #fff; color: #3c4043; border-radius: 4px; font: var(--ks-ui-font); font-size: 12px; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px rgba(60, 64, 67, 0.15); pointer-events: none; }
+.ks-problem { color: var(--ks-error); }

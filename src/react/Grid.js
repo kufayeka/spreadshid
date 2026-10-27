@@ -56,7 +56,7 @@ function bordersCss(borders) {
 // A cell is drawn only when it shows something (a value, a fill, a border). It leaves the last pixel on its right and at its bottom to the grid lines,
 // which are drawn once per row and once per column under the cells; a cell that must hide the lines inside it (a merged block, a text that runs on over
 // empty cells) covers them with the sheet's colour, as Google Sheets does.
-function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded }) {
+function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded, rule, invalid }) {
     const css = cellCss(style, display);
     // A text that runs on over the empty cells on its right takes only its text there: the cell's own fill (and its stripes when protected) stay
     // inside the cell itself, as in Google Sheets; the rest of the run is the sheet's colour, which hides the grid lines under the text.
@@ -65,8 +65,12 @@ function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guard
         <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '')} data-r={r} data-c={c}
             style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: own ? undefined : css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
             {own ? <span className={'ks-own' + (guarded ? ' ks-guarded' : '')} style={{ width: Math.max(0, ownWidth - 1), background: css.background }} /> : null}
-            <span className={'ks-text' + (style && style.link ? ' ks-link' : '')} title={style && style.link ? style.link + ' (Ctrl+click to open)' : undefined}
-                style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>
+            {rule && rule.kind === 'checkbox'
+                ? <span className={'ks-checkbox' + (display.text === 'TRUE' ? ' ks-checked' : '')} data-check="" role="checkbox" aria-checked={display.text === 'TRUE'} />
+                : <span className={'ks-text' + (style && style.link ? ' ks-link' : '')} title={style && style.link ? style.link + ' (Ctrl+click to open)' : undefined}
+                    style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>}
+            {rule && (rule.kind === 'list' || rule.kind === 'listFrom') ? <span className="ks-drop" data-drop="" aria-label="Choices">&#9662;</span> : null}
+            {invalid ? <span className="ks-invalid" title={'Invalid: must be ' + invalid} /> : null}
             {style && style.borders ? <span className="ks-borders" style={bordersCss(style.borders)} /> : null}
         </div>
     );
@@ -91,13 +95,16 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         const style = wb.style(sheetId, r, c);
         // a protected cell, drawn striped when the host asks (showProtected)
         const guarded = showProtected && wb.modeAt(sheetId, r, c);
+        // a cell under a rule of data validation shows a checkbox or a dropdown's arrow, and a mark when its value breaks a rule that only warns
+        const rule = wb.validationAt(sheetId, r, c);
+        const invalid = rule && rule.reject === false ? wb.invalidAt(sheetId, r, c) : null;
         // an empty cell with no style is not drawn: the grid lines are all it shows
-        if (display.kind === 'empty' && !style && !guarded) continue;
+        if (display.kind === 'empty' && !style && !guarded && !rule) continue;
         // A text that does not wrap and sits on the left runs on into the empty cells on its right, which are then not drawn (their grid lines would
         // cross the text). It stops at a protected cell that is shown striped. A centred text (the dots of a hidden cell) stays in its cell.
         let width = w;
         const align = (style && style.align) || display.align;
-        if (display.kind === 'text' && !(style && style.wrap) && align === 'left') {
+        if (display.kind === 'text' && !(style && style.wrap) && align === 'left' && !rule) {
             let next = c + 1;
             while (next <= to && next - c <= OVERFLOW_CELLS && !covered.has(next) && wb.raw(sheetId, r, next) === undefined && !(showProtected && wb.modeAt(sheetId, r, next))) {
                 width += colAxis.size(next);
@@ -105,7 +112,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
                 next++;
             }
         }
-        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={!!guarded} />);
+        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={!!guarded} rule={rule} invalid={invalid} />);
     }
     return cells;
 });
@@ -157,6 +164,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const valuesOnly = useRef(false);
     // the right-click menu: where it opens, and on what (cells, whole rows, whole columns)
     const [menu, setMenu] = useState(null);
+    // the choices of a dropdown cell, open under its arrow: { x, y, r, c }
+    const [choices, setChoices] = useState(null);
     const moveTo = (next) => { reveal.current = true; setSel(next); };
 
     // the grid fills its box: measured once on screen and whenever the box changes size
@@ -294,6 +303,16 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 Digit4: () => setFormat(wb, sheetId, sel, 'money'), Digit5: () => setFormat(wb, sheetId, sel, 'percent') }[e.code]
             : !ctrl && e.shiftKey && e.altKey ? { Digit5: () => toggle(wb, sheetId, sel, 'strike') }[e.code] : undefined;
         if (shortcut) { e.preventDefault(); shortcut(); return; }
+        if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const cells = [];
+            for (const b of rects) for (let r = b.r1; r <= b.r2 && cells.length < 100000; r++) for (let c = b.c1; c <= b.c2; c++) cells.push({ r, c });
+            const anyCheck = cells.some(({ r, c }) => { const rule = wb.validationAt(sheetId, r, c); return rule && rule.kind === 'checkbox'; });
+            if (anyCheck) { e.preventDefault(); if (!cells.some(({ r, c }) => guard(r, c))) toggleChecks(cells); return; }
+        }
+        if (e.altKey && e.key === 'ArrowDown') {
+            const rule = wb.validationAt(sheetId, sel.active.r, sel.active.c);
+            if (rule && (rule.kind === 'list' || rule.kind === 'listFrom')) { e.preventDefault(); openChoices(sel.active.r, sel.active.c); return; }
+        }
         const answer = keyAction(e, {
             sel, size,
             filled: (r, c) => wb.raw(sheetId, r, c) !== undefined,
@@ -438,9 +457,36 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         wb.setColProps(sheetId, targets, (c) => ({ width: columnNeed(each, wb.colId(sheetId, c), (r) => wb.display(sheetId, r, c).text) }), { source: 'user' });
     }
 
+    // a checkbox of the grid turned over (a click on it, or Space on the selection): one change for all of them
+    function toggleChecks(cells) {
+        const entries = cells.filter(({ r, c }) => { const rule = wb.validationAt(sheetId, r, c); return rule && rule.kind === 'checkbox'; })
+            .map(({ r, c }) => ({ r, c, value: wb.value(sheetId, r, c) === true ? false : true }));
+        if (entries.length) wb.setBlock(sheetId, entries, { source: 'user' });
+        return entries.length > 0;
+    }
+
+    // the choices of the active cell's dropdown, under the cell
+    function openChoices(r, c) {
+        if (guard(r, c)) return;
+        const b = cellBox(r, c);
+        const v = view.current.getBoundingClientRect();
+        setChoices({ x: v.left + b.x, y: v.top + b.y + b.h, r, c });
+    }
+
     function onMouseDown(e) {
         if (e.button !== 0) return;
         const edge = e.target && e.target.dataset;
+        // a checkbox or a dropdown's arrow: the cell is selected and the control does its part
+        if (edge && (edge.check !== undefined || edge.drop !== undefined)) {
+            const cell = e.target.closest('.ks-cell');
+            const r = Number(cell.dataset.r), c = Number(cell.dataset.c);
+            e.preventDefault();
+            if (editing) commit(null);
+            if (sink.current) sink.current.focus({ preventScroll: true });
+            setSel(selectCell(r, c));
+            if (edge.check !== undefined) { if (!guard(r, c)) toggleChecks([{ r, c }]); } else openChoices(r, c);
+            return;
+        }
         if (edge && edge.fill !== undefined) {
             e.preventDefault();
             if (editing) commit(null);
@@ -790,6 +836,16 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                         else commit(null);
                     }}
                     onCopy={(e) => onCopyOrCut(e, false)} onCut={(e) => onCopyOrCut(e, true)} onPaste={onPaste} />
+                {(() => {
+                    const rule = !editing && wb.validationAt(sheetId, sel.active.r, sel.active.c);
+                    if (!rule || !rule.help) return null;
+                    const b = cellBox(sel.active.r, sel.active.c);
+                    return <div className="ks-hint" style={{ left: b.x, top: b.y + b.h + 4 }}>{rule.help}</div>;
+                })()}
+                {choices ? <Menu at={{ x: choices.x, y: choices.y }} label="Choices" container={container}
+                    items={wb.choicesAt(sheetId, choices.r, choices.c).map((v) => ({ value: v, label: v, checked: String(wb.value(sheetId, choices.r, choices.c)) === v }))}
+                    onSelect={(v) => { wb.setValues(sheetId, choices.r, choices.c, "'" + v, { source: 'user' }); setChoices(null); }}
+                    onClose={() => { setChoices(null); if (sink.current) sink.current.focus({ preventScroll: true }); }} /> : null}
                 {menu ? <Menu at={{ x: menu.x, y: menu.y }} items={menuItems(menu)} onSelect={onMenuSelect} onClose={() => setMenu(null)} container={container} label="Cell" /> : null}
                 <span ref={mirror} className="ks-mirror" style={editStyle ? { fontWeight: editStyle.fontWeight, fontStyle: editStyle.fontStyle, fontSize: editStyle.fontSize, fontFamily: editStyle.fontFamily } : undefined} />
             </div>
