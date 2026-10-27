@@ -18,7 +18,25 @@ const cellAt = (js, r, c) => js(`(function(){ var h = document.querySelector('.k
  * Each picture: the page it is taken of (docs/examples), what is done on it first (with real input), and the part of the window it shows.
  * @type {{ name: string, page: string, act?: (p: any) => Promise<void>, clip?: { x: number, y: number, width: number, height: number } }[]}
  */
+// a sheet of the project workbook shown (by its name), then what else is asked
+const proyek = (name, sheet, act, clip) => ({ name, page: 'proyek.page.js', clip: clip || { x: 0, y: 0, width: 1366, height: 768 }, act: async (p) => {
+    for (let i = 0; i < 40 && !(await p.js('!!(window.__sheet && window.__sheet.current)')); i++) await p.wait(250);
+    await p.js(`window.__sheet.current.showSheet(window.__workbook.sheetIdByName(${JSON.stringify(sheet)}))`);
+    await p.wait(500);
+    if (act) await act(p);
+} });
+
 export const SHOTS = [
+    proyek('proyek-rab', 'RAB'),
+    proyek('proyek-harga', 'Harga', null, { x: 0, y: 0, width: 1000, height: 520 }),
+    proyek('proyek-ahsp', 'AHSP'),
+    proyek('proyek-kurva-s', 'Kurva S'),
+    proyek('proyek-opname', 'Opname M8'),
+    proyek('proyek-termin', 'Termin 2', null, { x: 0, y: 0, width: 1000, height: 480 }),
+    proyek('proyek-cco', 'CCO', null, { x: 0, y: 0, width: 1300, height: 480 }),
+    proyek('proyek-harian', 'Harian 27-10'),
+    proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
+    proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
     { name: 'mulai-cepat', page: '01-halaman.page.js', clip: { x: 0, y: 0, width: 1000, height: 420 } },
     { name: 'boq', page: '01-boq.page.js', clip: { x: 0, y: 0, width: 1000, height: 330 } },
     { name: 'bagian-layar', page: '01-boq.page.js', clip: { x: 0, y: 0, width: 1366, height: 768 } },
@@ -27,7 +45,19 @@ export const SHOTS = [
         const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(150); await type('15'); await key('Enter', 'Enter', 13); await wait(300);
         const q = await cellAt(js, 1, 1); await click(q.x, q.y); await wait(150); await type('Besi'); await key('Enter', 'Enter', 13); await wait(400);
     }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
-    { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } }
+    { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } },
+    { name: 'gaya', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 900, height: 230 } },
+    { name: 'data', page: '07-data.page.js', clip: { x: 0, y: 110, width: 900, height: 260 } },
+    { name: 'filter-menu', page: '07-data.page.js', act: async ({ js, click, wait }) => {
+        const p = await js('(function(){ var b = document.querySelector(\'.ks-filter-button[data-filter-col="3"]\').getBoundingClientRect(); return { x: Math.round(b.left + 10), y: Math.round(b.top + 10) }; })()');
+        await click(p.x, p.y); await wait(500);
+    }, clip: { x: 0, y: 110, width: 900, height: 560 } },
+    { name: 'dropdown', page: '07-data.page.js', act: async ({ js, click, key, wait }) => {
+        const p = await cellAt(js, 3, 3); await click(p.x, p.y); await wait(200); await key('ArrowDown', 'ArrowDown', 40, 1); await wait(400);
+    }, clip: { x: 0, y: 110, width: 900, height: 330 } },
+    { name: 'aturan', page: '10-aturan.page.js', act: async ({ js, click, type, wait }) => {
+        const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(200); await type('1'); await wait(300);
+    }, clip: { x: 0, y: 110, width: 900, height: 510 } }
 ];
 
 export async function takeShots(filter) {

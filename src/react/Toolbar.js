@@ -128,7 +128,8 @@ export function Toolbar({ workbook: wb, sheetId: s, sel, zoom, onZoom, painting,
                 {FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
             </select> : null}
             {shown('tool.size', 'format.size') ? <select className="ks-tool-select ks-size" aria-label="Font size" title="Font size" disabled={!wb.can('format.size')} value={style.fontSize || 10} onChange={(e) => { setPart(wb, s, sel, 'fontSize', Number(e.target.value) === 10 ? null : Number(e.target.value)); onDone(); }}>
-                {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                {/* a size that is not in the list (14 from code, 13 from a file) is shown as it is, among the others */}
+                {[...new Set([...SIZES, style.fontSize || 10])].sort((x, y) => x - y).map((n) => <option key={n} value={n}>{n}</option>)}
             </select> : null}
             {sep('c')}
             {tool('Bold (Ctrl+B)', <Icon name="bold" />, () => toggle(wb, s, sel, 'bold'), style.bold)}
