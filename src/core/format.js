@@ -87,7 +87,8 @@ function dayNames(locale, style) {
  * ss s (seconds), a (AM/PM), and text in quotes. Day and month are told apart by case (M month, m minute), as in Java and in Intl.
  */
 export function formatDate(serial, pattern, locale) {
-    const d = serialToDate(serial);
+    // rounded to the second first, as Excel shows it: 8:00 typed as a fraction (0.333333) is 07:59:59.97, and it shows 08:00, not 07:59
+    const d = serialToDate(Math.round(serial * 86400) / 86400);
     const Y = d.getUTCFullYear(), Mo = d.getUTCMonth(), D = d.getUTCDate(), W = d.getUTCDay();
     const H = d.getUTCHours(), Mi = d.getUTCMinutes(), S = d.getUTCSeconds();
     const pad = (x, n) => String(x).padStart(n, '0');

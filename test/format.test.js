@@ -99,5 +99,12 @@ const serial = (y, m, d) => dateToSerial(new Date(Date.UTC(y, m - 1, d)));
     ok('a workbook in id-ID: typed values get their format, edit as written, undo as one change; money cells round; text cells keep text');
 }
 
+// a time a little under the whole minute shows the minute it rounds to, as in Excel (8:00 kept as 0.333333 is 07:59:59.97)
+{
+    assert.strictEqual(formatValue(0.333333, { type: 'time', pattern: 'HH:mm' }, US).text, '08:00');
+    assert.strictEqual(formatValue(46322.687499, { type: 'time', pattern: 'HH:mm:ss' }, US).text, '16:30:00');
+    ok('times are rounded to the second before they are shown');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');
