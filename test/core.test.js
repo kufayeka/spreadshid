@@ -253,6 +253,26 @@ const text = (v) => (isError(v) ? v.code : v);
     assert.strictEqual(t.input('C1'), '=SUM(A1:B1)');
     assert.strictEqual(t.value('C1'), 5);
     ok('a range loses the deleted rows or columns at its edges and keeps the rest, undo brings it back');
+
+    // the ranges kept outside the cells shrink the same way: a named range, conditional formatting, validation, a merge
+    const w3 = createWorkbook();
+    const u = w3.sheet('Sheet1');
+    u.setValues('A1', [['h'], [1], [2], [3]]);
+    w3.addName('Data', 'Sheet1', 'A2:A4');
+    u.setValues('C1', '=SUM(Data)');
+    u.addConditional('A2:A4', { op: 'gt', a: 0, style: { bold: true } });
+    u.addValidation('A2:A4', { kind: 'number', op: 'gt', a: 0 });
+    u.mergeCells('B2:B4');
+    u.deleteRows('2');
+    assert.strictEqual(w3.names()[0].ref, 'Sheet1!A2:A3');
+    assert.strictEqual(u.value('C1'), 5);
+    assert.deepStrictEqual(u.shownStyle('A3'), { bold: true });
+    assert.ok(u.validationAt('A3'), 'the validation still covers the rows that stay');
+    assert.deepStrictEqual(u.merges(), [{ r1: 1, c1: 1, r2: 2, c2: 1 }]);
+    w3.undo();
+    assert.strictEqual(w3.names()[0].ref, 'Sheet1!A2:A4');
+    assert.deepStrictEqual(u.merges(), [{ r1: 1, c1: 1, r2: 3, c2: 1 }]);
+    ok('named ranges, conditional formatting, validation and merges shrink too, in the same change');
 }
 
 console.log('\n' + passed + ' passed');

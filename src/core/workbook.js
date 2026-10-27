@@ -1595,6 +1595,41 @@ export function createWorkbook(doc, options) {
             bySheet.get(e.s).push({ row: e.row, col: e.col, before, after: { ...before, refs } });
         }
         for (const [sheet, list] of bySheet) changes.push({ t: 'cells', sheet, changes: list });
+
+        // The same for every other range the workbook keeps by the ids of its corners: merged cells, conditional formatting, validation, the filter,
+        // groups, pivot tables and the areas of access rules (in the props of the sheets) and named ranges (in the settings). They are found by their
+        // shape, an object with the two corner ids, so a feature added later is covered without being listed here. Ids are unique in the whole
+        // workbook, so a corner that is not a row (or column) of this sheet is never touched.
+        const shrink = (x) => {
+            if (Array.isArray(x)) {
+                let out = x;
+                x.forEach((v, i) => { const n = shrink(v); if (n !== v) { if (out === x) out = x.slice(); out[i] = n; } });
+                return out;
+            }
+            if (!x || typeof x !== 'object') return x;
+            let out = x;
+            for (const k of Object.keys(x)) { const n = shrink(x[k]); if (n !== x[k]) { if (out === x) out = { ...x }; out[k] = n; } }
+            if (typeof out[k1] !== 'string' || typeof out[k2] !== 'string') return out;
+            const a = indexOf(out[k1]), b = indexOf(out[k2]);
+            if (a < 0 || b < 0) return out;
+            const lo = Math.min(a, b), hi = Math.max(a, b);
+            if (!gone(lo) && !gone(hi)) return out;
+            let newLo = lo, newHi = hi;
+            while (newLo <= hi && gone(newLo)) newLo++;
+            while (newHi >= lo && gone(newHi)) newHi--;
+            if (newLo > newHi) return out;
+            out = { ...out };
+            out[a <= b ? k1 : k2] = idAt(newLo);
+            out[a <= b ? k2 : k1] = idAt(newHi);
+            return out;
+        };
+        for (const id of sheetOrder) {
+            const props = sheets.get(id).props;
+            const after = shrink(props);
+            if (after !== props) changes.push({ t: 'sheetProps', sheet: id, before: clone(props), after: clone(after) });
+        }
+        const settingsAfter = shrink(settings);
+        if (settingsAfter !== settings) changes.push({ t: 'settings', before: clone(settings), after: clone(settingsAfter) });
         return changes;
     }
     function deleteRows(s, at, count, how) {
