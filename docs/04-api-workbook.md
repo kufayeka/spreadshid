@@ -800,7 +800,7 @@ Setiap op juga membawa `user` (dari opsi `user`) dan `at` (waktu ISO). Menghapus
 
 Contoh yang menggabungkan isi bab ini dengan `<Sheet>`. Aplikasimu punya panel sendiri di samping sheet:
 
-1. Orang **memilih range** di sheet. `onSelectionChange` memberi `{ sheet, active, ranges, address }`, dengan `address` seperti `'C2:C5'`.
+1. Orang **memilih range** di sheet. `onSelectionChange` memberi `{ sheet, active, ranges, address }`, dengan `address` seperti `'C2:C5'`. Event ini muncul sekali setelah mouse dilepas, jadi panel tidak berkedip selama drag.
 2. Di panel, orang memilih **peran** dan **mode** (boleh diubah, hanya baca, tersembunyi, tidak terlihat), lalu menekan Tambah.
 3. Aturan itu masuk ke **policy**, objek JSON milik aplikasimu yang nanti disimpan ke database.
 4. `wb.setAccess(policy, siapa)` langsung menerapkannya. Dengan "Lihat sebagai", orang bisa mencoba hasilnya sebagai akun lain.

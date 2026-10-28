@@ -65,6 +65,21 @@ await withExample(async ({ js, send, click, mouse, type, key, wait }) => {
     await wait(250);
     check('handle.select("E4") selects it (the name box says so)', (await q('document.querySelector(".ks-namebox").value')) === 'E4');
     check('and onSelectionChange told the host', await q('window.__events.selection.some(function(a){ return a.r === 3 && a.c === 4; })'));
+    // a real drag from B2 over B3 and B4 to B5: while the mouse is down the host hears nothing, on mouse up it hears once, the whole range
+    const from = await cellAt(1, 1), over1 = await cellAt(2, 1), over2 = await cellAt(3, 1), to = await cellAt(4, 1);
+    await q('window.__events.selection.length = 0');
+    await mouse('mouseMoved', from.x, from.y);
+    await mouse('mousePressed', from.x, from.y);
+    await mouse('mouseMoved', over1.x, over1.y, { buttons: 1 }); await wait(80);
+    await mouse('mouseMoved', over2.x, over2.y, { buttons: 1 }); await wait(80);
+    await mouse('mouseMoved', to.x, to.y, { buttons: 1 }); await wait(80);
+    check('while dragging, onSelectionChange is not called', (await q('window.__events.selection.length')) === 0, await q('window.__events.selection'));
+    await mouse('mouseReleased', to.x, to.y);
+    await wait(150);
+    check('on mouse up it is called once, with where the drag ended', (await q('window.__events.selection.length')) === 1 && (await q('window.__events.selection[0].r')) === 1, await q('window.__events.selection'));
+    await clickCell(3, 4);
+    check('a plain click is told once', (await q('window.__events.selection.length')) === 2, await q('window.__events.selection'));
+
     await q('window.__sheet.current.startEdit("Rejected")');
     await wait(200);
     check('handle.startEdit opens the editor with a text', (await q('document.querySelector(".ks-input").value')) === 'Rejected');

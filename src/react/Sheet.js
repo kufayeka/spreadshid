@@ -143,7 +143,13 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const [zoom, setZoom] = useState(1);
     const [paint, setPaint] = useState(null);
     const onPaint = () => setPaint((p) => (p ? null : copyBlock(wb, sheetId, rectsOf(sel)[rectsOf(sel).length - 1])));
+    // While the mouse is still dragging, the selection grows cell by cell. The host is told only once, when the mouse is let go,
+    // so a rules panel or a toolbar does not redraw for every cell the mouse passes over.
+    const dragging = useRef(false);
+    const onSelectStart = () => { dragging.current = true; };
     const onSelectEnd = (picked) => {
+        dragging.current = false;
+        if (props.onSelectionChange) props.onSelectionChange(selectionOf(wb, sheetId, picked));
         if (!paint) return;
         const rects = rectsOf(picked);
         pasteClip(wb, sheetId, rects[rects.length - 1], paint, 'styles');
@@ -196,7 +202,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
         ];
         return () => offs.forEach((off) => off());
     }, [wb]);
-    useEffect(() => { if (props.onSelectionChange) props.onSelectionChange(selectionOf(wb, sheetId, sel)); }, [sel, sheetId]);
+    useEffect(() => { if (props.onSelectionChange && !dragging.current) props.onSelectionChange(selectionOf(wb, sheetId, sel)); }, [sel, sheetId]);
     // a notice goes after a while, a longer one (what an import left out) later
     useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), Math.min(12000, 4000 + notice.length * 40)); return () => clearTimeout(t); }, [notice]);
 
@@ -344,7 +350,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     toGrid();
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
-                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
+                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} onComment={() => setPanel({ kind: 'comments', start: Date.now() })} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}

@@ -23,7 +23,7 @@ Semua props boleh tidak diisi.
 | `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (dari orang, kode, atau undo). Sama dengan `wb.on('op', ...)` |
 | `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak. Sheet sudah menampilkan `reason` sebagai pemberitahuan; prop ini buat log atau tampilanmu sendiri |
 | `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak sesuai tipe kolomnya ([bab 10](10-aturan.md)) |
-| `onSelectionChange` | `(sel: SheetSelection) => void` | | seleksi berubah: `sel.address` (`'C2:C5'`), `sel.active` (`{ r, c, address }`), `sel.ranges`, `sel.sheet` ([4.13](04-api-workbook.md#413-editor-hak-akses-di-luar-sheet)) |
+| `onSelectionChange` | `(sel: SheetSelection) => void` | | seleksi berubah. Saat orang men-drag, dipanggil **sekali saja** setelah mouse dilepas, bukan tiap sel yang dilewati. Klik, panah, dan `select()` langsung dipanggil. Isinya: `sel.address` (`'C2:C5'`), `sel.active` (`{ r, c, address }`), `sel.ranges`, `sel.sheet` ([4.13](04-api-workbook.md#413-editor-hak-akses-di-luar-sheet)) |
 | `fileName` | string | `'Spreadsheet'` | nama file (tanpa ekstensi) saat orang memilih File → Download |
 | `access` | `{ policy, who }` | tanpa batasan | access policy dan orang yang membuka sheet ([bab 13](13-hak-akses.md)). Sheet cuma menerapkan; kebijakannya tetap milik aplikasimu |
 | `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya ([bab 14](14-komentar.md)) |

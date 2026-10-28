@@ -150,7 +150,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui, onComment }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectStart, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui, onComment }) {
     // what the access policy lets this person see (policy.js): no headers, no grid lines, only an area of the sheet
     const seen = ui || {};
     const HW = seen.headers === false ? 0 : ROW_HEADER_WIDTH, HH = seen.headers === false ? 0 : HEADER_HEIGHT;
@@ -571,6 +571,8 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // a drag from where the mouse went down: the rectangle (or the rows, or the columns) follows the mouse, and the grid scrolls when it leaves the edge
     function drag(start, first) {
         if (start.kind === 'all') return;
+        // the host hears of the selection once the mouse is let go, not for every cell it passes over (onSelectionChange)
+        if (onSelectStart) onSelectStart();
         let current = first;
         const move = (ev) => {
             const { x, y, rect } = pointIn(ev);

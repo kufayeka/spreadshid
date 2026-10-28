@@ -34,6 +34,7 @@ export interface SheetProps {
     onOp?: (event: { ops: Op[]; source: Source }) => void;
     onReject?: (event: { op: Op; reason: string; source: Source }) => void;
     onCellError?: (event: { address: string; field?: string; value: unknown; expected: string }) => void;
+    /** Called when the selection changes. A mouse drag calls it once, when the mouse is let go; a click, the arrow keys and select() call it at once. */
     onSelectionChange?: (selection: SheetSelection) => void;
     /** The name a download gets, without its extension. */
     fileName?: string;
