@@ -717,7 +717,7 @@ Minggu | Rencana | Realisasi | Rencana kum. | Realisasi kum.
 ```
 <!-- /hasil -->
 
-Di halaman overview, hasilnya ditampilkan di `<Sheet>` dengan access policy yang cuma boleh melihat: tanpa menu, toolbar, formula bar, dan tab,
+Di halaman overview, hasilnya ditampilkan di `<Sheet>` dengan aturan akses yang cuma boleh melihat: tanpa menu, toolbar, formula bar, dan tab,
 hanya area tabelnya:
 
 <!-- contoh: galeri-overview.page.js -->
@@ -751,16 +751,22 @@ function bukaOverview() {
 }
 
 // siapa pun yang membuka overview cuma melihat: tanpa menu, toolbar, formula bar, tab; hanya area tabelnya
-const HANYA_LIHAT = {
-    default: 'pembaca',
-    roles: { pembaca: { can: ['copy', 'download'], ui: { menubar: false, toolbar: false, formulaBar: false, tabs: false, area: 'A1:F9' } } }
-};
+const HANYA_LIHAT = [
+    { who: '*', effect: 'allow', action: 'read', where: 'A1:F9' },
+    { who: '*', effect: 'allow', action: 'copy' },
+    { who: '*', effect: 'allow', action: 'download' },
+    { who: '*', effect: 'allow', action: 'view.area', where: 'A1:F9' },
+    { who: '*', effect: 'deny', action: 'ui.menubar' },
+    { who: '*', effect: 'deny', action: 'ui.toolbar' },
+    { who: '*', effect: 'deny', action: 'ui.formulaBar' },
+    { who: '*', effect: 'deny', action: 'ui.tabs' }
+];
 
 export default function HalamanOverview() {
     const [wb] = useState(bukaOverview);
     return (
         <div style={{ height: 300 }}>
-            <Sheet workbook={wb} access={{ policy: HANYA_LIHAT, who: 'user:owner' }} />
+            <Sheet workbook={wb} access={{ rows: HANYA_LIHAT, who: 'owner' }} />
         </div>
     );
 }

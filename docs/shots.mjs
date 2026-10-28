@@ -55,7 +55,7 @@ export const SHOTS = [
         const p = await cellAt(js, 3, 7); await click(p.x, p.y); await wait(600);
     }, clip: { x: 0, y: 0, width: 1366, height: 600 } },
     { name: 'dua-tampilan', page: '11-dua-tampilan.page.js', clip: { x: 0, y: 0, width: 1366, height: 520 } },
-    { name: 'akses-kasir', page: '13-kasir.page.js', act: async ({ js, click, wait }) => {
+    { name: 'akses-kasir', page: '13-08-kasir.page.tsx', act: async ({ js, click, wait }) => {
         const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(200); await click(p.x, p.y); await wait(100);
     }, clip: { x: 0, y: 0, width: 1100, height: 400 } },
     { name: 'komentar', page: '14-komentar.page.js', act: async ({ js, click, mouse, wait }) => {
@@ -79,7 +79,7 @@ export const SHOTS = [
     { name: 'rumus-fill', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 3, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
     { name: 'rumus-dolar', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 5, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
     { name: 'rumus-terbilang', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 7, 1); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
-    { name: 'editor-akses', page: '04-editor-akses.page.js', act: async ({ js, click, mouse, wait }) => {
+    { name: 'editor-akses', page: '04-13-editor-akses.page.tsx', act: async ({ js, click, mouse, wait }) => {
         const a = await cellAt(js, 1, 2), b = await cellAt(js, 4, 2);
         await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(200);
         const pick = (sel, v) => js(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
@@ -88,7 +88,7 @@ export const SHOTS = [
         await click(t.x, t.y); await wait(200);
         await pick('.lihat-sebagai', 'user:rina'); await wait(400);
     }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
-    { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
+    { name: 'invoice', page: '04-05-invoice.page.tsx', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {
         const p = await js(`(function(){ var b = document.querySelector('.ks-filter-button[data-filter-col="2"]').getBoundingClientRect(); return { x: Math.round(b.left + 8), y: Math.round(b.top + 8) }; })()`);
         await click(p.x, p.y); await wait(500);

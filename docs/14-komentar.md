@@ -53,8 +53,8 @@ const punyaJoko = dewi.comments('Produk')[0].items[2];
 try { dewi.editComment('Produk', thread, punyaJoko.id, 'diubah orang lain'); } catch (err) { console.log('ubah milik Joko :', err.message); }
 
 // komentar ikut tersimpan di workbook, dan viewFor tidak mengirimnya ke orang tanpa hak comment.read
-const policy = { roles: { tamu: { can: [] } }, default: 'tamu' };
-console.log('dikirim ke tamu :', createWorkbook(viewFor(dewi.toJSON(), { policy, who: 'user:tamu' })).comments('Produk').length, 'diskusi');
+const access = [{ who: '*', effect: 'allow', action: 'read' }];   // tamu boleh membaca sel, tapi tidak punya comment.read
+console.log('dikirim ke tamu :', createWorkbook(viewFor(dewi.toJSON(), { access, who: 'tamu' })).comments('Produk').length, 'diskusi');
 ```
 <!-- /contoh -->
 
@@ -99,11 +99,11 @@ export default function DiskusiStok() {
   dan kembali ke selnya kalau penghapusan itu di-undo.
 - **Ditutup, bukan dihapus.** `resolveComment(..., true)` menutup diskusi: tanda di sel hilang, isinya tetap bisa dibaca di tab Resolved. Balasan baru
   membukanya lagi.
-- **Hanya penulisnya** yang boleh mengubah atau menghapus komentar. Pengecualiannya orang dengan hak `comment.moderate` kalau ada policy. Dari kode,
+- **Hanya penulisnya** yang boleh mengubah atau menghapus komentar. Pengecualiannya orang dengan hak `comment.moderate` kalau ada aturan akses. Dari kode,
   percobaan yang tidak boleh melempar error, sedangkan di layar tombolnya tidak ditampilkan. Menghapus komentar pertama sebuah diskusi menghapus seluruh
   diskusinya.
 - **Hak akses** ([bab 13](13-hak-akses.md)): `comment.read`, `comment.create`, `comment.reply`, `comment.resolve`, `comment.edit`, `comment.delete`,
-  `comment.moderate`. Tanpa policy, semua orang boleh membaca dan menulis. Dengan policy, orang tanpa `comment.read` tidak melihat panelnya, dan `viewFor`
+  `comment.moderate`. Tanpa aturan akses, semua orang boleh membaca dan menulis. Dengan aturan akses, orang tanpa `comment.read` tidak melihat panelnya, dan `viewFor`
   tidak mengirim komentar kepadanya.
 
 | Fungsi | Artinya |

@@ -82,7 +82,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {(event: { address: string, field?: string, value: any, expected: string }) => void} [onCellError]
  * @property {(sel: SheetSelection) => void} [onSelectionChange]
  * @property {string} [fileName]
- * @property {{ policy: object|null, who: any }} [access]
+ * @property {{ rows: object[]|null, who: any }} [access]
  * @property {{ id: string, name: string }} [user]
  * @property {boolean} [showProtected]
  * @property {string} [className]
@@ -103,7 +103,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
  * @param {(sel: SheetSelection) => void} [props.onSelectionChange]  The selection changed (see SheetSelection).
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
- * @param {{ policy: object|null, who: any }} [props.access]  The access policy of the workbook and the person who has it open (policy.js). It is the
+ * @param {{ rows: object[]|null, who: any }} [props.access]  The access rows of the workbook and the person who has it open (policy.js). It is the
  *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
  * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments.
  * @param {boolean} [props.showProtected]  Draw the protected cells striped (the rules are the workbook's: setRules).
@@ -131,7 +131,12 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
 
     // each sheet keeps its own selection, as in Google Sheets
     const [selections, setSelections] = useState(() => new Map());
-    const sel = selections.get(sheetId) || selectCell(0, 0);
+    // A sheet nobody has selected in yet starts at A1. That first selection is made once per sheet and kept, not made new on every render: the
+    // selection is a dependency of the effect that tells the host (onSelectionChange), and a new object each render would tell it again and again,
+    // and a host that keeps the selection in its state would render again, forever.
+    const firstSel = useRef(new Map());
+    if (!firstSel.current.has(sheetId)) firstSel.current.set(sheetId, selectCell(0, 0));
+    const sel = selections.get(sheetId) || firstSel.current.get(sheetId);
     const setSel = (next) => setSelections((m) => new Map(m).set(sheetId, typeof next === 'function' ? next(m.get(sheetId) || selectCell(0, 0)) : next));
     const [editing, setEditing] = useState(null);
     useEffect(() => { setEditing(null); }, [sheetId]);
@@ -167,9 +172,9 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     // the person who writes (their name on their comments)
     useEffect(() => { if (props.user) wb.setUser(props.user); }, [wb, props.user && props.user.id, props.user && props.user.name]);
     // the host's access policy for the person who has the sheet open, applied to the workbook whenever the host gives another
-    const policy = props.access ? props.access.policy : null;
+    const accessRows = props.access ? props.access.rows : null;
     const who = props.access ? props.access.who : null;
-    useEffect(() => { if (props.access) wb.setAccess(policy, who); }, [wb, policy, JSON.stringify(who), !!props.access]);
+    useEffect(() => { if (props.access) wb.setAccess(accessRows, who); }, [wb, accessRows, JSON.stringify(who), !!props.access]);
     // making a pivot table (its dialog), and its editor that opens when a cell of a pivot table is selected (and closes when one outside is)
     const [pivotDialog, setPivotDialog] = useState(null);
     useEffect(() => {

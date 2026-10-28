@@ -156,7 +156,7 @@ export type TypesSpec = { headerRow: number; fields: Record<string, ColumnType> 
 // ---- access -------------------------------------------------------------------------------------------------------------------------------------------
 
 export type RangeMode = 'edit' | 'readonly' | 'hidden' | 'invisible';
-/** A rule for some cells (setRules, and a role's ranges in a policy). */
+/** A rule for some cells that the host sets with setRules (access per person is AccessRow). */
 export interface Rule {
     sheet?: string;
     range?: string;
@@ -166,25 +166,36 @@ export interface Rule {
     mode: RangeMode;
     message?: string;
 }
-export interface RoleUi {
-    menubar?: boolean; toolbar?: boolean; formulaBar?: boolean; headers?: boolean; gridlines?: boolean; tabs?: boolean;
-    hide?: string[];
-    disallowed?: 'grey' | 'hide';
-    sheets?: string[];
-    area?: string | Record<string, string>;
+/** The parts of the screen a person sees (AccessInfo.ui). */
+export interface AccessUi {
+    menubar: boolean; toolbar: boolean; formulaBar: boolean; headers: boolean; gridlines: boolean; tabs: boolean;
+    hide: string[];
+    disallowed: 'grey' | 'hide';
+    sheets: string[] | null;
+    area: string | Record<string, string> | null;
 }
-export interface Role { can?: string[]; ui?: RoleUi; ranges?: Rule[] }
-/** Who may do what in a workbook: plain JSON your app keeps with the workbook. */
-export interface Policy {
-    owners?: string[];
-    members?: Record<string, string | string[]>;
-    default?: string;
-    message?: string;
-    roles: Record<string, Role>;
+/**
+ * One rule of access: one row of a table in your database. "who may (not) do what, where, when".
+ * The most specific row wins (user: over role: over *), deny wins within a level, and what no row allows is not given.
+ * @example
+ * { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Stok!col:Qty', when: '=$G2<>"Approved"', message: 'Already approved' }
+ */
+export interface AccessRow {
+    /** 'user:rina', 'role:kasir' or '*' (everyone). */
+    who: string;
+    effect: 'allow' | 'deny';
+    /** 'read', 'edit', 'see', an action of ACTIONS ('format.bold', 'sort' ...), a group ('format'), 'ui.toolbar', 'view.area', 'view.sheet' or '*'. */
+    action: string;
+    /** 'Stok!A1:F100', 'Stok!col:Qty', 'Stok' (a whole sheet), 'A1:F100'; empty: everywhere. */
+    where?: string | null;
+    /** A formula written for the first row of the range, true where the row holds ('=$G2="Approved"'). */
+    when?: string | null;
+    /** What the person is told when this refuses something. */
+    message?: string | null;
 }
-/** The person who opens: "user:rina", or { user: 'joko', groups: ['gudang'] }. */
-export type Who = string | { user?: string; groups?: string[] };
-export interface AccessInfo { owner: boolean; roles: string[]; ui: Required<Omit<RoleUi, 'area' | 'sheets'>> & { area: string | Record<string, string> | null; sheets: string[] | null }; message: string | null }
+/** The person who opens: 'rina' (a user), or { user: 'rina', roles: ['kasir'] }. */
+export type Who = string | { user?: string; roles?: string[] };
+export interface AccessInfo { owner: boolean; roles: string[]; ui: AccessUi; message: string | null }
 export interface CellMode { mode: RangeMode; message?: string }
 
 // ---- changes ------------------------------------------------------------------------------------------------------------------------------------------
@@ -244,7 +255,7 @@ export interface Patch {
 /** What a sheet handle (wb.sheet('Produk')) has. Every one is also on the workbook, with the sheet as the first argument. */
 export interface SheetFns {
     // writing
-    setValues(at: CellAt, value: CellValue | CellValue[] | CellValue[][] | ((r: number, c: number, before: CellContent | undefined) => CellValue | undefined), how?: How): Op[] | null;
+    setValues(at: CellAt, value: CellValue | CellValue[] | CellValue[][], how?: How): Op[] | null;
     setValues(r: number, c: number, value: CellValue | CellValue[] | CellValue[][], how?: How): Op[] | null;
     setBlock(entries: Array<{ at?: string; r?: number; c?: number; value?: CellValue; style?: Style }>, how?: How): Op[] | null;
     clear(range: RangeAt, how?: How): Op[] | null;
@@ -355,7 +366,7 @@ export type WithSheet<T> = { [K in keyof T]: T[K] extends (...args: infer A) => 
 
 /** A workbook: createWorkbook(). */
 export interface Workbook extends WithSheet<Omit<SheetFns, 'setValues'>> {
-    setValues(sheet: SheetRef, at: CellAt, value: CellValue | CellValue[] | CellValue[][] | ((r: number, c: number, before: CellContent | undefined) => CellValue | undefined), how?: How): Op[] | null;
+    setValues(sheet: SheetRef, at: CellAt, value: CellValue | CellValue[] | CellValue[][], how?: How): Op[] | null;
     setValues(sheet: SheetRef, r: number, c: number, value: CellValue | CellValue[] | CellValue[][], how?: How): Op[] | null;
     readonly id: string;
     readonly version: number;
@@ -391,7 +402,7 @@ export interface Workbook extends WithSheet<Omit<SheetFns, 'setValues'>> {
     // the person and the rules
     setUser(user: { id: string; name: string } | string | null): void;
     setRules(rules: Rule[]): void;
-    setAccess(policy: Policy | null, who?: Who): void;
+    setAccess(rows: AccessRow[] | null, who?: Who): void;
     access(): AccessInfo;
     can(action: string): boolean;
     shows(id: string): boolean;
@@ -440,9 +451,9 @@ export function fromApiMakerType(type: object, library?: Record<string, object>)
 export function fieldType(field: object, library?: Record<string, object>): ColumnType;
 export function checkValue(type: ColumnType, value: unknown): string | null;
 
-export function mergePatch(doc: WorkbookDoc, patch: Patch, what?: { rules?: Rule[]; policy?: Policy; who?: Who }): WorkbookDoc;
-export function checkPatch(doc: WorkbookDoc, patch: Patch, what: { rules?: Rule[]; types?: Record<string, TypesSpec>; policy?: Policy; who?: Who }): { ok: boolean; problems: Array<{ sheet: string | null; address: string | null; reason: string }> };
-export function viewFor(doc: WorkbookDoc, what: { rules?: Rule[]; policy?: Policy; who?: Who }): WorkbookDoc;
+export function mergePatch(doc: WorkbookDoc, patch: Patch, what?: { rules?: Rule[]; access?: AccessRow[]; who?: Who }): WorkbookDoc;
+export function checkPatch(doc: WorkbookDoc, patch: Patch, what: { rules?: Rule[]; types?: Record<string, TypesSpec>; access?: AccessRow[]; who?: Who }): { ok: boolean; problems: Array<{ sheet: string | null; address: string | null; reason: string }> };
+export function viewFor(doc: WorkbookDoc, what: { rules?: Rule[]; access?: AccessRow[]; who?: Who }): WorkbookDoc;
 
 /** A copy of cells (copyBlock), to paste with pasteClip. */
 export interface Clip { v: 1; h: number; w: number; origin: { sheet: string; r: number; c: number }; cells: object[][]; cut?: boolean }
@@ -468,8 +479,9 @@ export function exportCsv(wb: Workbook, sheet: SheetRef, options?: { delimiter?:
 export function parseCsv(text: string, delimiter?: string): string[][];
 export function codeOfFormat(format: Format, settings?: Settings): string;
 
-export function resolveAccess(policy: Policy | null, who?: Who): AccessInfo & { can(action: string): boolean };
+export function resolveAccess(rows: AccessRow[] | null, who?: Who): AccessInfo & { can(action: string): boolean };
 export const ACTIONS: string[];
 export const ACTION_INFO: Array<{ id: string; label: string; group: string }>;
 export const UI_ITEMS: Array<{ id: string; label: string; group: string }>;
-export function validatePolicy(policy: unknown): Array<{ path: string; problem: string }>;
+export function validateAccess(rows: unknown): Array<{ row: number; problem: string }>;
+export function parseWhere(where: string | null | undefined): { sheet: string | null; range: string | null; columns: string[] | null };

@@ -16,7 +16,7 @@ const bare = (x) => (x && typeof x === 'object' && typeof x.f === 'string' ? { f
  * The stored workbook with a patch put on it (the shape pendingPatch() gives): sheets, columns and rows written whole by id, deleted ones taken out.
  * @param {import('./workbook.js').WorkbookDoc} doc
  * @param {ReturnType<ReturnType<typeof createWorkbook>['pendingPatch']>} patch
- * @param {{ policy?: object, who?: any, rules?: object[] }} [what]  The policy and the person (as viewFor takes them): the cells they were not given
+ * @param {{ access?: object[], who?: any, rules?: object[] }} [what]  The policy and the person (as viewFor takes them): the cells they were not given
  *   are kept as stored (their browser had them empty, or as answers), whatever the patch says of them.
  */
 export function mergePatch(doc, patch, what) {
@@ -59,7 +59,7 @@ export function mergePatch(doc, patch, what) {
  *
  * @param {import('./workbook.js').WorkbookDoc} doc  The workbook as it is stored now.
  * @param {object} patch
- * @param {{ rules?: object[], types?: Object<string, object>, policy?: object, who?: any }} what  The rules (as setRules takes them), the types per sheet
+ * @param {{ rules?: object[], types?: Object<string, object>, access?: object[], who?: any }} what  The rules (as setRules takes them), the types per sheet
  *   name or id (as setTypes), and the access policy with the person who saves (policy.js): what they may not do is a problem too.
  */
 export function checkPatch(doc, patch, what) {
@@ -67,7 +67,7 @@ export function checkPatch(doc, patch, what) {
     patch = keepHeld(doc, patch, what);
     const before = workbookFor(doc, what);
     const after = workbookFor(mergePatch(doc, patch), what);
-    if (what && what.policy !== undefined && !before.access().owner) {
+    if (what && what.access !== undefined && !before.access().owner) {
         problems.push(...refusedActions(doc, patch, before, what.who));
         // a sheet the person does not see cannot be written by them
         const unseen = new Set(before.sheetIds().filter((s) => !before.sheetShown(s)));
@@ -85,7 +85,7 @@ export function checkPatch(doc, patch, what) {
 
     // the rows of a sort (their contents only moved among them) are let through where the person may sort but not edit
     const noEdit = before.access().message || 'You can only view this sheet';
-    const sorted = what && what.policy !== undefined && before.can('sort') ? sortedRows(doc, patch) : new Set();
+    const sorted = what && what.access !== undefined && before.can('sort') ? sortedRows(doc, patch) : new Set();
     for (const row of patch.rows.upsert) {
         const s = row.sheetId;
         const stored = storedRows.get(row.id);
@@ -131,7 +131,7 @@ export function checkPatch(doc, patch, what) {
 function workbookFor(doc, what) {
     const wb = createWorkbook(doc);
     if (what && what.rules) wb.setRules(what.rules);
-    if (what && what.policy !== undefined) wb.setAccess(what.policy, what.who);
+    if (what && what.access !== undefined) wb.setAccess(what.access, what.who);
     return wb;
 }
 
@@ -195,7 +195,7 @@ const hiddenBySheet = new Map();
  * The workbook as a person may have it (what the server sends them): the hidden and invisible cells' content left out, and a formula that reads one of
  * them given as its answer. The host's rules and the policy (policy.js) decide, as the browser does; nothing the person may not see leaves the server.
  * @param {import('./workbook.js').WorkbookDoc} doc
- * @param {{ policy?: object, who?: any, rules?: object[] }} what
+ * @param {{ access?: object[], who?: any, rules?: object[] }} what
  */
 export function viewFor(doc, what) {
     const wb = workbookFor(doc, what);
@@ -218,7 +218,7 @@ export function viewFor(doc, what) {
 
 // the cells a person was not given, put back from what is stored into the rows a patch writes (the person's browser had them empty, or as answers)
 function keepHeld(doc, patch, what) {
-    if (!what || what.policy === undefined) return patch;
+    if (!what || what.access === undefined) return patch;
     const wb = workbookFor(doc, what);
     const out = clone(patch);
     // the comments of a person who may not read them were not sent: the sheets they save keep the stored ones

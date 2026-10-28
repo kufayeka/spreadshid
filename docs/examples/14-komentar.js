@@ -42,5 +42,5 @@ const punyaJoko = dewi.comments('Produk')[0].items[2];
 try { dewi.editComment('Produk', thread, punyaJoko.id, 'diubah orang lain'); } catch (err) { console.log('ubah milik Joko :', err.message); }
 
 // komentar ikut tersimpan di workbook, dan viewFor tidak mengirimnya ke orang tanpa hak comment.read
-const policy = { roles: { tamu: { can: [] } }, default: 'tamu' };
-console.log('dikirim ke tamu :', createWorkbook(viewFor(dewi.toJSON(), { policy, who: 'user:tamu' })).comments('Produk').length, 'diskusi');
+const access = [{ who: '*', effect: 'allow', action: 'read' }];   // tamu boleh membaca sel, tapi tidak punya comment.read
+console.log('dikirim ke tamu :', createWorkbook(viewFor(dewi.toJSON(), { access, who: 'tamu' })).comments('Produk').length, 'diskusi');

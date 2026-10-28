@@ -40,7 +40,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `populate` | data dari luar ke sheet, tetap sebagai data | [9](09-populate.md) |
 | `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [10.2](10-aturan.md#102-tipe-kolom) |
 | `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [12](12-server.md) |
-| `resolveAccess`, `validatePolicy`, `ACTIONS`, `ACTION_INFO`, `UI_ITEMS` | access control | [13](13-hak-akses.md) |
+| `resolveAccess`, `validateAccess`, `parseWhere`, `ACTIONS`, `ACTION_INFO`, `UI_ITEMS` | access control | [13](13-hak-akses.md) |
 | `exportXlsx`, `importXlsx`, `importXlsxInto` | file `.xlsx` | [15](15-excel.md) |
 | `exportCsv`, `importCsvInto`, `parseCsv`, `codeOfFormat` | CSV, dan kode format Excel | [15](15-excel.md) |
 
@@ -98,7 +98,7 @@ Handle juga punya `id` dan `name`.
 | syarat conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
 | jenis validasi | [7.4](07-data.md#74-validasi-data) |
 | spesifikasi pivot | [8.2](08-pivot.md#82-spesifikasi) |
-| tindakan dan bagian layar access control | [13.2](13-hak-akses.md#132-bentuk-policy) |
+| semua isi `action` aturan akses | [13.12](13-hak-akses.md#1312-referensi) |
 | yang ikut dan tidak ke Excel | [15](15-excel.md) |
 | menu dan toolbar | [16](16-layar.md) |
 

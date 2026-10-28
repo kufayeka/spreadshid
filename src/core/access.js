@@ -76,11 +76,14 @@ export function resolveRules(wb, rules) {
             const headerRowId = cols ? wb.rowId(s, headerRow) : null;
             // the modes of access control (policy.js): edit, readonly, hidden, invisible; anything else is read only
             const mode = ['edit', 'hidden', 'invisible'].includes(rule.mode) ? rule.mode : 'readonly';
-            out.push({ s, corners, cols, headerRowId, when: rule.when || null, baseRow, mode, message: rule.message || null, cache: new Map() });
+            out.push({ s, corners, cols, headerRowId, when: rule.when || null, baseRow, mode, message: rule.message || null, level: rule.level || 0, deny: !!rule.deny, cache: new Map() });
         }
     }
     return out;
 }
+
+// how much a mode keeps from a person (an allow that gives more wins among the allows of one level)
+const RANK_OF = { edit: 1, readonly: 2, hidden: 3, invisible: 4 };
 
 /**
  * What a rule makes of the cell (r, c) of sheet s: 'hidden', 'readonly' or null, and the message of the rule that decided.
@@ -89,7 +92,9 @@ export function resolveRules(wb, rules) {
  * @param {number} revision  The workbook's revision: the conditions worked out for a row are kept until it changes.
  */
 export function modeOf(wb, rules, s, r, c, revision) {
-    let found = null;
+    // the host's own rules (level 0) always hold; of the access rows (policy.js) only the most specific level that covers the cell counts
+    // within that level a deny wins, and among the allows the one that gives more (edit over read): "read A1:F10, edit C2:C10" opens C
+    let found = null, denied = null, allowed = null, best = 0;
     for (const rule of rules) {
         if (rule.s !== s) continue;
         if (rule.corners) {
@@ -99,10 +104,15 @@ export function modeOf(wb, rules, s, r, c, revision) {
         }
         if (rule.cols && (!rule.cols.has(wb.colId(s, c)) || wb.rowId(s, r) === rule.headerRowId)) continue;
         if (rule.when && !conditionHolds(wb, rule, s, r, revision)) continue;
-        // where rules meet, the stronger mode wins (edit < readonly < hidden < invisible)
-        found = strongerMode(found, { mode: rule.mode, message: rule.message });
+        // where rules of one level meet, the stronger mode wins (edit < readonly < hidden < invisible)
+        const m = { mode: rule.mode, message: rule.message };
+        if (!rule.level) { found = strongerMode(found, m); continue; }
+        if (rule.level > best) { best = rule.level; denied = null; allowed = null; }
+        if (rule.level !== best) continue;
+        if (rule.deny) denied = strongerMode(denied, m);
+        else allowed = !allowed || RANK_OF[m.mode] < RANK_OF[allowed.mode] ? m : allowed;
     }
-    return found;
+    return strongerMode(found, denied || allowed);
 }
 
 // a rule's condition for one row, worked out once per row and revision

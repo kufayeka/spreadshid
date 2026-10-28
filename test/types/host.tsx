@@ -2,7 +2,7 @@
 // mistake the types must catch: if one compiles, the types are too loose and the test fails.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, useWorkbook } from '@kufayeka/sheet';
-import type { SheetHandle, SheetSelection, Workbook, Policy } from '@kufayeka/sheet';
+import type { SheetHandle, SheetSelection, Workbook, AccessRow } from '@kufayeka/sheet';
 import { createWorkbook, isError, populate, pivot, tableOf, checkPatch, mergePatch, exportXlsx } from '@kufayeka/sheet/core';
 import type { CellResult, Op, WorkbookDoc } from '@kufayeka/sheet/core';
 
@@ -72,7 +72,7 @@ export function Lembar({ id }: { id: string }) {
             <button onClick={simpan} disabled={!unsaved}>Simpan {range}</button>
             <button onClick={tulis}>tulis</button>
             <Sheet ref={ref} workbook={wb} fileName={id} style={{ flex: 1 }} onSelectionChange={onSelect}
-                onReject={(e) => console.log(e.reason)} access={{ policy: null, who: 'user:rina' }} />
+                onReject={(e) => console.log(e.reason)} access={{ rows: null, who: 'rina' }} />
             {/* @ts-expect-error a prop that does not exist */}
             <Sheet workbok={wb} />
         </div>
@@ -88,11 +88,11 @@ export function server(doc: WorkbookDoc) {
     void p.cells;
     // @ts-expect-error a pivot function that does not exist
     pivot(records, { values: [{ field: 'No', fn: 'TOTAL' }] });
-    const policy: Policy = { roles: { kasir: { can: ['sort'], ranges: [{ sheet: 'Produk', range: 'C2:C5', mode: 'hidden' }] } } };
-    // @ts-expect-error a mode that does not exist
-    const bad: Policy = { roles: { kasir: { ranges: [{ range: 'A1', mode: 'secret' }] } } };
+    const access: AccessRow[] = [{ who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!C2:C5' }];
+    // @ts-expect-error an effect that does not exist
+    const bad: AccessRow = { who: 'role:kasir', effect: 'maybe', action: 'read' };
     void bad;
-    const result = checkPatch(doc, wb.pendingPatch(), { policy, who: 'user:rina' });
+    const result = checkPatch(doc, wb.pendingPatch(), { access, who: { user: 'rina', roles: ['kasir'] } });
     if (result.ok) return mergePatch(doc, wb.pendingPatch());
     const bytes: Uint8Array = exportXlsx(wb);
     void bytes;

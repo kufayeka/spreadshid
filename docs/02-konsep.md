@@ -241,7 +241,7 @@ Fungsi yang mengubah workbook menerima parameter terakhir `how`, misalnya `{ sou
 | `cellError` | `{ address, field, value, expected }` | nilai tidak cocok dengan tipe kolomnya ([bab 10](10-aturan.md)) |
 | `saved` | | setelah `wb.saved(...)` |
 | `layout` | | ukuran baris/kolom atau aturan berubah (dipakai tampilan) |
-| `access` | `{ owner, roles, ui, message }` | access policy diganti ([bab 13](13-hak-akses.md)) |
+| `access` | `{ owner, roles, ui, message }` | aturan akses diganti ([bab 13](13-hak-akses.md)) |
 
 ## 2.6 Menyimpan
 

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
+import type { Workbook, BorderSide } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 
 // Invoice toko: merge, warna, border, format uang dan persen, teks yang turun, lebar kolom, tanpa garis sel.
-function buatInvoice() {
+function buatInvoice(): Workbook {
     const wb = createWorkbook();
     wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
     const inv = wb.sheet('Sheet1');
@@ -30,7 +31,7 @@ function buatInvoice() {
     inv.setStyle('D5:E10', { format: { type: 'money', decimals: 0 } });
     inv.setStyle('D8:D10', { align: 'right', bold: true });
     inv.setStyle('A10:E10', { fill: '#e8f0fe', bold: true, fontSize: 12 });
-    const tipis = { style: 'solid', width: 1, color: '#dadce0' };
+    const tipis: BorderSide = { style: 'solid', width: 1, color: '#dadce0' };
     inv.setStyle('A4:E7', { borders: { bottom: tipis } });
     inv.setStyle('D10:E10', { borders: { top: { style: 'double', width: 3, color: '#1a73e8' } } });
     inv.setRowProps('1', { height: 40 });
@@ -49,4 +50,4 @@ export default function Invoice() {
 }
 // ----- tampilkan -----
 import { createRoot } from 'react-dom/client';
-createRoot(document.getElementById('root')).render(<Invoice />);
+createRoot(document.getElementById('root')!).render(<Invoice />);

@@ -1,5 +1,5 @@
-// An access editor the host builds outside the sheet (docs/examples/04-editor-akses.page.js), in a real Chrome: a range dragged in the sheet comes to
-// the host as "C2:C5" (onSelectionChange), a rule made from it goes in the policy, and "view as" shows the sheet as that person gets it.
+// An access editor the host builds outside the sheet (docs/examples/04-13-editor-akses.page.tsx), in a real Chrome: a range dragged in the sheet comes to
+// the host as "C2:C5" (onSelectionChange), a rule made from it is a new row of the access table, and "view as" shows the sheet as that person gets it.
 //   node test/grid-access-editor.test.js     (needs Chrome and a build: npm run build)
 import { chromeAvailable, withExample } from './chrome.js';
 
@@ -25,12 +25,13 @@ await withExample(async ({ js, click, mouse, wait }) => {
     await wait(200);
     check('the dragged range comes to the host as an address', (await text('.range-terpilih')) === 'Produk!C2:C5', await text('.range-terpilih'));
 
-    await pick('.pilih-peran', 'kasir');
+    await pick('.pilih-peran', 'role:kasir');
     await pick('.pilih-mode', 'hidden');
     const add = await js('(function(){ var e = document.querySelector(".tambah-aturan").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
     await click(add.x, add.y);
     await wait(200);
-    check('the rule is in the policy', (await js('document.querySelector(".editor-akses").textContent')).includes('Produk!C2:C5: tersembunyi'));
+    const last = await js('Array.from(document.querySelectorAll(".daftar-aturan tbody tr")).pop().textContent');
+    check('the rule is a new row of the table: role:kasir deny read Produk!C2:C5', last.startsWith('role:kasirdenyreadProduk!C2:C5'), last);
 
     check('the owner still sees the cost price', (await shown(1, 2)) === 'Rp 64.000', await shown(1, 2));
     await pick('.lihat-sebagai', 'user:rina');
@@ -40,7 +41,7 @@ await withExample(async ({ js, click, mouse, wait }) => {
     await pick('.lihat-sebagai', 'user:joko');
     await wait(300);
     check('as Joko (gudang), the rule of the kasir does not count', (await shown(1, 2)) === 'Rp 64.000', await shown(1, 2));
-}, '../docs/examples/04-editor-akses.page.js');
+}, '../docs/examples/04-13-editor-akses.page.tsx');
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL OK');
 process.exit(failures ? 1 : 0);

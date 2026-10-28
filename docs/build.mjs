@@ -8,7 +8,8 @@
 //
 //   node docs/build.mjs           writes the documentation again
 //   node docs/build.mjs --check   says what is not up to date (and fails), writes nothing (test/docs.test.js runs it)
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { transformSync } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,9 @@ const MOUNT = '// ----- tampilkan -----';
 
 /** The documents: the README and every chapter. */
 export const documents = () => ['README.md', ...readdirSync(here).filter((f) => f.endsWith('.md')).sort().map((f) => 'docs/' + f)];
+
+// the language of a block of code, by the end of the file's name
+const langOf = (name) => (/\.tsx$/.test(name) ? 'tsx' : /\.ts$/.test(name) ? 'ts' : /\.page\.js$|jsx/.test(name) ? 'jsx' : /\.sql$/.test(name) ? 'sql' : 'js');
 
 function codeOf(name) {
     const file = join(examples, name);
@@ -33,8 +37,21 @@ function codeOf(name) {
 const outputs = new Map();
 function outputOf(name) {
     if (!outputs.has(name)) {
-        const text = execFileSync(process.execPath, [join(examples, name)], { cwd: root, encoding: 'utf8' });
-        outputs.set(name, text.replace(/\r\n/g, '\n').trimEnd());
+        let file = join(examples, name);
+        // a TypeScript example is turned into JavaScript next to itself first (Node does not strip types from files under node_modules, where the
+        // package lives), run, and the JavaScript taken away again; test/docs.test.js checks its types with tsc
+        const ts = /\.ts$/.test(name);
+        if (ts) {
+            const js = transformSync(readFileSync(file, 'utf8'), { loader: 'ts', format: 'esm', sourcefile: name }).code;
+            file = join(examples, '_run-' + name.replace(/[\\/]/g, '-').replace(/\.ts$/, '.mjs'));
+            writeFileSync(file, js);
+        }
+        try {
+            const text = execFileSync(process.execPath, [file], { cwd: root, encoding: 'utf8' });
+            outputs.set(name, text.replace(/\r\n/g, '\n').trimEnd());
+        } finally {
+            if (ts) rmSync(file, { force: true });
+        }
     }
     return outputs.get(name);
 }
@@ -42,7 +59,7 @@ function outputOf(name) {
 /** A document with its examples and their outputs put in. */
 export function built(text) {
     return text
-        .replace(/<!-- contoh: ([\w./-]+) -->[\s\S]*?<!-- \/contoh -->/g, (m, name) => '<!-- contoh: ' + name + ' -->\n```' + (/\.page\.js$|jsx/.test(name) ? 'jsx' : /\.sql$/.test(name) ? 'sql' : 'js') + '\n' + codeOf(name) + '\n```\n<!-- /contoh -->')
+        .replace(/<!-- contoh: ([\w./-]+) -->[\s\S]*?<!-- \/contoh -->/g, (m, name) => '<!-- contoh: ' + name + ' -->\n```' + langOf(name) + '\n' + codeOf(name) + '\n```\n<!-- /contoh -->')
         .replace(/<!-- hasil: ([\w./-]+) -->[\s\S]*?<!-- \/hasil -->/g, (m, name) => '<!-- hasil: ' + name + ' -->\n```text\n' + outputOf(name) + '\n```\n<!-- /hasil -->')
         // what the example writes is markdown itself (a table): put in as it is
         .replace(/<!-- tabel: ([\w./-]+) -->[\s\S]*?<!-- \/tabel -->/g, (m, name) => '<!-- tabel: ' + name + ' -->\n' + outputOf(name) + '\n<!-- /tabel -->');

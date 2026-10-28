@@ -1,6 +1,6 @@
 // The public types of @kufayeka/sheet (the React part), written by hand: see core.d.ts. The build copies this file to dist/types/index.d.ts.
 import type { ForwardRefExoticComponent, RefAttributes, CSSProperties } from 'react';
-import type { Workbook, Op, Source, Policy, Who } from './core/index.js';
+import type { Workbook, Op, Source, AccessRow, Who } from './core/index.js';
 
 /** What is selected, as the host gets it (onSelectionChange, ref.getSelection()). */
 export interface SheetSelection {
@@ -38,7 +38,7 @@ export interface SheetProps {
     onSelectionChange?: (selection: SheetSelection) => void;
     /** The name a download gets, without its extension. */
     fileName?: string;
-    access?: { policy: Policy | null; who: Who };
+    access?: { rows: AccessRow[] | null; who: Who };
     user?: { id: string; name: string };
     showProtected?: boolean;
     className?: string;

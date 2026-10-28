@@ -415,9 +415,9 @@ await db.query('update spreadsheet set content = $2 where id = $1', [id, baru]);
 | `wb.pendingPatch()` | yang berubah sejak simpan terakhir |
 | `wb.saved(patch?)` | tandai sudah tersimpan. Tanpa patch: semuanya, untuk simpan utuh |
 | `wb.unsaved()` | ada yang belum tersimpan atau tidak |
-| `checkPatch(content, patch, { rules, types, policy, who })` | `{ ok, problems }` |
+| `checkPatch(content, patch, { rules, types, access, who })` | `{ ok, problems }` |
 | `mergePatch(content, patch)` | `content` baru dengan patch digabungkan |
-| `viewFor(content, { rules, policy, who })` | `content` tanpa data yang tidak boleh dilihat orang itu |
+| `viewFor(content, { rules, access, who })` | `content` tanpa data yang tidak boleh dilihat orang itu |
 
 ### Data rahasia: `viewFor`
 

@@ -4,6 +4,7 @@
 import assert from 'node:assert';
 import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
@@ -26,17 +27,17 @@ ok('every example in the documentation runs, and its code and output are the one
 
 // every page example renders to HTML on a server (the part above its "tampilkan" line: what a reader copies)
 const tmp = join(here, '.docs-ssr');
-const pages = readdirSync(examples).filter((f) => f.endsWith('.page.js') || f === '01-next-page.js');
+const pages = readdirSync(examples).filter((f) => f.endsWith('.page.js') || f.endsWith('.page.tsx') || f === '01-next-page.js');
 for (const name of pages) {
     const text = readFileSync(join(examples, name), 'utf8');
     const code = text.split('// ----- tampilkan -----')[0];
     const out = await build({
-        stdin: { contents: code, resolveDir: examples, sourcefile: name, loader: 'jsx' }, bundle: true, write: false, format: 'esm', platform: 'node',
+        stdin: { contents: code, resolveDir: examples, sourcefile: name, loader: name.endsWith('.tsx') ? 'tsx' : 'jsx' }, bundle: true, write: false, format: 'esm', platform: 'node',
         jsx: 'automatic', external: ['react', 'react-dom', 'react/jsx-runtime'], loader: { '.css': 'empty' }, logLevel: 'silent'
     });
     // written in the package (and taken away after), so React is found the way a reader's app finds it
     mkdirSync(tmp, { recursive: true });
-    const file = join(tmp, name.replace(/\.js$/, '.mjs'));
+    const file = join(tmp, name.replace(/\.(js|tsx)$/, '.mjs'));
     writeFileSync(file, out.outputFiles[0].text);
     const mod = await import(pathToFileURL(file).href);
     const html = renderToString(createElement(mod.default));
@@ -54,9 +55,17 @@ for (const doc of documents()) {
     for (const [, link] of text.matchAll(/\]\(([\w./-]+\.md)(#[\w.-]*)?\)/g)) assert.ok(existsSync(resolve(dirname(file), link)), doc + ': the page ' + link + ' is there');
     for (const [, name] of text.matchAll(/<!-- (?:contoh|hasil|tabel): ([\w./-]+) -->/g)) used.add(name);
 }
-const unused = readdirSync(examples).filter((f) => (f.endsWith('.js') || f.endsWith('.sql')) && !used.has(f));
+const unused = readdirSync(examples).filter((f) => /\.(js|ts|tsx|sql)$/.test(f) && !f.endsWith('.d.ts') && !used.has(f));
 assert.deepStrictEqual(unused, [], 'every example file is in the documentation');
 ok('every picture, link and example file is there, and every example is used');
+
+// the TypeScript examples type-check with strict against the package's own types: what a reader copies compiles in their project
+if (readdirSync(examples).some((f) => /\.tsx?$/.test(f) && !f.endsWith('.d.ts'))) {
+    const tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc');
+    try { execFileSync(process.execPath, [tsc, '-p', join(examples, 'tsconfig.json')], { encoding: 'utf8', stdio: 'pipe' }); }
+    catch (err) { assert.fail('the TypeScript examples do not type-check:\n' + (err.stdout || err.message)); }
+    ok('every TypeScript example type-checks with strict');
+}
 
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');

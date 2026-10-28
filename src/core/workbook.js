@@ -643,7 +643,7 @@ export function createWorkbook(doc, options) {
      * The access policy of the workbook and the person who has it open (policy.js): what they may do, what they see, and the rules of their ranges.
      * It is the host's (kept in its database, given again on every open); null takes it away (everything is allowed).
      * @param {object|null} policy
-     * @param {string|{ user?: string, groups?: string[] }} who
+     * @param {string|{ user?: string, roles?: string[] }} who
      */
     function setAccess(policy, who) {
         access = resolveAccess(policy, who);
@@ -681,6 +681,8 @@ export function createWorkbook(doc, options) {
     function cellMode(s, r, c, action) {
         if (anyPivots() && pivotAt(s, r, c)) return { mode: 'readonly', message: 'This is a pivot table: change it in its editor' };
         const m = rules.length ? modeOf(api, rules, s, r, c, revision) : null;
+        // a read-only cell may still be moved by an action of its own (a sort) when the person may do that action
+        if (m && m.mode === 'readonly' && action && action !== 'edit' && access.can(action)) return null;
         if (m) return m.mode === 'edit' ? null : m;
         // a change made for an action of its own (a sort) needs that action, not 'edit'
         if (!access.can('edit') && !(action && access.can(action))) return { mode: 'readonly', message: access.message || 'You can only view this sheet' };

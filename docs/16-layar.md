@@ -9,7 +9,7 @@ bahasa Inggris.
 ![Bagian-bagian layar](img/bagian-layar.png)
 
 Dari atas ke bawah: **menubar**, **toolbar**, **kotak alamat** dan **formula bar**, **grid** dengan judul kolom dan nomor baris, dan **tab sheet** di
-bawah. Setiap bagian bisa disembunyikan per peran lewat policy ([13.2](13-hak-akses.md#132-bentuk-policy)).
+bawah. Setiap bagian bisa disembunyikan per role atau per akun lewat aturan `ui.*` ([13.8](13-hak-akses.md#138-langkah-7-tampilan-layar)).
 
 ## 16.1 Menu
 
@@ -47,7 +47,7 @@ Clear contents, Hide dan Unhide, Merge dan Unmerge, serta Sort.
 | Σ | fungsi cepat: SUM, AVERAGE, COUNT, MAX, MIN untuk seleksi |
 | T× | hapus format |
 
-Tombol yang tidak boleh dipakai seseorang tampil abu-abu, atau hilang kalau policy memakai `disallowed: 'hide'`.
+Tombol yang tidak boleh dipakai seseorang tampil abu-abu, atau hilang kalau ada aturan `deny ui.disallowed`.
 
 ## 16.3 Panel samping
 
