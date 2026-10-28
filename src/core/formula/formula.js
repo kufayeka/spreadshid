@@ -4,7 +4,7 @@
 //
 // "=SUM(A1:A5)*2", "=IF(B2>10;"high";"low")" (the arguments are separated by , or ;). References: A1, $A$1, A1:B5, B:B (a whole column), 2:2 (a whole row).
 import { colName, colIndex, MAX_ROWS, MAX_COLS } from "./address.js";
-import { ERR, XlRange, isError, isRange, toNumber, toText, compare, roundSig, errorOf } from "./xlvalue.js";
+import { ERR, XlRange, XlArray, isError, isRange, toNumber, toText, compare, roundSig, errorOf } from "./xlvalue.js";
 import { FUNCTIONS } from "./xlfuncs.js";
 
 // ---- reading the text ------------------------------------------------------------------------------------------------------------------------------
@@ -183,17 +183,73 @@ export function parseFormula(text) {
 
 const outside = (r, c) => r < 0 || c < 0 || r >= MAX_ROWS || c >= MAX_COLS;
 
+// ---- operators, on single values and cell by cell on ranges -------------------------------------------------------------------------------------
+
+const many = (v) => isRange(v) && (v.rows > 1 || v.cols > 1);
+const single = (v) => (isRange(v) ? v.at(0, 0) : v);
+const num2 = (a, b, f) => {
+    const x = toNumber(a), y = toNumber(b);
+    if (isError(x)) return x;
+    if (isError(y)) return y;
+    return f(x, y);
+};
+const neg = (v) => { const x = toNumber(v); return isError(x) ? x : -x; };
+const pct = (v) => { const x = toNumber(v); return isError(x) ? x : roundSig(x / 100); };
+
+/** One operator on two single values (an error on either side is the answer). */
+function op2(op, a, b) {
+    if (isError(a)) return a;
+    if (isError(b)) return b;
+    switch (op) {
+        case "+": return num2(a, b, (x, y) => roundSig(x + y));
+        case "-": return num2(a, b, (x, y) => roundSig(x - y));
+        case "*": return num2(a, b, (x, y) => roundSig(x * y));
+        case "/": return num2(a, b, (x, y) => (y === 0 ? ERR.DIV0 : roundSig(x / y)));
+        case "^": return num2(a, b, (x, y) => { if (x === 0 && y === 0) return ERR.NUM; const r = Math.pow(x, y); return isFinite(r) ? roundSig(r) : ERR.NUM; });
+        case "&": return toText(a) + toText(b);
+        case "=": return compare(a, b) === 0;
+        case "<>": return compare(a, b) !== 0;
+        case "<": return compare(a, b) < 0;
+        case ">": return compare(a, b) > 0;
+        case "<=": return compare(a, b) <= 0;
+        default: return compare(a, b) >= 0;
+    }
+}
+
+/** A function on every value of a range: an array of the answers. */
+function each1(v, f) {
+    const m = [];
+    for (let r = 0; r < v.rows; r++) { const row = []; for (let c = 0; c < v.cols; c++) row.push(f(v.at(r, c))); m.push(row); }
+    return new XlArray(m);
+}
+
+/**
+ * Two ranges (or a range and a value) cell by cell, as Excel does: a single value, a single row or a single column is repeated to the size of the
+ * other side; where one side is shorter than the other (and not one long) the answer is #N/A.
+ */
+function each2(a, b, f) {
+    const size = (v) => (isRange(v) ? [v.rows, v.cols] : [1, 1]);
+    const [ra, ca] = size(a), [rb, cb] = size(b);
+    const rows = Math.max(ra, rb), cols = Math.max(ca, cb);
+    const pick = (v, rv, cv, r, c) => {
+        if (!isRange(v)) return v;
+        const i = rv === 1 ? 0 : r, j = cv === 1 ? 0 : c;
+        return i < rv && j < cv ? v.at(i, j) : ERR.NA;
+    };
+    const m = [];
+    for (let r = 0; r < rows; r++) {
+        const row = [];
+        for (let c = 0; c < cols; c++) row.push(f(pick(a, ra, ca, r, c), pick(b, rb, cb, r, c)));
+        m.push(row);
+    }
+    return new XlArray(m);
+}
+
 /**
  * The value of a tree. `env` is { cell(r, c, sheet) -> value, range(r1, c1, r2, c2, sheet) -> XlRange, now: Date, at: { r, c }, volatile() }.
  * An error never throws: it is the value (and travels on through the sums and the functions, as in Excel).
  */
 export function evaluate(node, env) {
-    const num2 = (a, b, f) => {
-        const x = toNumber(a), y = toNumber(b);
-        if (isError(x)) return x;
-        if (isError(y)) return y;
-        return f(x, y);
-    };
     const scalar = (n) => {
         const v = evaluate(n, env);
         return isRange(v) ? (v.rows === 1 && v.cols === 1 ? v.at(0, 0) : ERR.VALUE) : v;
@@ -204,26 +260,13 @@ export function evaluate(node, env) {
         case "ref": return outside(node.r, node.c) ? ERR.REF : env.cell(node.r, node.c, node.sheet);
         case "range": return outside(node.r2, node.c2) ? ERR.REF : env.range(node.r1, node.c1, node.r2, node.c2, node.sheet);
         case "slot": return env.slot(node.i, false);
-        case "un": { const x = toNumber(scalar(node.a)); return isError(x) ? x : -x; }
-        case "pct": { const x = toNumber(scalar(node.a)); return isError(x) ? x : roundSig(x / 100); }
+        case "un": { const v = evaluate(node.a, env); if (many(v)) return each1(v, neg); return neg(single(v)); }
+        case "pct": { const v = evaluate(node.a, env); if (many(v)) return each1(v, pct); return pct(single(v)); }
         case "bin": {
-            const a = scalar(node.a), b = scalar(node.b);
-            if (isError(a)) return a;
-            if (isError(b)) return b;
-            switch (node.op) {
-                case "+": return num2(a, b, (x, y) => roundSig(x + y));
-                case "-": return num2(a, b, (x, y) => roundSig(x - y));
-                case "*": return num2(a, b, (x, y) => roundSig(x * y));
-                case "/": return num2(a, b, (x, y) => (y === 0 ? ERR.DIV0 : roundSig(x / y)));
-                case "^": return num2(a, b, (x, y) => { if (x === 0 && y === 0) return ERR.NUM; const r = Math.pow(x, y); return isFinite(r) ? roundSig(r) : ERR.NUM; });
-                case "&": return toText(a) + toText(b);
-                case "=": return compare(a, b) === 0;
-                case "<>": return compare(a, b) !== 0;
-                case "<": return compare(a, b) < 0;
-                case ">": return compare(a, b) > 0;
-                case "<=": return compare(a, b) <= 0;
-                default: return compare(a, b) >= 0;
-            }
+            const va = evaluate(node.a, env), vb = evaluate(node.b, env);
+            // a range on either side: the operator works cell by cell (=A2:A9*B2:B9, =--(C2:C9="Semen")), and the answer is an array
+            if (many(va) || many(vb)) return each2(va, vb, (x, y) => op2(node.op, x, y));
+            return op2(node.op, single(va), single(vb));
         }
         case "call": {
             const f = FUNCTIONS[node.name];

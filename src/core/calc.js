@@ -16,7 +16,7 @@
 //   stands (ROW, COLUMN). A formula that reads single cells keeps its value, because it reads the same cells by id wherever they went.
 
 import { parseFormula, evaluate } from './formula/formula.js';
-import { ERR, XlRange, isRange } from './formula/xlvalue.js';
+import { ERR, XlRange, isRange, isArray } from './formula/xlvalue.js';
 import { resolveRef } from './refs.js';
 
 /**
@@ -258,6 +258,18 @@ export function createEngine(host) {
                 range.s = rect.s;
                 return range;
             },
+            // a range found while working out (OFFSET, INDIRECT): where it is depends on values, so the formula is worked out again after every
+            // change, as Excel does with these two
+            rangeAt(s, r1, c1, r2, c2) {
+                volatile.add(e);
+                mark(s);
+                const rows = host.rowOrder(s), cols = host.colOrder(s);
+                if (r1 < 0 || c1 < 0 || r2 >= rows.length || c2 >= cols.length) return ERR.REF;
+                const range = new XlRange(r1, c1, r2, c2, (r, c) => valueOfIds(s, rows[r], cols[c]));
+                range.s = s;
+                return range;
+            },
+            sheetByName(name) { return host.sheetIdByName ? host.sheetIdByName(name) : null; },
             // a formula that could not be kept by ids (it did not read) has no references; these two are here for completeness
             cell: () => ERR.REF,
             range: () => ERR.REF,
@@ -280,7 +292,9 @@ export function createEngine(host) {
     function evaluateEntry(e) {
         if (!e.ast) return ERR.NAME;
         let result = evaluate(e.ast, envOf(e));
-        if (isRange(result)) result = result.rows === 1 && result.cols === 1 ? result.at(0, 0) : ERR.VALUE;
+        // an array a formula worked out (=A2:A9*B2:B9 alone in a cell) shows its first value, as Excel did before arrays spilled; a plain range of
+        // several cells (=A2:A9) is #VALUE!
+        if (isRange(result)) result = result.rows === 1 && result.cols === 1 ? result.at(0, 0) : isArray(result) ? result.at(0, 0) : ERR.VALUE;
         if (result === undefined) result = null;
         const decimals = host.decimalsFor(e.s, e.row, e.col);
         if (decimals !== null && typeof result === 'number') result = roundTo(result, decimals);

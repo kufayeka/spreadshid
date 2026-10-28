@@ -457,3 +457,6 @@ def("ISERROR", 1, 1, (a) => isError(a[0]), { errors: true });
 def("ISNA", 1, 1, (a) => a[0] === ERR.NA, { errors: true });
 def("ISLOGICAL", 1, 1, (a) => typeof a[0] === "boolean", { errors: true });
 def("N", 1, 1, (a) => (typeof a[0] === "number" ? a[0] : typeof a[0] === "boolean" ? (a[0] ? 1 : 0) : 0));
+
+import { registerMore } from "./xlfuncs-more.js";
+registerMore(def);

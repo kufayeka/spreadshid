@@ -35,7 +35,16 @@ export class XlRange {
     values() { const out = []; for (let r = this.r1; r <= this.r2; r++) for (let c = this.c1; c <= this.c2; c++) out.push(this._get(r, c)); return out; }
 }
 
+/**
+ * Values worked out by a formula, rows of columns, that are not cells of a sheet: what =A2:A9*B2:B9 gives. It reads as a range does, so every function
+ * that takes a range (SUM, MAX, SUMPRODUCT ...) takes it too.
+ */
+export class XlArray extends XlRange {
+    constructor(matrix) { super(0, 0, matrix.length - 1, (matrix[0] || []).length - 1, (r, c) => matrix[r][c]); this.matrix = matrix; }
+}
+
 export const isRange = (v) => v instanceof XlRange;
+export const isArray = (v) => v instanceof XlArray;
 
 /** A number as Excel keeps it: 15 significant digits (so 0.1 + 0.2 is 0.3). */
 export function roundSig(n) { return typeof n === "number" && isFinite(n) ? Number(n.toPrecision(15)) : n; }
