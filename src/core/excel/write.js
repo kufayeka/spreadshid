@@ -5,6 +5,7 @@
 // widths and heights, the merges, the frozen panes. The view makes it from the grid as it is shown.
 import { colName } from "../formula/address.js";
 import { dateToSerial } from "../formula/xlvalue.js";
+import { validationsXml, notesParts } from "./notes.js";
 
 const xmlEsc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]);
 // characters XML cannot hold at all (control characters other than tab, new line, carriage return)
@@ -173,11 +174,14 @@ export function buildXlsxFiles(book) {
         // the [−] of a group is on the row before it (its title) and on the column before it: Excel is told so (summaryBelow, summaryRight)
         const levelsRow = Math.max(0, ...Object.values(rowLevels)), levelsCol = Math.max(0, ...Object.values(colLevels));
         const outlinePr = levelsRow || levelsCol ? '<sheetPr><outlinePr summaryBelow="0" summaryRight="0"/></sheetPr>' : '';
-        const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + outlinePr + dim
+        // data validation, and the notes (comments) with the drawing that shows them: the drawing is a part of its own, linked from the sheet
+        const valid = validationsXml(model.validations || []);
+        const notes = model.notes || [];
+        const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' + outlinePr + dim
             + '<sheetViews><sheetView' + (model.active ? ' tabSelected="1"' : "") + ' workbookViewId="0">' + pane + "</sheetView></sheetViews>"
             + '<sheetFormatPr defaultRowHeight="' + pxToPoints(model.defaultRow || 28) + '"' + (model.defaultRow ? ' customHeight="1"' : "") + (levelsRow ? ' outlineLevelRow="' + levelsRow + '"' : "") + (levelsCol ? ' outlineLevelCol="' + levelsCol + '"' : "") + "/>" + colsXml
-            + "<sheetData>" + rowsXml + "</sheetData>" + autoFilterXml(model.autoFilter) + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + cfXml(model) + "</worksheet>";
-        return { sheetName, hidden: !!model.hidden, sheet };
+            + "<sheetData>" + rowsXml + "</sheetData>" + autoFilterXml(model.autoFilter) + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join("") + "</mergeCells>" : "") + cfXml(model) + valid.xml + (notes.length ? '<legacyDrawing r:id="rId1"/>' : '') + "</worksheet>";
+        return { sheetName, hidden: !!model.hidden, sheet, notes, left: valid.left };
     };
     const rendered = models.map(renderSheet);
 
@@ -198,15 +202,27 @@ export function buildXlsxFiles(book) {
     const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     // the named ranges of the workbook ({ name, ref: "'BOQ'!$D$2:$D$200" }), as Excel keeps them
     const namesXml = book.names && book.names.length ? '<definedNames>' + book.names.map((n) => '<definedName name="' + xmlEsc(n.name) + '"' + (n.localSheetId !== undefined ? ' localSheetId="' + n.localSheetId + '"' : '') + (n.hidden ? ' hidden="1"' : '') + '>' + xmlEsc(n.ref) + '</definedName>').join('') + '</definedNames>' : '';
-    const sheetParts = rendered.map((x, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("");
+    const sheetParts = rendered.map((x, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        + (x.notes.length ? '<Override PartName="/xl/comments' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"/>' : '')).join("");
+    // a sheet with notes: its comments part and its drawing, both linked from the sheet's own relationships
+    const noteFiles = [];
+    rendered.forEach((x, i) => {
+        if (!x.notes.length) return;
+        const n = i + 1, parts = notesParts(x.notes, n);
+        noteFiles.push({ name: "xl/comments" + n + ".xml", text: parts.comments });
+        noteFiles.push({ name: "xl/drawings/vmlDrawing" + n + ".vml", text: parts.vml });
+        noteFiles.push({ name: "xl/worksheets/_rels/sheet" + n + ".xml.rels", text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing" Target="../drawings/vmlDrawing' + n + '.vml"/>'
+            + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="../comments' + n + '.xml"/></Relationships>' });
+    });
     const sheetRels = rendered.map((x, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join("");
     const activeTab = Math.max(0, Math.min(rendered.length - 1, Number(book.active) || 0));
     const sheetList = rendered.map((x, i) => '<sheet name="' + xmlEsc(x.sheetName) + '" sheetId="' + (i + 1) + '"' + (x.hidden ? ' state="hidden"' : "") + ' r:id="rId' + (i + 1) + '"/>').join("");
     return [
-        { name: "[Content_Types].xml", text: head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheetParts + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+        { name: "[Content_Types].xml", text: head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="vml" ContentType="application/vnd.openxmlformats-officedocument.vmlDrawing"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheetParts + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
         { name: "_rels/.rels", text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
         { name: "xl/workbook.xml", text: head + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="' + activeTab + '"/></bookViews><sheets>' + sheetList + '</sheets>' + namesXml + '</workbook>' },
         { name: "xl/_rels/workbook.xml.rels", text: head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheetRels + '<Relationship Id="rId' + (rendered.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
         { name: "xl/styles.xml", text: styles }
-    ].concat(rendered.map((x, i) => ({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", text: x.sheet })));
+    ].concat(rendered.map((x, i) => ({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", text: x.sheet })), noteFiles);
 }

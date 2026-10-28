@@ -23,6 +23,8 @@ import { outlineOf } from '../outline.js';
 import { conditionalRects, conditionalFormulaText } from '../conditional.js';
 import { formulaProblem } from '../formula/formula.js';
 import { colName } from '../formula/address.js';
+import { ruleRect } from '../validation.js';
+import { noteText, threadsFor } from './notes.js';
 
 // ---- out ------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -121,7 +123,10 @@ export function exportXlsx(wb) {
             defaultCol: props.colWidth || 100, defaultRow: props.rowHeight || 21,
             merges: wb.merges(s), freeze: { rows: props.freezeRows || 0, cols: props.freezeCols || 0 },
             autoFilter: toExcelFilter(wb, s),
-            conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean)
+            conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean),
+            validations: (props.validations || []).map((rule) => ({ rule, rect: ruleRect(wb, s, rule) })).filter((x) => x.rect),
+            // the open and the resolved threads, each as one note on its cell
+            notes: wb.comments(s).filter((t) => t.at && t.items.length).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) }))
         };
     });
     // the named ranges, by the names the sheets have in the file (Excel takes a sheet name of 31 characters at most, without \ / ? * [ ] :)
@@ -156,6 +161,17 @@ function addRules(wb, docs, read) {
 // the filters of a file put on the sheets once their values and formulas are in
 function addFilters(wb, docs, read) {
     read.sheets.forEach((sh, i) => { if (sh.autoFilter) applyExcelFilter(wb, docs[i].id, sh.autoFilter, read.warnings, sh.name); });
+}
+
+// the data validation and the notes (as comment threads) of a file, put on the sheets once their cells stand
+function addValidationsAndNotes(wb, docs, read) {
+    read.sheets.forEach((sh, i) => {
+        for (const { rect, spec } of sh.validations || []) {
+            try { wb.addValidation(docs[i].id, rect, spec, { source: 'remote' }); } catch (err) { read.warnings.push('"' + sh.name + '": a rule of data validation was not imported (' + err.message + ')'); }
+        }
+        const threads = threadsFor(wb, docs[i].id, sh.notes || []);
+        if (threads.length) wb.setSheetProps(docs[i].id, { comments: threads }, { source: 'remote' });
+    });
 }
 
 // the named ranges of a file put in a workbook made from its sheets, before their formulas (which then keep them by id)
@@ -244,6 +260,7 @@ export async function importXlsx(bytes, options) {
     docs.forEach((d, i) => { if (formulas[i].length) wb.setBlock(d.id, formulas[i], { source: 'remote' }); });
     addRules(wb, docs, read);
     addFilters(wb, docs, read);
+    addValidationsAndNotes(wb, docs, read);
     return { workbook: wb, warnings: read.warnings, active: docs[read.active] ? docs[read.active].id : docs[0].id };
 }
 
@@ -262,6 +279,7 @@ export async function importXlsxInto(wb, bytes, how) {
     docs.forEach((d, i) => { if (formulas[i].length) temp.setBlock(d.id, formulas[i], { source: 'remote' }); });
     addRules(temp, docs, read);
     addFilters(temp, docs, read);
+    addValidationsAndNotes(temp, docs, read);
     // a name the workbook has already stays the workbook's (the file's formulas that use it then read the workbook's range), and it is said
     const fileNames = (temp.settings().names || []).filter((n) => {
         if (!wb.nameRange(n.name)) return true;

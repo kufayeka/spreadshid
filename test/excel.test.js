@@ -233,5 +233,31 @@ function excelPackage(files) {
     ok('a CSV as a new sheet: its name, numbers in the locale, formulas, as big as it is, one undo');
 }
 
+// data validation and comments go out to the file and come back: the kinds Excel has, and threads as notes (a line per comment, resolved marked)
+{
+    const wb = createWorkbook(null, { user: { id: 'u1', name: 'Dewi' } });
+    const s = wb.sheet('Sheet1');
+    s.addValidation('A2:A50', { kind: 'list', values: ['Jakarta', 'Bandung'], help: 'Pilih cabang' });
+    s.addValidation('B2:B50', { kind: 'number', op: 'between', a: 1, b: 500 });
+    s.addValidation('C2:C50', { kind: 'date', op: 'gte', a: 'today', reject: false });
+    s.addValidation('D2:D50', { kind: 'checkbox' });
+    s.addValidation('E2:E50', { kind: 'listFrom', source: 'Sheet1!H1:H3' });
+    s.addValidation('F2:F50', { kind: 'text', op: 'contains', a: 'PO' });
+    const t = s.addComment('B2', 'Qty besar, cek stok dulu');
+    wb.setUser({ id: 'u2', name: 'Joko' });
+    s.replyComment(t.thread, 'Sudah dicek: aman.\nBesok kirim.');
+    s.resolveComment(s.addComment('A3', 'Cabang baru').thread, true);
+    const { workbook: back, warnings } = await importXlsx(exportXlsx(wb));
+    const b = back.sheet('Sheet1');
+    const kind = (a) => { const r = b.validationAt(a); return r && [r.kind, r.op, r.a, r.b, r.reject, r.values, r.source, r.help].filter((x) => x !== undefined).join(' '); };
+    assert.deepStrictEqual(['A2', 'B2', 'C2', 'D2', 'E2', 'F2'].map(kind), [
+        'list true Jakarta,Bandung Pilih cabang', 'number between 1 500 true', 'date gte today false', 'checkbox true', 'listFrom true Sheet1!H1:H3', 'text contains PO true']);
+    assert.deepStrictEqual(b.comments().map((x) => [back.address(x.at.r, x.at.c), x.resolved, x.items.map((i) => i.by.name + ': ' + i.text)]), [
+        ['B2', false, ['Dewi: Qty besar, cek stok dulu', 'Joko: Sudah dicek: aman.\nBesok kirim.']],
+        ['A3', true, ['Joko: Cabang baru']]]);
+    assert.deepStrictEqual(warnings, []);
+    ok('data validation and comments go to an .xlsx file and come back');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');

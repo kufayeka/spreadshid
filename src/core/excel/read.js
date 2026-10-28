@@ -9,6 +9,7 @@ import { colIndex } from '../formula/address.js';
 import { shiftFormula, formulaProblem } from '../formula/formula.js';
 import { fromExcelRule } from './conditional.js';
 import { readExcelFilter } from './filter.js';
+import { readValidations, readNotes } from './notes.js';
 import { colName } from '../formula/address.js';
 
 const MAX_SHEETS = 100;
@@ -243,7 +244,7 @@ function readSheet(root, shared, styles, info, warnings) {
     const pane = kid(kid(kid(sheet, 'sheetViews'), 'sheetView'), 'pane');
     const freeze = pane && pane.attrs.state === 'frozen' ? { rows: Number(pane.attrs.ySplit) || 0, cols: Number(pane.attrs.xSplit) || 0 } : null;
     if (unknown.size) warnings.push('"' + info.name + '": formulas with ' + [...unknown].slice(0, 6).join(', ') + (unknown.size > 6 ? ' …' : '') + ' are not in the sheet: the values Excel worked out were kept');
-    if (kid(sheet, 'drawing') || kid(sheet, 'legacyDrawing')) warnings.push('"' + info.name + '": pictures, charts and comments were not imported');
+    if (kid(sheet, 'drawing')) warnings.push('"' + info.name + '": pictures and charts were not imported');
     // the rules of conditional formatting, in Excel's order (its priority); what the sheet has no rule for is said
     const conditionals = [], skipped = new Set();
     const cfRules = [];
@@ -264,8 +265,9 @@ function readSheet(root, shared, styles, info, warnings) {
         else conditionals.push({ rects, spec: made.spec });
     }
     if (skipped.size) warnings.push('"' + info.name + '": conditional formatting with ' + [...skipped].join(', ') + ' was not imported');
-    if (kid(sheet, 'dataValidations')) warnings.push('"' + info.name + '": data validation was not imported');
-    return { name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals, autoFilter, rowLevels, colLevels };
+    const valid = readValidations(kid(sheet, 'dataValidations'), kid, kids, addressOf);
+    if (valid.left.length) warnings.push('"' + info.name + '": data validation of the kind ' + valid.left.join(', ') + ' was not imported');
+    return { validations: valid.rules, name: info.name, hidden: info.hidden, cells, maxR, maxC, widths, heights, hiddenCols, hiddenRows, merges, freeze, defaultCol, defaultRow, conditionals, autoFilter, rowLevels, colLevels };
 }
 
 /**
@@ -304,6 +306,19 @@ export async function readXlsx(bytes) {
         const part = files.get(path);
         if (!part) { warnings.push('the sheet "' + s.attrs.name + '" is not in the file (a chart sheet?)'); continue; }
         const read = readSheet(parseXml(new TextDecoder().decode(part)), shared, styles, { name: s.attrs.name, hidden: !!s.attrs.state && s.attrs.state !== 'visible', knownNames }, warnings);
+        // the sheet's notes (comments): found through the sheet's own relationships
+        read.notes = [];
+        const relsPart = files.get(path.replace(/([^/]+)$/, '_rels/$1.rels'));
+        if (relsPart) {
+            for (const rel of kids(kid(parseXml(new TextDecoder().decode(relsPart)), 'Relationships'), 'Relationship')) {
+                if (!/\/comments$/.test(rel.attrs.Type || '')) continue;
+                const target = rel.attrs.Target || '';
+                const at = target[0] === '/' ? target.slice(1) : path.replace(/[^/]+$/, '') + target;
+                const clean = at.split('/').reduce((acc, seg) => (seg === '..' ? acc.slice(0, -1) : seg === '.' ? acc : acc.concat(seg)), []).join('/');
+                const notesPart = files.get(clean);
+                if (notesPart) read.notes = readNotes(kid(parseXml(new TextDecoder().decode(notesPart)), 'comments'), kid, kids, addressOf);
+            }
+        }
         // a workbook of the 1904 system counts its dates from 1904: moved to the sheet's count
         if (date1904) for (const cell of read.cells) if (typeof cell.value === 'number' && cell.style.format && /date|time/.test(cell.style.format.type)) cell.value += 1462;
         sheets.push(read);

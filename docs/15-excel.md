@@ -105,8 +105,8 @@ URL.revokeObjectURL(a.href);
 | filter | ya | ya. Filter warna dan top 10 disebut di `warnings` |
 | grup baris dan kolom | ya | ya |
 | pivot table | sebagai nilai | sebagai nilai |
-| validasi data (dropdown) | **belum** | **belum**, disebut di `warnings` |
-| komentar | **belum** | **belum**, disebut di `warnings` |
+| validasi data | ya: daftar, daftar dari range, checkbox (sebagai daftar TRUE/FALSE), angka, tanggal, panjang teks, teks memuat. Email dan URL tidak, karena Excel tidak punya jenis itu | ya. Jenis lain (rumus bebas) disebut di `warnings` |
+| komentar | ya, sebagai *note* Excel: satu note per diskusi, satu baris per komentar (`Dewi: …`), diskusi selesai diawali `[resolved]` | ya, dibaca balik menjadi diskusi dengan penulis per baris |
 | gambar dan grafik | tidak ada di library ini | dilewati, disebut di `warnings` |
 | locale | tidak disimpan oleh Excel | beri lewat `settings` |
 | aturan, tipe kolom, policy | tidak ikut: itu milik aplikasimu | |
