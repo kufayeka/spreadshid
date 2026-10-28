@@ -23,7 +23,7 @@ Semua props boleh tidak diisi.
 | `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (dari orang, kode, atau undo). Sama dengan `wb.on('op', ...)` |
 | `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak. Sheet sudah menampilkan `reason` sebagai pemberitahuan; prop ini buat log atau tampilanmu sendiri |
 | `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak sesuai tipe kolomnya ([bab 10](10-aturan.md)) |
-| `onSelectionChange` | `(sel) => void` | | seleksi berubah. `sel.active` adalah sel aktif `{ r, c }`, `sel.ranges` daftar kotak yang dipilih |
+| `onSelectionChange` | `(sel: SheetSelection) => void` | | seleksi berubah: `sel.address` (`'C2:C5'`), `sel.active` (`{ r, c, address }`), `sel.ranges`, `sel.sheet` ([4.13](04-api-workbook.md#413-editor-hak-akses-di-luar-sheet)) |
 | `fileName` | string | `'Spreadsheet'` | nama file (tanpa ekstensi) saat orang memilih File → Download |
 | `access` | `{ policy, who }` | tanpa batasan | access policy dan orang yang membuka sheet ([bab 13](13-hak-akses.md)). Sheet cuma menerapkan; kebijakannya tetap milik aplikasimu |
 | `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya ([bab 14](14-komentar.md)) |
@@ -139,7 +139,7 @@ Setelah tombol **Pilih B2:C4** diklik:
 | `startEdit(text?)` | membuka editor di sel aktif berisi `text` (tanpa `text`: isi sel sekarang), seperti orang mulai mengetik |
 | `focus()` | balikin keyboard ke grid (misalnya setelah dialogmu ditutup) |
 | `showSheet(id)` | menampilkan sheet lain |
-| `getSelection()` | seleksi sekarang: `{ ranges, active }` |
+| `getSelection()` | seleksi sekarang, bentuknya sama dengan `onSelectionChange`: `{ sheet, active, ranges, address }` |
 | `workbook` | workbook yang sedang ditampilkan |
 
 > **Seleksi baru berubah di render berikutnya.** `select()` mengubah state React, jadi `getSelection()` yang dipanggil tepat sesudahnya masih
