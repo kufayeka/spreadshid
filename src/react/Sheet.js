@@ -37,6 +37,37 @@ export function useWorkbookRevision(wb) {
 const FIND_START = { open: false, dialog: false, query: '', replacement: '', matchCase: false, wholeCell: false, regex: false, inFormulas: false, allSheets: false, index: -1, status: '' };
 
 /**
+ * What the host's code can ask of the sheet, through a ref.
+ * @typedef {object} SheetHandle
+ * @property {ReturnType<typeof createWorkbook>} workbook  The workbook shown.
+ * @property {(target: string|{ r1: number, c1: number, r2?: number, c2?: number }) => void} select  Select "B7", "A1:C3" or a rectangle, and show it.
+ * @property {(address: string) => void} scrollTo  Show a cell without selecting it.
+ * @property {(text?: string) => void} startEdit  Start editing the active cell (with a text, or what it holds).
+ * @property {() => void} focus  Give the keyboard to the grid.
+ * @property {(sheetId: string) => void} showSheet
+ * @property {() => object} getSelection
+ */
+
+/**
+ * The props of the sheet (each one is explained on the component below). Written out as a type of its own so TypeScript sees them: a component
+ * made with forwardRef loses the props of its JSDoc in the declarations.
+ * @typedef {object} SheetProps
+ * @property {ReturnType<typeof createWorkbook>} [workbook]
+ * @property {string} [sheet]
+ * @property {(sheetId: string) => void} [onSheetChange]
+ * @property {(event: { ops: object[], source: string }) => void} [onOp]
+ * @property {(event: { reason: string, op: object, source: string }) => void} [onReject]
+ * @property {(event: { address: string, field?: string, value: any, expected: string }) => void} [onCellError]
+ * @property {(sel: { ranges: object[], active: { r: number, c: number } }) => void} [onSelectionChange]
+ * @property {string} [fileName]
+ * @property {{ policy: object|null, who: any }} [access]
+ * @property {{ id: string, name: string }} [user]
+ * @property {boolean} [showProtected]
+ * @property {string} [className]
+ * @property {import('react').CSSProperties} [style]
+ */
+
+/**
  * The spreadsheet.
  *
  * @param {object} props
@@ -58,7 +89,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {import('react').CSSProperties} [props.style]  Inline style of the outer element (its height above all: the grid fills it).
  * @param {import('react').Ref<SheetHandle>} [ref]  What the host's code can ask of the sheet (see SheetHandle).
  */
-export const Sheet = forwardRef(function Sheet(props, ref) {
+export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetProps & import('react').RefAttributes<SheetHandle>>} */ (forwardRef(function Sheet(props, ref) {
     // a workbook of its own when the host gives none (made once, on the first render)
     const [own] = useState(() => (props.workbook ? null : createWorkbook()));
     const wb = props.workbook || own;
@@ -192,16 +223,6 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
         setFind((f) => ({ ...f, index: -1, status: 'Replaced ' + changed + (changed === 1 ? ' cell' : ' cells') }));
     }
 
-    /**
-     * @typedef {object} SheetHandle
-     * @property {ReturnType<typeof createWorkbook>} workbook  The workbook shown.
-     * @property {(target: string|{ r1: number, c1: number, r2?: number, c2?: number }) => void} select  Select "B7", "A1:C3" or a rectangle, and show it.
-     * @property {(address: string) => void} scrollTo  Show a cell without selecting it.
-     * @property {(text?: string) => void} startEdit  Start editing the active cell (with a text, or what it holds).
-     * @property {() => void} focus  Give the keyboard to the grid.
-     * @property {(sheetId: string) => void} showSheet
-     * @property {() => object} getSelection
-     */
     useImperativeHandle(ref, () => ({
         workbook: wb,
         select(target) {
@@ -387,4 +408,4 @@ export const Sheet = forwardRef(function Sheet(props, ref) {
             ) : null}
         </div>
     );
-});
+}));
