@@ -24,7 +24,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `createWorkbook` | workbook baru, atau dibuka dari `toJSON()`: `createWorkbook(doc, { user, now, beforeOp, undoLimit })` | [2](02-konsep.md), [11.2](11-react.md#112-sheet-yang-sudah-berisi) |
 | `VERSION` | versi paket | |
 | `isError`, `ERR` | memeriksa hasil rumus yang error, dan daftar kode error | [5.5](05-rumus.md#55-error) |
-| `FUNCTION_NAMES` | nama semua fungsi rumus | [5.6](05-rumus.md#56-daftar-fungsi) |
+| `FUNCTION_NAMES` | nama semua fungsi rumus | [5.7](05-rumus.md#57-daftar-fungsi) |
 | `formatValue`, `FORMAT_PRESETS`, `localeInfo` | menampilkan nilai dengan format dan locale, format siap pakai, info pemisah locale | [6](06-format.md) |
 | `displayOf` | yang tampil dari sebuah nilai dan format: `{ text, align, kind, color }` | [6](06-format.md) |
 | `dateToSerial`, `serialToDate` | `Date` menjadi nomor hari dan sebaliknya | [9](09-populate.md) |
@@ -93,7 +93,7 @@ Handle juga punya `id` dan `name`.
 | opsi `createWorkbook` dan event workbook | [2.5](02-konsep.md#25-perubahan-event-dan-undo) |
 | jenis op | [4.8](04-api-workbook.md#48-jenis-op) |
 | kunci gaya, props baris, kolom, dan sheet | [4.3](04-api-workbook.md#43-gaya-dan-merge), [4.4](04-api-workbook.md#44-baris-dan-kolom), [4.5](04-api-workbook.md#45-sheet) |
-| fungsi rumus | [5.6](05-rumus.md#56-daftar-fungsi) |
+| fungsi rumus | [5.7](05-rumus.md#57-daftar-fungsi) |
 | jenis format dan huruf pola | [6.1](06-format.md#61-jenis-format) |
 | syarat conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
 | jenis validasi | [7.4](07-data.md#74-validasi-data) |

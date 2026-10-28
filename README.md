@@ -56,7 +56,7 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): semua props, event, handle (`ref`), keyboard, tema
 - [Galeri: satu proyek konstruksi](docs/galeri.md)
 4. [API workbook](docs/04-api-workbook.md): mengisi dan membaca sel, gaya, baris dan kolom, sheet, undo, op
-5. [Rumus](docs/05-rumus.md): referensi, laporan dengan rumus, named range, SUBTOTAL, error, 105 fungsi
+5. [Rumus](docs/05-rumus.md): referensi, laporan dengan rumus, named range, SUBTOTAL, error, 124 fungsi, termasuk TERBILANG
 6. [Format, locale, dan conditional formatting](docs/06-format.md)
 7. [Data](docs/07-data.md): sort, filter, grup, validasi, cari dan ganti
 8. [Pivot table](docs/08-pivot.md): di sheet, dan tanpa sheet untuk server
