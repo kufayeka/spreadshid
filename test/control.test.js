@@ -125,6 +125,28 @@ function boq() {
     ok('the server checks a save: protected cells, protected rows by a condition, types, deleted rows; mergePatch puts the patch on what is stored');
 }
 
+// a patch made by hand cannot get round the rules: a row with no sheet, or a row of one sheet sent under another, is refused
+{
+    const base = createWorkbook();
+    base.setValues('Sheet1', 'A1', [['Kode', 'Harga'], ['A', 100]]);
+    const other = base.addSheet('Lain');
+    base.setValues('Lain', 'A1', [['x']]);
+    const doc = base.toJSON();
+    const rules = [{ sheet: 'Sheet1', columns: ['Harga'], mode: 'readonly' }];
+    const wb = createWorkbook(doc);
+    wb.saved(wb.pendingPatch());
+    const empty = wb.pendingPatch();
+    const s1 = doc.sheets.find((s) => s.props.name === 'Sheet1');
+    const harga = s1.columns[1].id;
+    const lain = doc.sheets.find((s) => s.id === other).rows[1];
+    // a row of the sheet Lain, sent as a row of Sheet1 with a price in the protected column
+    const moved = { ...empty, rows: { upsert: [{ ...lain, sheetId: s1.id, cells: { [harga]: 1 } }], delete: [] } };
+    assert.match(checkPatch(doc, moved, { rules }).problems.map((p) => p.reason).join(), /cannot move to another sheet/);
+    const nowhere = { ...empty, rows: { upsert: [{ ...s1.rows[1], cells: { [harga]: 1 } }], delete: [] } };
+    assert.match(checkPatch(doc, nowhere, { rules }).problems.map((p) => p.reason).join(), /names no sheet/);
+    ok('a hand-made patch with a row of no sheet, or a row moved to another sheet, is refused');
+}
+
 // the header row of a table: the field names, titles in the order of the fields, or titles by field
 {
     const wb = createWorkbook();

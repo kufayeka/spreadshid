@@ -85,8 +85,11 @@ export function checkPatch(doc, patch, what) {
     const sorted = what && what.policy !== undefined && before.can('sort') ? sortedRows(doc, patch) : new Set();
     for (const row of patch.rows.upsert) {
         const s = row.sheetId;
-        if (!after.sheetIds().includes(s)) continue;
         const stored = storedRows.get(row.id);
+        // a patch made by hand: a row of no sheet, or a stored row sent under another sheet (its cells would be checked nowhere: the rules read a
+        // row where it stood, and it stood in the other sheet) is refused as it is
+        if (!after.sheetIds().includes(s)) { problems.push({ sheet: null, address: null, reason: 'a row of the patch names no sheet of this workbook' }); continue; }
+        if (stored && stored.sheet !== s) { problems.push({ sheet: after.sheetProps(s).name, address: null, reason: 'a row cannot move to another sheet' }); continue; }
         const cols = new Set([...Object.keys(row.cells || {}), ...Object.keys(row.style || {}), ...Object.keys((stored && stored.row.cells) || {}), ...Object.keys((stored && stored.row.style) || {})]);
         for (const cid of cols) {
             const changed = !stored || !same(stored.row.cells && stored.row.cells[cid], row.cells && row.cells[cid]) || !same(stored.row.style && stored.row.style[cid], row.style && row.style[cid]);
