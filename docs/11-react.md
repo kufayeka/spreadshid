@@ -2,21 +2,221 @@
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Aturan dan tipe kolom](10-aturan.md) · Berikutnya: [12. Menyimpan ke server](12-server.md)
 
-Bab ini tentang memasang sheet di aplikasi React sungguhan: di mana workbook disimpan, cara membaca isinya dari komponen lain, memuat dari API dengan
-`useEffect`, menyimpan otomatis, menghubungkan form React dengan sheet, dan Next.js. Semua contoh di sini dijalankan oleh test di Chrome sungguhan
-(`test/grid-react.test.js`).
+Bab ini dimulai dari yang paling kecil. Lima langkah pertama masing-masing hanya menambah **satu** hal: sheet kosong, sheet berisi, angka di luar
+sheet, data dari server, lalu tombol Simpan. Setelah itu baru masuk ke pola untuk aplikasi sungguhan. Semua contoh dijalankan oleh test di Chrome
+sungguhan.
 
-- [11.1 Workbook bukan state React](#111-workbook-bukan-state-react)
-- [11.2 Membaca workbook dari komponen lain: `useWorkbook`](#112-membaca-workbook-dari-komponen-lain-useworkbook)
-- [11.3 Memuat dari API](#113-memuat-dari-api)
-- [11.4 Menyimpan otomatis](#114-menyimpan-otomatis)
-- [11.5 Aplikasi lengkap: kasir](#115-aplikasi-lengkap-kasir)
-- [11.6 Data dari props](#116-data-dari-props)
-- [11.7 Dua tampilan, satu workbook](#117-dua-tampilan-satu-workbook)
-- [11.8 Next.js](#118-nextjs)
-- [11.9 Kesalahan yang sering terjadi](#119-kesalahan-yang-sering-terjadi)
+**Gambaran besarnya dulu.** Ada dua benda:
 
-## 11.1 Workbook bukan state React
+```
+   workbook  (data)                          <Sheet>  (tampilan)
+   ┌─────────────────────────────┐           ┌───────────────────────────────┐
+   │ A1 'Produk'   B1 'Harga'    │  dibaca   │   A            B              │
+   │ A2 'Semen'    B2 72000      │ ────────► │ 1 Produk       Harga          │
+   │ D2 '=B2*C2'  (rumus)        │           │ 2 Semen        72000          │
+   │ undo, rumus, format, ...    │ ◄──────── │   (orang mengetik di sini)    │
+   └─────────────────────────────┘  diubah   └───────────────────────────────┘
+          │  toJSON() / pendingPatch()
+          ▼
+   server dan database (bab 12)
+```
+
+- **Workbook** menyimpan isi: nilai, rumus, format, undo. Workbook bukan komponen React, melainkan objek JavaScript biasa yang dibuat dengan
+  `createWorkbook()`.
+- **`<Sheet>`** hanya menampilkan workbook dan meneruskan ketikan orang ke workbook itu. Setiap kali workbook berubah, entah karena diketik orang atau
+  diubah kode, `<Sheet>` menggambar ulang dirinya sendiri.
+- Untuk **menyimpan**, yang dikirim ke server adalah isi workbook (`toJSON()`), atau bagian yang berubah saja (`pendingPatch()`). Bentuk penyimpanannya
+  di database dibahas langkah demi langkah di [bab 12](12-server.md).
+
+**Langkah demi langkah**
+
+- [11.1 Sheet kosong](#111-sheet-kosong)
+- [11.2 Sheet yang sudah berisi](#112-sheet-yang-sudah-berisi)
+- [11.3 Angka dari sheet di luar sheet](#113-angka-dari-sheet-di-luar-sheet)
+- [11.4 Isi dari server](#114-isi-dari-server)
+- [11.5 Tombol Simpan](#115-tombol-simpan)
+
+**Untuk aplikasi sungguhan**
+
+- [11.6 Workbook bukan state React](#116-workbook-bukan-state-react)
+- [11.7 Membaca workbook dari komponen lain: `useWorkbook`](#117-membaca-workbook-dari-komponen-lain-useworkbook)
+- [11.8 Memuat dari API](#118-memuat-dari-api)
+- [11.9 Menyimpan otomatis](#119-menyimpan-otomatis)
+- [11.10 Aplikasi lengkap: kasir](#1110-aplikasi-lengkap-kasir)
+- [11.11 Data dari props](#1111-data-dari-props)
+- [11.12 Dua tampilan, satu workbook](#1112-dua-tampilan-satu-workbook)
+- [11.13 Next.js](#1113-nextjs)
+- [11.14 Kesalahan yang sering terjadi](#1114-kesalahan-yang-sering-terjadi)
+
+## 11.1 Sheet kosong
+
+<!-- contoh: 11-langkah1.page.js -->
+```jsx
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+
+// Langkah 1: sheet kosong. Satu komponen, satu tinggi. Orang sudah bisa mengetik, menghitung, dan mengunduh Excel.
+export default function Halaman() {
+    return <div style={{ height: 400 }}><Sheet /></div>;
+}
+```
+<!-- /contoh -->
+
+Itu saja. `<Sheet>` tanpa props membuat workbook kosongnya sendiri. Orang sudah bisa mengetik, menulis rumus, memberi format, dan mengunduh Excel.
+Satu-satunya yang wajib adalah **tinggi**: pembungkusnya harus punya tinggi, kalau tidak sheet-nya setinggi 0. Isinya hilang saat halaman ditutup,
+karena belum disimpan ke mana pun.
+
+## 11.2 Sheet yang sudah berisi
+
+<!-- contoh: 11-langkah2.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// Langkah 2: sheet yang sudah berisi. Isinya dibuat oleh kode, di dalam sebuah workbook.
+function buatDaftarHarga() {
+    const wb = createWorkbook();
+    wb.setValues('Sheet1', 'A1', [
+        ['Produk', 'Harga', 'Qty', 'Jumlah'],
+        ['Semen 50 kg', 72000, 10, '=B2*C2'],
+        ['Besi 10 mm', 79500, 5, '=B3*C3'],
+        ['Total', null, null, '=SUM(D2:D3)']
+    ]);
+    return wb;
+}
+
+export default function Halaman() {
+    // useState(fungsi): workbook dibuat sekali saja, saat halaman pertama tampil
+    const [wb] = useState(buatDaftarHarga);
+    return <div style={{ height: 400 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Yang baru:
+
+- `createWorkbook()` membuat workbook, dan `setValues` mengisinya. Teks yang diawali `=` menjadi rumus.
+- `useState(buatDaftarHarga)`, **tanpa tanda kurung** setelah nama fungsinya. React memanggil fungsi itu sekali saja, saat halaman pertama tampil. Kalau
+  ditulis `useState(buatDaftarHarga())`, workbook baru dibuat di setiap render lalu dibuang.
+- `<Sheet workbook={wb} />` menampilkan workbook itu. Ketik Qty baru di sheet, dan Jumlah serta Total langsung dihitung ulang. Tidak ada `setState` yang
+  perlu dipanggil.
+
+## 11.3 Angka dari sheet di luar sheet
+
+<!-- contoh: 11-langkah3.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet, useWorkbook } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// Langkah 3: angka dari sheet tampil di luar sheet, dan tombol di luar sheet mengubah sheet.
+function buatDaftarHarga() {
+    const wb = createWorkbook();
+    wb.setValues('Sheet1', 'A1', [['Produk', 'Harga', 'Qty', 'Jumlah'], ['Semen 50 kg', 72000, 10, '=B2*C2'], ['Besi 10 mm', 79500, 5, '=B3*C3'], ['Total', null, null, '=SUM(D2:D3)']]);
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buatDaftarHarga);
+    // dibaca ulang setiap kali sheet berubah: ketik Qty baru di sheet, angka di atas ikut berubah
+    const total = useWorkbook(wb, (w) => w.value('Sheet1', 'D4'));
+    return (
+        <div>
+            <p>Total belanja: <b className="total">{total}</b>
+                {' '}<button className="tambah" onClick={() => wb.setValues('Sheet1', 'C2', wb.value('Sheet1', 'C2') + 1)}>+1 semen</button></p>
+            <div style={{ height: 360 }}><Sheet workbook={wb} /></div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Yang baru:
+
+- `useWorkbook(wb, (w) => w.value('Sheet1', 'D4'))` membaca satu sel, dan membacanya ulang setiap kali workbook berubah. Ketik di sheet, dan "Total
+  belanja" di atasnya ikut berubah.
+- Tombol "+1 semen" mengubah workbook langsung dengan `wb.setValues(...)`. Sheet dan total ikut berubah, karena keduanya membaca workbook yang sama.
+
+Polanya selalu sama: **ubah workbook, jangan ubah tampilan**. Semua yang membaca workbook menyesuaikan diri.
+
+## 11.4 Isi dari server
+
+<!-- contoh: 11-langkah4.page.js -->
+```jsx
+import { useEffect, useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { ambilWorkbook } from './data/api.js';
+
+// Langkah 4: isinya datang dari server. Selama menunggu tampil "Memuat…", lalu sheet tampil berisi.
+export default function Halaman() {
+    const [wb, setWb] = useState(null);
+    useEffect(() => {
+        // di aplikasimu: fetch('/api/workbooks/penjualan').then((r) => r.json())
+        ambilWorkbook('penjualan').then((doc) => setWb(createWorkbook(doc)));
+    }, []);
+    if (!wb) return <p>Memuat…</p>;
+    return <div style={{ height: 400 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Yang baru:
+
+- Server mengirim isi workbook sebagai JSON (`doc`), yaitu hasil `toJSON()` yang dulu disimpan. Bentuknya, sampai ke isi tabel database-nya, dijelaskan di [12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah).
+- `createWorkbook(doc)` mengubah JSON itu kembali menjadi workbook. Ini dilakukan sekali, saat jawaban datang, lalu hasilnya disimpan dengan `setWb`.
+- Selama `wb` masih `null`, tampilkan teks "Memuat…".
+
+`ambilWorkbook` di sini adalah API tiruan supaya contohnya bisa dijalankan ([`examples/data/api.js`](examples/data/api.js)). Di aplikasimu, isinya
+`fetch` seperti yang tertulis di komentar. Versi yang lebih tahan banting (membatalkan permintaan lama, menampilkan error) ada di 11.8.
+
+## 11.5 Tombol Simpan
+
+<!-- contoh: 11-langkah5.page.js -->
+```jsx
+import { useEffect, useState } from 'react';
+import { Sheet, useWorkbook } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { ambilWorkbook, simpanPatch } from './data/api.js';
+
+// Langkah 5: tombol Simpan. Yang dikirim hanya bagian yang berubah (patch), bukan seluruh isi.
+export default function Halaman() {
+    const [wb, setWb] = useState(null);
+    useEffect(() => { ambilWorkbook('penjualan').then((doc) => setWb(createWorkbook(doc))); }, []);
+    // true kalau ada yang diubah sejak simpan terakhir: tombol Simpan hanya aktif kalau perlu
+    const adaPerubahan = useWorkbook(wb, (w) => w.unsaved());
+    if (!wb) return <p>Memuat…</p>;
+
+    async function simpan() {
+        const patch = wb.pendingPatch();                 // 1. apa yang berubah
+        const jawaban = await simpanPatch('penjualan', patch);   // 2. kirim ke server
+        wb.saved(patch, jawaban);                        // 3. beri tahu workbook: yang ini sudah tersimpan
+    }
+    return (
+        <div>
+            <button className="simpan" disabled={!adaPerubahan} onClick={simpan}>{adaPerubahan ? 'Simpan' : 'Tersimpan'}</button>
+            <div style={{ height: 400 }}><Sheet workbook={wb} /></div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Menyimpan selalu tiga langkah:
+
+1. `wb.pendingPatch()`: apa saja yang berubah sejak simpan terakhir. Kalau orang mengubah satu sel di sheet 10.000 baris, isinya satu baris saja.
+2. Kirim patch itu ke server. Server menggabungkannya dengan yang tersimpan ([bab 12](12-server.md)).
+3. `wb.saved(patch, jawaban)`: memberi tahu workbook bahwa patch itu sudah tersimpan. Setelah ini `wb.unsaved()` kembali `false`, dan tombolnya
+   bertuliskan "Tersimpan".
+
+Menyimpan otomatis tanpa tombol adalah tiga langkah yang sama, dijalankan sendiri sedetik setelah orang berhenti mengetik (11.9).
+
+## 11.6 Workbook bukan state React
 
 Workbook adalah objek yang berubah sendiri. Isinya berubah setiap kali orang mengetik, dan `<Sheet>` menggambar ulang dirinya tanpa `setState`. Karena itu
 workbook **tidak** disimpan sebagai state yang diganti-ganti. Workbook dibuat sekali, lalu objek yang sama dipakai terus:
@@ -38,7 +238,7 @@ const [wb] = useState(buatTemplate);            // sama, dengan fungsi yang suda
 Mengganti workbook dengan workbook lain (misalnya membuka file lain) boleh: simpan di `useState` lalu panggil `setWb(createWorkbook(docLain))`.
 `<Sheet>` menampilkan workbook baru itu.
 
-## 11.2 Membaca workbook dari komponen lain: `useWorkbook`
+## 11.7 Membaca workbook dari komponen lain: `useWorkbook`
 
 Total di header halaman, tombol Undo yang tahu kapan bisa dipakai, tanda "belum tersimpan". Semua komponen ini bukan bagian dari `<Sheet>`, tetapi
 harus ikut berubah bersamanya. `useWorkbook` dari `@kufayeka/sheet` melakukannya:
@@ -61,9 +261,9 @@ const belumTersimpan = useWorkbook(wb, (w) => w.unsaved());
 - Jaga `baca` tetap ringan. Membaca beberapa sel itu ringan. Menjumlahkan 100.000 baris dengan JavaScript tidak ringan: buat rumus di sheet, lalu baca
   hasilnya.
 
-## 11.3 Memuat dari API
+## 11.8 Memuat dari API
 
-Hook untuk memuat workbook, dan hook untuk menyimpannya (11.4), ditaruh di satu file. File ini dipakai oleh semua contoh berikutnya:
+Hook untuk memuat workbook, dan hook untuk menyimpannya (11.9), ditaruh di satu file. File ini dipakai oleh semua contoh berikutnya:
 
 <!-- contoh: 11-hooks.js -->
 ```js
@@ -174,7 +374,7 @@ Yang perlu diperhatikan:
   kali saat development.
 - **Berganti workbook**: `id` lain memuat workbook lain, dan `<Sheet>` menampilkan workbook baru begitu jawabannya datang.
 
-## 11.4 Menyimpan otomatis
+## 11.9 Menyimpan otomatis
 
 `useAutosave` di file yang sama menyimpan satu detik setelah orang berhenti mengubah:
 
@@ -214,7 +414,7 @@ Cara kerjanya:
 
 Apa yang dilakukan server dengan patch itu (menggabungkan, memeriksa, menolak), dan bentuk tabel database-nya, dibahas di [bab 12](12-server.md).
 
-## 11.5 Aplikasi lengkap: kasir
+## 11.10 Aplikasi lengkap: kasir
 
 Semua bagian di atas dalam satu halaman. Header menampilkan omzet, jumlah transaksi, Undo/Redo, dan status simpan. Panel kanan menampilkan transaksi
 yang dipilih, dan di bawahnya ada form React untuk menambah transaksi:
@@ -319,7 +519,7 @@ Yang dipakai di sini:
   [bab 10](10-aturan.md)) tetap berlaku seperti kalau orang mengetiknya sendiri. Perubahan itu juga masuk undo dan ikut tersimpan otomatis.
 - **Tombol Undo di luar sheet** cukup memanggil `wb.undo()`. Sheet dan header ikut berubah.
 
-## 11.6 Data dari props
+## 11.11 Data dari props
 
 Laporan yang datanya datang lewat props, misalnya dari pilihan cabang di atasnya:
 
@@ -392,7 +592,7 @@ Ada dua cara menanggapi props yang berubah:
 memindahkannya, dan klik tab di sheet memberi tahu state-mu. Contoh di atas menyimpan nama sheet di state dan mengubahnya menjadi id dengan
 `wb.sheetIdByName`. Nama lebih cocok untuk URL atau `localStorage`.
 
-## 11.7 Dua tampilan, satu workbook
+## 11.12 Dua tampilan, satu workbook
 
 Dua `<Sheet>` boleh menampilkan workbook yang sama. Isi dan undo milik workbook, sedangkan seleksi, gulir, dan sheet aktif milik masing-masing tampilan:
 
@@ -422,7 +622,7 @@ export default function DuaTampilan() {
 Mengubah Qty di kiri langsung mengubah pivot di kanan. Pola yang sama berguna untuk data dan grafik, data dan ringkasan, atau sheet induk dan sheet
 detail yang berdampingan.
 
-## 11.8 Next.js
+## 11.13 Next.js
 
 Di App Router, cara yang paling enak adalah membaca workbook di **server component** lalu memberikannya ke client component sebagai props. Halaman
 langsung tampil berisi, tanpa "Memuat…" dan tanpa permintaan kedua dari browser:
@@ -475,20 +675,20 @@ export function LembarPenjualan({ id, doc }) {
 - `doc` adalah JSON biasa (hasil `wb.toJSON()` yang dulu disimpan), jadi bisa melewati batas server ke client. Workbook-nya sendiri dibuat di client.
 - Komponen yang memanggil `createWorkbook`, `useState`, atau `useWorkbook` harus client component (`'use client'`). `<Sheet>` sendiri sudah client
   component, jadi bisa dipakai langsung di halaman yang tidak membuat workbook ([1.5](01-mulai-cepat.md#15-nextjs)).
-- Untuk halaman yang memuat dari API di browser (11.3), server merender teks memuatnya dulu. `<Sheet>` juga aman dirender di server karena tidak
+- Untuk halaman yang memuat dari API di browser (11.8), server merender teks memuatnya dulu. `<Sheet>` juga aman dirender di server karena tidak
   menyentuh `window` atau `document` saat render.
 
-## 11.9 Kesalahan yang sering terjadi
+## 11.14 Kesalahan yang sering terjadi
 
 | Gejala | Sebab | Solusi |
 |---|---|---|
-| Isi kembali kosong, undo hilang, setiap kali state lain berubah | `createWorkbook()` dipanggil di badan komponen | `useState(() => createWorkbook(...))` (11.1) |
-| Total di header tidak ikut berubah | dibaca sekali dengan `wb.value(...)` di render | `useWorkbook(wb, (w) => w.value(...))` (11.2) |
+| Isi kembali kosong, undo hilang, setiap kali state lain berubah | `createWorkbook()` dipanggil di badan komponen | `useState(() => createWorkbook(...))` (11.6) |
+| Total di header tidak ikut berubah | dibaca sekali dengan `wb.value(...)` di render | `useWorkbook(wb, (w) => w.value(...))` (11.7) |
 | Header digambar ulang terus walau totalnya sama | `baca` mengembalikan objek atau array baru | kembalikan angka atau teks, atau pecah menjadi beberapa `useWorkbook` |
-| Pindah cepat dari workbook A ke B, yang tampil malah A | jawaban API yang lama datang belakangan | `AbortController` di effect (11.3) |
-| Perubahan hilang setelah autosave | `wb.saved()` dipanggil tanpa patch yang dikirim, atau sebelum jawaban datang | `wb.saved(patch, jawaban)` dengan patch yang sama, setelah server menjawab (11.4) |
-| Ctrl+Z menghapus data yang diisi dari API | data diisi dengan source bawaan (`code`), jadi masuk undo | isi dengan `{ source: 'remote' }` (11.6) |
-| Form React melewati validasi sheet | ditulis tanpa source, jadi dianggap kode | `{ source: 'user' }` (11.5) |
+| Pindah cepat dari workbook A ke B, yang tampil malah A | jawaban API yang lama datang belakangan | `AbortController` di effect (11.8) |
+| Perubahan hilang setelah autosave | `wb.saved()` dipanggil tanpa patch yang dikirim, atau sebelum jawaban datang | `wb.saved(patch, jawaban)` dengan patch yang sama, setelah server menjawab (11.9) |
+| Ctrl+Z menghapus data yang diisi dari API | data diisi dengan source bawaan (`code`), jadi masuk undo | isi dengan `{ source: 'remote' }` (11.11) |
+| Form React melewati validasi sheet | ditulis tanpa source, jadi dianggap kode | `{ source: 'user' }` (11.10) |
 | Panel detail menunjuk baris yang salah setelah sort | yang disimpan nomor baris | simpan `wb.rowId(r)`, cari nomornya lagi dengan `wb.rowIndex(id)` |
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Aturan dan tipe kolom](10-aturan.md) · Berikutnya: [12. Menyimpan ke server](12-server.md)

@@ -81,11 +81,11 @@ test-nya menjaga batas atasnya.
 - **Satu panggilan untuk banyak sel.** `setValues` dengan tabel, `setBlock`, atau `populate` adalah satu perubahan dan satu kali hitung ulang. Memanggil
   `setValues` 10.000 kali dalam loop berarti 10.000 perubahan dan 10.000 langkah undo.
 - **`undoLimit`.** Bawaannya 200 langkah. Untuk sheet sangat besar, `createWorkbook(doc, { undoLimit: 50 })` menghemat memori.
-- **Simpan patch, bukan `toJSON`, setiap kali ada perubahan** ([11.4](11-react.md#114-menyimpan-otomatis)). Satu ketikan menghasilkan patch sekitar
+- **Simpan patch, bukan `toJSON`, setiap kali ada perubahan** ([11.9](11-react.md#119-menyimpan-otomatis)). Satu ketikan menghasilkan patch sekitar
   1 KB, sedangkan workbook 100.000 baris berukuran puluhan MB.
-- **`useWorkbook` dengan nilai sederhana** ([11.2](11-react.md#112-membaca-workbook-dari-komponen-lain-useworkbook)), supaya komponen di luar sheet tidak
+- **`useWorkbook` dengan nilai sederhana** ([11.7](11-react.md#117-membaca-workbook-dari-komponen-lain-useworkbook)), supaya komponen di luar sheet tidak
   digambar ulang di setiap ketikan.
 - **Membuka workbook besar sekali, lalu memakainya terus.** `createWorkbook(doc)` untuk 100.000 baris butuh beberapa detik. Jangan membuatnya ulang
-  saat props lain berubah ([11.1](11-react.md#111-workbook-bukan-state-react)).
+  saat props lain berubah ([11.6](11-react.md#116-workbook-bukan-state-react)).
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [16. Panduan layar](16-layar.md) · Berikutnya: [18. Referensi](18-referensi.md)

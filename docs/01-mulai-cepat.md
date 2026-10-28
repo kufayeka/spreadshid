@@ -62,7 +62,7 @@ sheet. Isinya hilang begitu halaman ditutup karena belum ada yang menyimpan. Car
 | **Grid** | huruf kolom, nomor baris, sel. Baris dan kolom bisa dibekukan, diubah ukurannya, dikelompokkan |
 | **Tab sheet** | `+` untuk sheet baru, `☰` daftar semua sheet, lalu satu tab per sheet (klik kanan: ganti nama, duplikat, sembunyikan, geser, hapus; tab juga bisa diseret) |
 
-Tiap bagian bisa disembunyikan per orang lewat access control (bab 11). Misalnya mandor di lapangan cuma isi kolom realisasi, tanpa menu dan toolbar.
+Tiap bagian bisa disembunyikan per orang lewat access control ([bab 13](13-hak-akses.md)). Misalnya mandor di lapangan cuma isi kolom realisasi, tanpa menu dan toolbar.
 
 ## 1.4 Workbook dari kode
 

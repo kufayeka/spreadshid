@@ -22,11 +22,11 @@ Semua props boleh tidak diisi.
 | `onSheetChange` | `(sheetId) => void` | | sheet aktif berganti: tab diklik, sheet ditambah atau diduplikat, hasil pencarian di sheet lain |
 | `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (dari orang, kode, atau undo). Sama dengan `wb.on('op', ...)` |
 | `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak. Sheet sudah menampilkan `reason` sebagai pemberitahuan; prop ini buat log atau tampilanmu sendiri |
-| `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak sesuai tipe kolomnya (bab 10) |
+| `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak sesuai tipe kolomnya ([bab 10](10-aturan.md)) |
 | `onSelectionChange` | `(sel) => void` | | seleksi berubah. `sel.active` adalah sel aktif `{ r, c }`, `sel.ranges` daftar kotak yang dipilih |
 | `fileName` | string | `'Spreadsheet'` | nama file (tanpa ekstensi) saat orang memilih File → Download |
-| `access` | `{ policy, who }` | tanpa batasan | access policy dan orang yang membuka sheet (bab 11). Sheet cuma menerapkan; kebijakannya tetap milik aplikasimu |
-| `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya (bab 12) |
+| `access` | `{ policy, who }` | tanpa batasan | access policy dan orang yang membuka sheet ([bab 13](13-hak-akses.md)). Sheet cuma menerapkan; kebijakannya tetap milik aplikasimu |
+| `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya ([bab 14](14-komentar.md)) |
 | `showProtected` | boolean | `false` | sel yang dilindungi aturan digambar bergaris-garis (berguna saat membuat aturan) |
 | `className` | string | | class tambahan di elemen terluar |
 | `style` | objek style | | style elemen terluar. Tinggi bisa diatur di sini; variabel tema juga (3.5) |

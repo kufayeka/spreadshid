@@ -55,18 +55,21 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 2. [Konsep dasar](docs/02-konsep.md): workbook, sheet, alamat sel, id baris dan kolom, perubahan (op), undo, menyimpan
 3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): semua props, event, handle (`ref`), keyboard, tema
 - [Galeri: satu proyek konstruksi](docs/galeri.md)
-4. API workbook *(menyusul)*
-5. Rumus *(menyusul)*
-6. Format dan locale *(menyusul)*
-7. Data: sort, filter, grup, validasi, conditional formatting *(menyusul)*
-8. Mengisi sheet dari data (populate) *(menyusul)*
-9. Menyimpan ke database *(menyusul)*
-10. Aturan dan tipe kolom *(menyusul)*
-11. Access control *(menyusul)*
-12. Komentar *(menyusul)*
-13. Excel dan CSV *(menyusul)*
-14. Performa *(menyusul)*
-15. Referensi lengkap *(menyusul)*
+4. [API workbook](docs/04-api-workbook.md): mengisi dan membaca sel, gaya, baris dan kolom, sheet, undo, op
+5. [Rumus](docs/05-rumus.md): referensi, laporan dengan rumus, named range, SUBTOTAL, error, 105 fungsi
+6. [Format, locale, dan conditional formatting](docs/06-format.md)
+7. [Data](docs/07-data.md): sort, filter, grup, validasi, cari dan ganti
+8. [Pivot table](docs/08-pivot.md): di sheet, dan tanpa sheet untuk server
+9. [Mengisi sheet dari data](docs/09-populate.md): populate dari API atau database
+10. [Aturan dan tipe kolom](docs/10-aturan.md)
+11. [Memakai di React](docs/11-react.md): langkah demi langkah, useWorkbook, memuat, menyimpan, Next.js
+12. [Menyimpan ke server](docs/12-server.md): dari sheet ke tabel database, patch, viewFor
+13. [Access control](docs/13-hak-akses.md)
+14. [Komentar](docs/14-komentar.md)
+15. [Excel dan CSV](docs/15-excel.md)
+16. [Panduan layar](docs/16-layar.md): menu, toolbar, panel
+17. [Performa](docs/17-performa.md)
+18. [Referensi](docs/18-referensi.md): semua nama, satu baris masing-masing
 
 ## Soal dokumentasi ini
 

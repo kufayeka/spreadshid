@@ -483,7 +483,7 @@ id dari nama  : true
 | `wb.hideSheet(sheet, true/false)` | sembunyikan atau tampilkan tab. Sheet terakhir yang tampil tidak bisa disembunyikan |
 | `wb.moveSheet(sheet, ke)` | pindahkan supaya berdiri sebelum sheet nomor `ke` |
 | `setSheetProps(props)`, `sheetProps()` | props sheet, digabung seperti gaya |
-| `wb.sheetShown(sheet)` | apakah sheet ini terlihat oleh orang yang membuka, menurut access policy ([bab 11](11-hak-akses.md)) |
+| `wb.sheetShown(sheet)` | apakah sheet ini terlihat oleh orang yang membuka, menurut access policy ([bab 13](13-hak-akses.md)) |
 
 | Props sheet | Artinya |
 |---|---|

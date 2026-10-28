@@ -69,5 +69,27 @@ await withExample(async ({ js, click, type, key, wait }) => {
     check('it shows the last value', (await js('document.querySelector("#moving").textContent')) === 'tiga');
 }, 'use-workbook.js');
 
+// the step-by-step pages of the React guide: step 3 (a total outside the sheet, a button that changes the sheet), step 5 (a Save button)
+const pressIn = async (js, click, wait, sel) => { const p = await js(`(function(){ var b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`); await click(p.x, p.y); await wait(300); };
+await withExample(async ({ js, click, wait }) => {
+    for (let i = 0; i < 60 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(250);
+    await wait(300);
+    const before = Number(await js('document.querySelector(".total").textContent'));
+    await pressIn(js, click, wait, '.tambah');
+    const after = Number(await js('document.querySelector(".total").textContent'));
+    check('step 3: the button outside the sheet adds a bag of cement, and the total outside the sheet follows', after === before + 72000, [before, after]);
+}, '../docs/examples/11-langkah3.page.js');
+await withExample(async ({ js, click, type, key, wait }) => {
+    for (let i = 0; i < 60 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(250);
+    await wait(300);
+    check('step 5: nothing to save after loading', (await js('document.querySelector(".simpan").textContent')) === 'Tersimpan');
+    const h = await js(`(function(){ var a = document.querySelector('.ks-colhead[data-c="7"]').getBoundingClientRect(), b = document.querySelector('.ks-rowhead[data-r="1"]').getBoundingClientRect(); return { x: Math.round(a.left + a.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+    await click(h.x, h.y); await wait(100); await type('99'); await key('Enter', 'Enter', 13); await wait(200);
+    check('step 5: a Qty typed turns Save on', (await js('document.querySelector(".simpan").textContent')) === 'Simpan');
+    await pressIn(js, click, wait, '.simpan');
+    await wait(400);
+    check('step 5: Save sends the patch and the button says saved', (await js('document.querySelector(".simpan").textContent')) === 'Tersimpan');
+}, '../docs/examples/11-langkah5.page.js');
+
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL OK');
 process.exit(failures ? 1 : 0);

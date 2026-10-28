@@ -155,7 +155,7 @@ Id ini yang bikin semuanya stabil:
 
 - **Rumus** menyimpan referensinya sebagai id, jadi `=SUM(A1:A2)` otomatis jadi `=SUM(A3:A4)` kalau dua baris disisipkan di atasnya.
 - **Penyimpanan** ke database per baris berdasarkan id. Menyisipkan satu baris di tengah 100.000 baris cuma mengirim satu baris baru, tidak menggeser
-  semuanya (bab 9).
+  semuanya ([12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah)).
 - **Aturan, komentar, validasi, conditional formatting, dan named range** menempel ke sel lewat id, jadi ikut pindah bersama selnya.
 
 Fungsi untuk bolak-balik nomor dan id: `rowId(s, r)`, `colId(s, c)`, `rowIndex(s, id)`, `colIndex(s, id)`. Nomor `-1` artinya baris atau kolom itu
@@ -238,10 +238,10 @@ Fungsi yang mengubah workbook menerima parameter terakhir `how`, misalnya `{ sou
 |---|---|---|
 | `op` | `{ ops, source }` | tiap perubahan yang berhasil diterapkan |
 | `reject` | `{ reason, op, source }` | perubahan ditolak (oleh `beforeOp`, aturan, tipe kolom, validasi, atau access control) |
-| `cellError` | `{ address, field, value, expected }` | nilai tidak cocok dengan tipe kolomnya (bab 10) |
+| `cellError` | `{ address, field, value, expected }` | nilai tidak cocok dengan tipe kolomnya ([bab 10](10-aturan.md)) |
 | `saved` | | setelah `wb.saved(...)` |
 | `layout` | | ukuran baris/kolom atau aturan berubah (dipakai tampilan) |
-| `access` | `{ owner, roles, ui, message }` | access policy diganti (bab 11) |
+| `access` | `{ owner, roles, ui, message }` | access policy diganti ([bab 13](13-hak-akses.md)) |
 
 ## 2.6 Menyimpan
 
@@ -284,6 +284,6 @@ dibuka lagi    : 125
 
 Workbook baru dikirim semua di simpanan pertama. Setelah itu satu ketikan cuma mengirim satu baris. `wb.toJSON()` kasih seluruh workbook sebagai
 objek biasa, dan `createWorkbook(doc)` membukanya lagi. Bentuk tabel database, cara menggabungkan patch di server (`mergePatch`), dan cara
-mengeceknya (`checkPatch`) ada di bab 9.
+mengeceknya (`checkPatch`) ada di [bab 12](12-server.md).
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai cepat](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)
