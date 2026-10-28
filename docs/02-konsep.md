@@ -155,7 +155,7 @@ Id ini yang bikin semuanya stabil:
 
 - **Rumus** menyimpan referensinya sebagai id, jadi `=SUM(A1:A2)` otomatis jadi `=SUM(A3:A4)` kalau dua baris disisipkan di atasnya.
 - **Penyimpanan** ke database per baris berdasarkan id. Menyisipkan satu baris di tengah 100.000 baris cuma mengirim satu baris baru, tidak menggeser
-  semuanya ([12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah)).
+  semuanya ([12.1](12-server.md#123-isi-content)).
 - **Aturan, komentar, validasi, conditional formatting, dan named range** menempel ke sel lewat id, jadi ikut pindah bersama selnya.
 
 Fungsi untuk bolak-balik nomor dan id: `rowId(s, r)`, `colId(s, c)`, `rowIndex(s, id)`, `colIndex(s, id)`. Nomor `-1` artinya baris atau kolom itu

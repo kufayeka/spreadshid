@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="330" viewBox="0 0 900 330" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5f6368"/></marker>
+  </defs>
+  <rect width="900" height="330" fill="#ffffff"/>
+
+  <!-- browser -->
+  <rect x="20" y="40" width="230" height="200" rx="10" fill="#f8f9fa" stroke="#5f6368"/>
+  <text x="135" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="#202124">BROWSER</text>
+  <rect x="40" y="82" width="190" height="56" rx="6" fill="#fff" stroke="#dadce0"/>
+  <text x="135" y="106" text-anchor="middle" font-size="13" fill="#202124">&lt;Sheet&gt;</text>
+  <text x="135" y="125" text-anchor="middle" font-size="12" fill="#5f6368">orang mengetik</text>
+  <rect x="40" y="160" width="190" height="56" rx="6" fill="#e8f0fe" stroke="#1a73e8"/>
+  <text x="135" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#1a73e8">workbook</text>
+  <text x="135" y="203" text-anchor="middle" font-size="12" fill="#5f6368">wb.toJSON()</text>
+  <line x1="135" y1="140" x2="135" y2="156" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- the JSON -->
+  <line x1="254" y1="188" x2="318" y2="188" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="322" y="120" width="200" height="136" rx="8" fill="#fef7e0" stroke="#f9ab00"/>
+  <text x="422" y="144" text-anchor="middle" font-size="13" font-weight="700" fill="#202124">satu JSON</text>
+  <g font-family="Consolas, monospace" font-size="11" fill="#202124">
+    <text x="336" y="166">{ "sheets": [ {</text>
+    <text x="336" y="182">  "props": { "name": "Produk" },</text>
+    <text x="336" y="198">  "rows": [ { "cells":</text>
+    <text x="336" y="214">    { "A": "SMN-01", ... } },</text>
+    <text x="336" y="230">  ... ] } ] }</text>
+  </g>
+  <text x="422" y="110" text-anchor="middle" font-size="12" fill="#5f6368">PUT /api/spreadsheet/stok</text>
+
+  <!-- server -->
+  <line x1="526" y1="188" x2="570" y2="188" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="574" y="150" width="90" height="76" rx="8" fill="#f8f9fa" stroke="#5f6368"/>
+  <text x="619" y="184" text-anchor="middle" font-size="14" font-weight="700" fill="#202124">SERVER</text>
+  <text x="619" y="204" text-anchor="middle" font-size="11" fill="#5f6368">UPSERT</text>
+  <line x1="668" y1="188" x2="690" y2="188" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- the table -->
+  <text x="790" y="96" text-anchor="middle" font-size="13" font-weight="700" fill="#202124">tabel spreadsheet</text>
+  <g font-size="12" fill="#202124">
+    <rect x="694" y="106" width="196" height="136" fill="#fff" stroke="#1a73e8"/>
+    <rect x="694" y="106" width="196" height="26" fill="#e8f0fe" stroke="#1a73e8"/>
+    <line x1="770" y1="106" x2="770" y2="242" stroke="#1a73e8"/>
+    <text x="702" y="124" font-weight="700">id</text><text x="778" y="124" font-weight="700">content</text>
+    <line x1="694" y1="168" x2="890" y2="168" stroke="#dadce0"/><line x1="694" y1="204" x2="890" y2="204" stroke="#dadce0"/>
+    <rect x="695" y="133" width="194" height="34" fill="#fef7e0"/>
+    <line x1="770" y1="133" x2="770" y2="167" stroke="#1a73e8"/>
+    <text x="702" y="155">stok</text><text x="778" y="155" font-family="Consolas, monospace" font-size="11">{"sheets":…}</text>
+    <text x="702" y="191">penjualan</text><text x="778" y="191" font-family="Consolas, monospace" font-size="11">{"sheets":…}</text>
+    <text x="702" y="227">laporan</text><text x="778" y="227" font-family="Consolas, monospace" font-size="11">{"sheets":…}</text>
+  </g>
+  <text x="790" y="262" text-anchor="middle" font-size="12" fill="#5f6368">1 spreadsheet = 1 baris</text>
+
+  <text x="450" y="300" text-anchor="middle" font-size="14" fill="#202124">Membuka lagi: server mengirim <tspan font-family="Consolas, monospace">content</tspan>, browser memanggil <tspan font-family="Consolas, monospace">createWorkbook(content)</tspan>.</text>
+</svg>

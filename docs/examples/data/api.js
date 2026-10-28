@@ -1,7 +1,8 @@
 // API tiruan untuk contoh bab 11, supaya contohnya jalan tanpa server. Di aplikasimu, ganti isinya dengan fetch ke API-mu sendiri:
 //
-//   export const ambilWorkbook = (id, signal) => fetch('/api/workbooks/' + id, { signal }).then((r) => r.json());
-//   export const simpanPatch = (id, patch) => fetch('/api/workbooks/' + id, { method: 'PATCH', body: JSON.stringify(patch) }).then((r) => r.json());
+//   export const ambilWorkbook = (id, signal) => fetch('/api/spreadsheet/' + id, { signal }).then((r) => r.json());
+//   export const simpanContent = (id, content) => fetch('/api/spreadsheet/' + id, { method: 'PUT', body: JSON.stringify(content) });
+//   export const simpanPatch = (id, patch) => fetch('/api/spreadsheet/' + id, { method: 'PATCH', body: JSON.stringify(patch) }).then((r) => r.json());
 //
 // Server-nya menggabungkan patch dengan mergePatch dan memeriksanya dengan checkPatch (bab 12).
 import { createWorkbook, mergePatch } from '@kufayeka/sheet/core';
@@ -37,6 +38,13 @@ export async function ambilWorkbook(id, signal) {
     await tunggu(300, signal);
     if (!tersimpan) tersimpan = awal();
     return JSON.parse(JSON.stringify(tersimpan));
+}
+
+/** PUT /api/spreadsheet/:id: seluruh isi workbook (toJSON) menggantikan yang tersimpan. Satu baris di tabel spreadsheet. */
+export async function simpanContent(id, content) {
+    await tunggu(200);
+    tersimpan = JSON.parse(JSON.stringify(content));
+    return { ok: true };
 }
 
 /** PATCH /api/workbooks/:id: perubahan sejak simpan terakhir. Menjawab versi yang baru. */

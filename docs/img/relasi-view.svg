@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5f6368"/></marker>
+  </defs>
+  <rect width="900" height="420" fill="#ffffff"/>
+
+  <!-- the one table -->
+  <text x="130" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="#202124">tabel spreadsheet</text>
+  <g font-size="12" fill="#202124">
+    <rect x="20" y="52" width="220" height="100" fill="#fff" stroke="#1a73e8"/>
+    <rect x="20" y="52" width="220" height="26" fill="#e8f0fe" stroke="#1a73e8"/>
+    <line x1="130" y1="52" x2="130" y2="152" stroke="#1a73e8"/>
+    <text x="28" y="70" font-weight="700">id</text><text x="138" y="70" font-weight="700">content</text>
+    <line x1="20" y1="115" x2="240" y2="115" stroke="#dadce0"/>
+    <text x="28" y="101">master-produk</text><text x="138" y="101" font-family="Consolas, monospace" font-size="11">{"sheets":…}</text>
+    <text x="28" y="138">penjualan-10</text><text x="138" y="138" font-family="Consolas, monospace" font-size="11">{"sheets":…}</text>
+  </g>
+
+  <!-- the views -->
+  <line x1="244" y1="96" x2="320" y2="70" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="244" y1="134" x2="320" y2="260" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+  <text x="282" y="160" text-anchor="middle" font-size="12" fill="#5f6368">view</text>
+
+  <text x="470" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="#202124">view produk</text>
+  <g font-size="12" fill="#202124">
+    <rect x="324" y="44" width="292" height="104" fill="#fff" stroke="#188038"/>
+    <rect x="324" y="44" width="292" height="24" fill="#e6f4ea" stroke="#188038"/>
+    <text x="332" y="61" font-weight="700">kode</text><text x="410" y="61" font-weight="700">nama</text><text x="530" y="61" font-weight="700">kategori</text>
+    <text x="332" y="86">SMN-01</text><text x="410" y="86">Semen Portland</text><text x="530" y="86">Semen</text>
+    <text x="332" y="108">BSI-10</text><text x="410" y="108">Besi beton 10</text><text x="530" y="108">Besi</text>
+    <text x="332" y="130">CAT-05</text><text x="410" y="130">Cat tembok 5</text><text x="530" y="130">Cat</text>
+  </g>
+
+  <g transform="translate(0,30)">
+  <text x="470" y="194" text-anchor="middle" font-size="14" font-weight="700" fill="#202124">view penjualan</text>
+  <g font-size="12" fill="#202124">
+    <rect x="324" y="204" width="292" height="104" fill="#fff" stroke="#188038"/>
+    <rect x="324" y="204" width="292" height="24" fill="#e6f4ea" stroke="#188038"/>
+    <text x="332" y="221" font-weight="700">no</text><text x="380" y="221" font-weight="700">kode</text><text x="460" y="221" font-weight="700">qty</text><text x="520" y="221" font-weight="700">total</text>
+    <text x="332" y="246">1</text><text x="380" y="246">SMN-01</text><text x="460" y="246">11</text><text x="520" y="246">752400</text>
+    <text x="332" y="268">2</text><text x="380" y="268">KRM-40</text><text x="460" y="268">14</text><text x="520" y="268">1148000</text>
+    <text x="332" y="290">3</text><text x="380" y="290">BSI-10</text><text x="460" y="290">10</text><text x="520" y="290">795000</text>
+  </g>
+
+  <!-- the relation -->
+  </g>
+
+  <line x1="350" y1="232" x2="350" y2="152" stroke="#d93025" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text x="362" y="196" font-size="12" font-weight="700" fill="#d93025">JOIN: penjualan.kode = produk.kode</text>
+
+  <!-- the answer -->
+  <line x1="620" y1="176" x2="660" y2="176" stroke="#5f6368" stroke-width="2" marker-end="url(#a)"/>
+  <text x="770" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#202124">omzet per kategori</text>
+  <g font-size="12" fill="#202124">
+    <rect x="664" y="134" width="216" height="104" fill="#fff" stroke="#f9ab00"/>
+    <rect x="664" y="134" width="216" height="24" fill="#fef7e0" stroke="#f9ab00"/>
+    <text x="672" y="151" font-weight="700">kategori</text><text x="772" y="151" font-weight="700">omzet</text>
+    <text x="672" y="176">Bata</text><text x="772" y="176">178.494.750</text>
+    <text x="672" y="198">Cat</text><text x="772" y="198">143.393.750</text>
+    <text x="672" y="220">Semen</text><text x="772" y="220">97.448.800</text>
+  </g>
+
+  <text x="450" y="402" text-anchor="middle" font-size="14" fill="#202124">Data tetap disimpan utuh. View hanya cara membaca: dari SQL ia terlihat seperti tabel biasa.</text>
+</svg>

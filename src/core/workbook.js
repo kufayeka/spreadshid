@@ -1930,10 +1930,12 @@ export function createWorkbook(doc, options) {
 
     /**
      * The server kept `patch`: forget what it carried, unless it changed again after the patch was taken.
-     * @param {ReturnType<typeof pendingPatch>} patch
+     * @param {ReturnType<typeof pendingPatch>} [patch]  The patch the server kept; none when the whole workbook (toJSON) was saved.
      * @param {{ version?: number }} [answer]  The new version the server gave the workbook.
      */
     function saved(patch, answer) {
+        // no patch: the whole workbook was saved (toJSON() sent as it is), so everything up to now is
+        if (!patch) patch = { upTo: changeNo, rows: { upsert: [...dirty.rows.keys()].map((rid) => ({ id: rid })) } };
         revision++;
         const forget = (map) => { for (const [k, n] of [...map]) if (n <= patch.upTo) map.delete(k); };
         forget(dirty.rows); forget(dirty.columns); forget(dirty.sheets);

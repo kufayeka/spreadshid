@@ -54,7 +54,7 @@ for (const doc of documents()) {
     for (const [, link] of text.matchAll(/\]\(([\w./-]+\.md)(#[\w.-]*)?\)/g)) assert.ok(existsSync(resolve(dirname(file), link)), doc + ': the page ' + link + ' is there');
     for (const [, name] of text.matchAll(/<!-- (?:contoh|hasil): ([\w./-]+) -->/g)) used.add(name);
 }
-const unused = readdirSync(examples).filter((f) => f.endsWith('.js') && !used.has(f));
+const unused = readdirSync(examples).filter((f) => (f.endsWith('.js') || f.endsWith('.sql')) && !used.has(f));
 assert.deepStrictEqual(unused, [], 'every example file is in the documentation');
 ok('every picture, link and example file is there, and every example is used');
 

@@ -31,8 +31,8 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `parseInput` | teks ketikan menjadi nilai menurut locale: `'1.250,5'` → 1250.5 | [6.3](06-format.md#63-locale) |
 | `roundTo` | pembulatan yang dipakai format uang | [5.1](05-rumus.md#51-dasar) |
 | `colName`, `colIndex` | `2` ↔ `'C'` | [2.2](02-konsep.md#22-alamat-sel) |
-| `storeFormula`, `formulaText`, `resolveRef`, `isStoredFormula` | rumus teks ↔ rumus tersimpan `{ f, refs }`, dan ke mana sebuah referensi menunjuk | [2.3](02-konsep.md), [12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah) |
-| `newId`, `keyBetween`, `keysBetween`, `compareKeys` | id baru, key urutan di antara dua key, dan perbandingannya | [12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah) |
+| `storeFormula`, `formulaText`, `resolveRef`, `isStoredFormula` | rumus teks ↔ rumus tersimpan `{ f, refs }`, dan ke mana sebuah referensi menunjuk | [2.3](02-konsep.md), [12.1](12-server.md#123-isi-content) |
+| `newId`, `keyBetween`, `keysBetween`, `compareKeys` | id baru, key urutan di antara dua key, dan perbandingannya | [12.1](12-server.md#123-isi-content) |
 | `fillBlock`, `copyBlock`, `pasteClip`, `pasteText` | fill handle, copy, dan paste dari kode | [5.1](05-rumus.md#51-dasar) |
 | `sortRange` | urutkan range menurut satu kolom | [7.1](07-data.md#71-sort) |
 | `findAll`, `replaceIn` | cari dan ganti | [7.5](07-data.md#75-cari-dan-ganti) |
@@ -61,7 +61,7 @@ Fungsi yang hanya ada di `wb`, bukan di handle sheet:
 | `setRules` | aturan per sel untuk orang yang membuka | [10.1](10-aturan.md#101-aturan-hanya-baca-dan-tersembunyi) |
 | `setAccess`, `access`, `can`, `shows` | access control | [13](13-hak-akses.md) |
 | `setUser` | ganti orang yang membuka (penulis komentar dan op) | [14](14-komentar.md) |
-| `id` | id workbook | [12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah) |
+| `id` | id workbook | [12.1](12-server.md#123-isi-content) |
 
 ## 18.4 Handle sheet
 

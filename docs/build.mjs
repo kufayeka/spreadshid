@@ -41,7 +41,7 @@ function outputOf(name) {
 /** A document with its examples and their outputs put in. */
 export function built(text) {
     return text
-        .replace(/<!-- contoh: ([\w./-]+) -->[\s\S]*?<!-- \/contoh -->/g, (m, name) => '<!-- contoh: ' + name + ' -->\n```' + (/\.page\.js$|jsx/.test(name) ? 'jsx' : 'js') + '\n' + codeOf(name) + '\n```\n<!-- /contoh -->')
+        .replace(/<!-- contoh: ([\w./-]+) -->[\s\S]*?<!-- \/contoh -->/g, (m, name) => '<!-- contoh: ' + name + ' -->\n```' + (/\.page\.js$|jsx/.test(name) ? 'jsx' : /\.sql$/.test(name) ? 'sql' : 'js') + '\n' + codeOf(name) + '\n```\n<!-- /contoh -->')
         .replace(/<!-- hasil: ([\w./-]+) -->[\s\S]*?<!-- \/hasil -->/g, (m, name) => '<!-- hasil: ' + name + ' -->\n```text\n' + outputOf(name) + '\n```\n<!-- /hasil -->');
 }
 

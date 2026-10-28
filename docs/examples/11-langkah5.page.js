@@ -2,20 +2,19 @@ import { useEffect, useState } from 'react';
 import { Sheet, useWorkbook } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
-import { ambilWorkbook, simpanPatch } from './data/api.js';
+import { ambilWorkbook, simpanContent } from './data/api.js';
 
-// Langkah 5: tombol Simpan. Yang dikirim hanya bagian yang berubah (patch), bukan seluruh isi.
+// Langkah 5: tombol Simpan. Seluruh isi workbook dikirim sebagai satu JSON, dan disimpan sebagai satu baris di database.
 export default function Halaman() {
     const [wb, setWb] = useState(null);
     useEffect(() => { ambilWorkbook('penjualan').then((doc) => setWb(createWorkbook(doc))); }, []);
-    // true kalau ada yang diubah sejak simpan terakhir: tombol Simpan hanya aktif kalau perlu
+    // true kalau ada yang diubah sejak simpan terakhir
     const adaPerubahan = useWorkbook(wb, (w) => w.unsaved());
     if (!wb) return <p>Memuat…</p>;
 
     async function simpan() {
-        const patch = wb.pendingPatch();                 // 1. apa yang berubah
-        const jawaban = await simpanPatch('penjualan', patch);   // 2. kirim ke server
-        wb.saved(patch, jawaban);                        // 3. beri tahu workbook: yang ini sudah tersimpan
+        await simpanContent('penjualan', wb.toJSON());   // di aplikasimu: fetch(..., { method: 'PUT', body: JSON.stringify(wb.toJSON()) })
+        wb.saved();                                      // workbook mencatat: semua sudah tersimpan
     }
     return (
         <div>

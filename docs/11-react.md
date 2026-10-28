@@ -2,31 +2,16 @@
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Aturan dan tipe kolom](10-aturan.md) · Berikutnya: [12. Menyimpan ke server](12-server.md)
 
-Bab ini dimulai dari yang paling kecil. Lima langkah pertama masing-masing hanya menambah **satu** hal: sheet kosong, sheet berisi, angka di luar
-sheet, data dari server, lalu tombol Simpan. Setelah itu baru masuk ke pola untuk aplikasi sungguhan. Semua contoh dijalankan oleh test di Chrome
-sungguhan.
+Mulai dari yang kecil. Lima langkah pertama masing-masing menambah satu hal saja. Kalau langkah 5 sudah jalan, kamu sudah punya halaman spreadsheet
+yang bisa dibuka dan disimpan.
 
-**Gambaran besarnya dulu.** Ada dua benda:
+Sebelum mulai, satu gambar ini dulu:
 
-```
-   workbook  (data)                          <Sheet>  (tampilan)
-   ┌─────────────────────────────┐           ┌───────────────────────────────┐
-   │ A1 'Produk'   B1 'Harga'    │  dibaca   │   A            B              │
-   │ A2 'Semen'    B2 72000      │ ────────► │ 1 Produk       Harga          │
-   │ D2 '=B2*C2'  (rumus)        │           │ 2 Semen        72000          │
-   │ undo, rumus, format, ...    │ ◄──────── │   (orang mengetik di sini)    │
-   └─────────────────────────────┘  diubah   └───────────────────────────────┘
-          │  toJSON() / pendingPatch()
-          ▼
-   server dan database (bab 12)
-```
+![Workbook dan Sheet](img/konsep-react.svg)
 
-- **Workbook** menyimpan isi: nilai, rumus, format, undo. Workbook bukan komponen React, melainkan objek JavaScript biasa yang dibuat dengan
-  `createWorkbook()`.
-- **`<Sheet>`** hanya menampilkan workbook dan meneruskan ketikan orang ke workbook itu. Setiap kali workbook berubah, entah karena diketik orang atau
-  diubah kode, `<Sheet>` menggambar ulang dirinya sendiri.
-- Untuk **menyimpan**, yang dikirim ke server adalah isi workbook (`toJSON()`), atau bagian yang berubah saja (`pendingPatch()`). Bentuk penyimpanannya
-  di database dibahas langkah demi langkah di [bab 12](12-server.md).
+Ada dua benda. **Workbook** adalah isinya: angka, rumus, format, undo. **`<Sheet>`** adalah yang dilihat orang. Orang mengetik di Sheet, isinya masuk
+ke workbook. Total di header, tombol, dan form di halamanmu juga membaca dan mengubah workbook yang sama. Ubah workbook, semuanya ikut berubah. Menyimpan
+artinya mengirim isi workbook ke server ([bab 12](12-server.md)).
 
 **Langkah demi langkah**
 
@@ -36,7 +21,7 @@ sungguhan.
 - [11.4 Isi dari server](#114-isi-dari-server)
 - [11.5 Tombol Simpan](#115-tombol-simpan)
 
-**Untuk aplikasi sungguhan**
+**Lanjutan, kalau langkah 1–5 sudah jalan**
 
 - [11.6 Workbook bukan state React](#116-workbook-bukan-state-react)
 - [11.7 Membaca workbook dari komponen lain: `useWorkbook`](#117-membaca-workbook-dari-komponen-lain-useworkbook)
@@ -95,6 +80,8 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
+![Sheet berisi daftar harga](img/langkah2.png)
+
 Yang baru:
 
 - `createWorkbook()` membuat workbook, dan `setValues` mengisinya. Teks yang diawali `=` menjadi rumus.
@@ -134,6 +121,8 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
+![Total di luar sheet, setelah tombol +1 semen diklik](img/langkah3.png)
+
 Yang baru:
 
 - `useWorkbook(wb, (w) => w.value('Sheet1', 'D4'))` membaca satu sel, dan membacanya ulang setiap kali workbook berubah. Ketik di sheet, dan "Total
@@ -167,12 +156,12 @@ export default function Halaman() {
 
 Yang baru:
 
-- Server mengirim isi workbook sebagai JSON (`doc`), yaitu hasil `toJSON()` yang dulu disimpan. Bentuknya, sampai ke isi tabel database-nya, dijelaskan di [12.1](12-server.md#121-dari-sheet-ke-tabel-database-langkah-demi-langkah).
-- `createWorkbook(doc)` mengubah JSON itu kembali menjadi workbook. Ini dilakukan sekali, saat jawaban datang, lalu hasilnya disimpan dengan `setWb`.
-- Selama `wb` masih `null`, tampilkan teks "Memuat…".
+- Server mengirim satu JSON, yaitu kolom `content` dari tabel `spreadsheet` ([12.1](12-server.md#121-tabelnya)).
+- `createWorkbook(doc)` mengubah JSON itu jadi workbook lagi. Dipanggil sekali, saat jawabannya datang.
+- Selama menunggu, `wb` masih `null`, jadi yang tampil "Memuat…".
 
-`ambilWorkbook` di sini adalah API tiruan supaya contohnya bisa dijalankan ([`examples/data/api.js`](examples/data/api.js)). Di aplikasimu, isinya
-`fetch` seperti yang tertulis di komentar. Versi yang lebih tahan banting (membatalkan permintaan lama, menampilkan error) ada di 11.8.
+`ambilWorkbook` di contoh ini pura-pura jadi server, supaya contohnya bisa langsung dicoba ([`examples/data/api.js`](examples/data/api.js)). Di
+aplikasimu, isinya `fetch` ke server-mu sendiri.
 
 ## 11.5 Tombol Simpan
 
@@ -182,20 +171,19 @@ import { useEffect, useState } from 'react';
 import { Sheet, useWorkbook } from '@kufayeka/sheet';
 import { createWorkbook } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
-import { ambilWorkbook, simpanPatch } from './data/api.js';
+import { ambilWorkbook, simpanContent } from './data/api.js';
 
-// Langkah 5: tombol Simpan. Yang dikirim hanya bagian yang berubah (patch), bukan seluruh isi.
+// Langkah 5: tombol Simpan. Seluruh isi workbook dikirim sebagai satu JSON, dan disimpan sebagai satu baris di database.
 export default function Halaman() {
     const [wb, setWb] = useState(null);
     useEffect(() => { ambilWorkbook('penjualan').then((doc) => setWb(createWorkbook(doc))); }, []);
-    // true kalau ada yang diubah sejak simpan terakhir: tombol Simpan hanya aktif kalau perlu
+    // true kalau ada yang diubah sejak simpan terakhir
     const adaPerubahan = useWorkbook(wb, (w) => w.unsaved());
     if (!wb) return <p>Memuat…</p>;
 
     async function simpan() {
-        const patch = wb.pendingPatch();                 // 1. apa yang berubah
-        const jawaban = await simpanPatch('penjualan', patch);   // 2. kirim ke server
-        wb.saved(patch, jawaban);                        // 3. beri tahu workbook: yang ini sudah tersimpan
+        await simpanContent('penjualan', wb.toJSON());   // di aplikasimu: fetch(..., { method: 'PUT', body: JSON.stringify(wb.toJSON()) })
+        wb.saved();                                      // workbook mencatat: semua sudah tersimpan
     }
     return (
         <div>
@@ -207,14 +195,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Menyimpan selalu tiga langkah:
+![Tombol Simpan aktif setelah Qty diubah](img/langkah5.png)
 
-1. `wb.pendingPatch()`: apa saja yang berubah sejak simpan terakhir. Kalau orang mengubah satu sel di sheet 10.000 baris, isinya satu baris saja.
-2. Kirim patch itu ke server. Server menggabungkannya dengan yang tersimpan ([bab 12](12-server.md)).
-3. `wb.saved(patch, jawaban)`: memberi tahu workbook bahwa patch itu sudah tersimpan. Setelah ini `wb.unsaved()` kembali `false`, dan tombolnya
-   bertuliskan "Tersimpan".
+Menyimpan itu dua baris:
 
-Menyimpan otomatis tanpa tombol adalah tiga langkah yang sama, dijalankan sendiri sedetik setelah orang berhenti mengetik (11.9).
+1. `wb.toJSON()` dikirim ke server. Server menyimpannya ke kolom `content` ([12.2](12-server.md#122-kode-server)).
+2. `wb.saved()` mencatat bahwa semuanya sudah tersimpan. `wb.unsaved()` jadi `false`, tombolnya jadi "Tersimpan".
+
+Sampai sini kamu sudah punya halaman spreadsheet yang bisa dibuka dan disimpan. Bagian selanjutnya untuk kebutuhan yang lebih banyak: simpan otomatis,
+halaman yang lebih besar, Next.js.
 
 ## 11.6 Workbook bukan state React
 
