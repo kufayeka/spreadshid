@@ -110,5 +110,13 @@ const user = { source: 'user' };
     ok('comments by CRUD: start, reply, resolve, own edit, moderate, read; the server leaves out what may not be read');
 }
 
+// a comment is dated by the workbook's clock (opt.now), as NOW() is
+{
+    const wb = createWorkbook(null, { user: { id: 'u', name: 'U' }, now: () => new Date(Date.UTC(2026, 9, 27, 9, 15)) });
+    wb.addComment('Sheet1', 'A1', 'hai');
+    assert.strictEqual(wb.comments('Sheet1')[0].items[0].at, '2026-10-27T09:15:00.000Z');
+    ok('a comment is dated by the workbook clock');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');

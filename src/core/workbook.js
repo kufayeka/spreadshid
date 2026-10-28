@@ -82,6 +82,8 @@ export function createWorkbook(doc, options) {
     const id = (doc && doc.id) || newId();
 
     const undoStack = [];
+    // the workbook's clock: the time of comments and of the ops, and NOW() and TODAY(), all from opt.now when the host gives one (a test, a server's clock)
+    const clockNow = () => (opt.now ? opt.now() : new Date());
     const redoStack = [];
     const undoLimit = opt.undoLimit || 200;
 
@@ -174,7 +176,7 @@ export function createWorkbook(doc, options) {
             const fmt = formatOfIds(s, rid, cid);
             return fmt && fmt.type === 'money' ? (fmt.decimals === undefined ? 2 : fmt.decimals) : null;
         },
-        now: () => (opt.now ? opt.now() : new Date()),
+        now: clockNow,
         // is row r hidden by the filter, or (byHand) also hidden by hand or in a folded group (for SUBTOTAL)
         rowHidden(s, r, byHand) {
             const sheet = sheets.get(s);
@@ -886,7 +888,7 @@ export function createWorkbook(doc, options) {
         s = sheetIdOf(s);
         const words = String(text || '').trim();
         if (!words) throw new Error('a comment needs some text');
-        const item = { id: newId(), by: author(), text: words, at: new Date().toISOString() };
+        const item = { id: newId(), by: author(), text: words, at: clockNow().toISOString() };
         const all = threadsOf(s);
         const open = all.find((x) => !x.resolved && x.row === api.rowId(s, r) && x.col === api.colId(s, c));
         if (open) { putThreads(s, all.map((x) => (x === open ? { ...x, items: x.items.concat([item]) } : x)), how); return { thread: open.id, item: item.id }; }
@@ -900,7 +902,7 @@ export function createWorkbook(doc, options) {
         s = sheetIdOf(s);
         const words = String(text || '').trim();
         if (!words) throw new Error('a reply needs some text');
-        const item = { id: newId(), by: author(), text: words, at: new Date().toISOString() };
+        const item = { id: newId(), by: author(), text: words, at: clockNow().toISOString() };
         const all = threadsOf(s);
         if (!all.some((x) => x.id === threadId)) throw new Error('there is no comment ' + threadId);
         // a reply opens a resolved thread again, as in Google Sheets
@@ -925,7 +927,7 @@ export function createWorkbook(doc, options) {
         ownItem(thread, itemId);
         const words = String(text || '').trim();
         if (!words) throw new Error('a comment needs some text');
-        putThreads(s, all.map((x) => (x.id === threadId ? { ...x, items: x.items.map((i) => (i.id === itemId ? { ...i, text: words, edited: new Date().toISOString() } : i)) } : x)), how);
+        putThreads(s, all.map((x) => (x.id === threadId ? { ...x, items: x.items.map((i) => (i.id === itemId ? { ...i, text: words, edited: clockNow().toISOString() } : i)) } : x)), how);
     }
 
     /** Takes a comment away (its writer only); the first one of a thread takes the whole thread. One change. */
@@ -1314,7 +1316,7 @@ export function createWorkbook(doc, options) {
             if (broken) { emit('reject', { op: broken.op, reason: broken.message, source }); return null; }
         }
         changeNo++;
-        const at = new Date().toISOString();
+        const at = clockNow().toISOString();
         const done = [];
         try {
             for (const op of accepted) { APPLY[op.t](op); done.push(op); }
