@@ -314,6 +314,61 @@ Perhatikan kolom E (Harga beli):
   pengecualian untuk satu orang.
 - Untuk **yeka**, `allow *` tanpa `where` berarti boleh semuanya, dan `wb.access().owner` bernilai `true`.
 
+### Pemilik
+
+Pemilik spreadsheet ditulis sebagai satu baris biasa: **`user:<nama>` · `allow` · `*`**, tanpa `where`. Tidak ada kolom atau pengaturan khusus
+lain. Pemilik:
+
+- boleh semua aksi di semua sel, dengan layar lengkap;
+- boleh mengubah aturan akses itu sendiri (aksi `access`), jadi layar pengaturan aturan cukup ditampilkan kalau `wb.can('access')`;
+- tidak bisa dikalahkan oleh baris `role:` atau `*`, karena baris akun paling spesifik.
+
+<!-- contoh: 13-04-pemilik.ts -->
+```ts
+import type { AccessRow } from '@kufayeka/sheet/core';
+import { buatStok } from './data/stok-akses.js';
+
+// Pemilik = satu baris "user:<nama> allow *". Baris untuk role dan untuk semua orang tidak bisa mengalahkannya, karena baris akun paling spesifik.
+const rows: AccessRow[] = [
+    { who: 'user:yeka', effect: 'allow', action: '*' },                                       // pemilik
+    { who: '*', effect: 'deny', action: 'edit', where: 'Produk!col:Harga beli' },             // semua orang: harga beli dikunci
+    { who: 'role:kasir', effect: 'deny', action: 'ui.toolbar' }                               // kasir: tanpa toolbar
+];
+
+const wb = buatStok();
+const yeka = { user: 'yeka', roles: ['kasir'] };    // yeka juga kasir
+
+wb.setAccess(rows, yeka);
+console.log('pemilik?', wb.access().owner, '| E2:', wb.modeAt('Produk', 'E2')?.mode ?? 'edit', '| toolbar:', wb.access().ui.toolbar, '| boleh mengubah aturan:', wb.can('access'));
+
+// HATI-HATI: satu baris deny untuk akun pemilik sendiri mencabut status pemiliknya
+wb.setAccess([...rows, { who: 'user:yeka', effect: 'deny', action: 'download' }], yeka);
+console.log('dengan deny untuk yeka -> pemilik?', wb.access().owner, '| E2:', wb.modeAt('Produk', 'E2')?.mode ?? 'edit', '| download:', wb.can('download'));
+
+// HATI-HATI: tanpa baris pemilik, yeka hanya orang biasa (di sini tidak dapat apa-apa)
+wb.setAccess(rows.slice(1), yeka);
+console.log('tanpa baris pemilik -> pemilik?', wb.access().owner, '| E2:', wb.modeAt('Produk', 'E2')?.mode);
+```
+<!-- /contoh -->
+
+<!-- hasil: 13-04-pemilik.ts -->
+```text
+pemilik? true | E2: edit | toolbar: true | boleh mengubah aturan: true
+dengan deny untuk yeka -> pemilik? false | E2: edit | download: false
+tanpa baris pemilik -> pemilik? false | E2: invisible
+```
+<!-- /hasil -->
+
+Dua hal yang perlu dijaga, karena pemilik hanyalah sebuah baris:
+
+1. **Jangan tulis `deny` untuk akun pemilik sendiri.** Satu `deny` saja sudah mencabut status pemiliknya. Kalau pemilik memang tidak boleh
+   melakukan sesuatu, berarti dia bukan pemilik, dan aturannya ditulis seperti untuk orang lain.
+2. **Jangan biarkan baris pemilik terhapus.** Tanpa baris itu, pemilik menjadi orang biasa, dan bisa saja tidak mendapat apa-apa. Di layar
+   pengaturan aturanmu, sembunyikan tombol hapus untuk baris pemilik, atau tolak penyimpanan yang tidak lagi berisi baris `allow *` untuk pemilik.
+
+Kalau ada beberapa pemilik, tulis satu baris untuk setiap akun. Super admin aplikasimu juga bisa dibuat dengan cara ini: aplikasimu menambahkan
+baris `user:<admin> allow *` saat mengambil aturan dari database, tanpa perlu menyimpannya di setiap spreadsheet.
+
 ## 13.6 Langkah 5: aturan dengan syarat
 
 Kolom `when` membuat aturan hanya berlaku di baris yang memenuhi syarat. Syaratnya **rumus biasa**, ditulis untuk baris pertama range, lalu
@@ -622,7 +677,7 @@ Contoh lengkapnya ada di [4.13](04-api-workbook.md#413-editor-hak-akses-di-luar-
 |---|---|
 | `allow edit` | boleh diubah (dan dibaca) |
 | `allow read` | hanya baca |
-| `deny edit` | hanya baca |
+| `deny edit` | paling tinggi hanya baca: membatasi `allow` yang ada, tidak memberi izin baca sendiri |
 | `deny read` | tersembunyi, tampil `•••` |
 | `deny see` | tidak terlihat, tampil kosong |
 | tidak ada baris | tidak terlihat |

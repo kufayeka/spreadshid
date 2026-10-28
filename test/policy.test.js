@@ -80,6 +80,20 @@ const patch = other.pendingPatch();
 check('checkPatch lets budi change Barang', checkPatch(doc, patch, { access: ROWS, who: { user: 'budi', roles: ['kasir'] } }).ok);
 check('checkPatch refuses the same change from rina', !checkPatch(doc, patch, { access: ROWS, who: { user: 'rina', roles: ['kasir'] } }).ok);
 
+// the owner: a deny for a role or for everyone does not take it away, a deny for the owner's own user does
+const OWNED = [{ who: 'user:yeka', effect: 'allow', action: '*' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }, { who: 'role:kasir', effect: 'deny', action: 'ui.toolbar' }];
+check('yeka (also a kasir) stays the owner despite denies for everyone and for kasir', resolveAccess(OWNED, { user: 'yeka', roles: ['kasir'] }).owner === true);
+check('a deny for yeka herself ends it', resolveAccess([...OWNED, { who: 'user:yeka', effect: 'deny', action: 'download' }], 'yeka').owner === false);
+
+// a deny of edit only caps: alone, it gives nothing to read
+const capped = stok();
+capped.setAccess([{ who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
+check('deny edit with no allow: the cell stays unseen (not read only)', capped.modeAt('Stok', 1, 5).mode === 'invisible', capped.modeAt('Stok', 1, 5));
+capped.setAccess([{ who: '*', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
+check('deny edit over an allow edit of the same level: read only', capped.modeAt('Stok', 1, 5).mode === 'readonly', capped.modeAt('Stok', 1, 5));
+capped.setAccess([{ who: 'user:tamu', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
+check('a user\'s own allow edit beats a deny of edit for everyone', capped.modeAt('Stok', 1, 5) === null, capped.modeAt('Stok', 1, 5));
+
 // the validator
 check('right rows: no problems', validateAccess(ROWS).length === 0, validateAccess(ROWS));
 const bad = validateAccess([{ who: 'kasir', effect: 'maybe', action: 'format.blod', where: 'Stok!A1:ZZZZ9' }]);

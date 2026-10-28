@@ -64,7 +64,7 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 10. [Aturan dan tipe kolom](docs/10-aturan.md)
 11. [Memakai di React](docs/11-react.md): langkah demi langkah, useWorkbook, memuat, menyimpan, Next.js
 12. [Menyimpan ke server](docs/12-server.md): dari sheet ke tabel database, patch, viewFor
-13. [Access control](docs/13-hak-akses.md)
+13. [Hak akses](docs/13-hak-akses.md)
 14. [Komentar](docs/14-komentar.md)
 15. [Excel dan CSV](docs/15-excel.md)
 16. [Panduan layar](docs/16-layar.md): menu, toolbar, panel

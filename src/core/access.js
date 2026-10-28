@@ -76,7 +76,7 @@ export function resolveRules(wb, rules) {
             const headerRowId = cols ? wb.rowId(s, headerRow) : null;
             // the modes of access control (policy.js): edit, readonly, hidden, invisible; anything else is read only
             const mode = ['edit', 'hidden', 'invisible'].includes(rule.mode) ? rule.mode : 'readonly';
-            out.push({ s, corners, cols, headerRowId, when: rule.when || null, baseRow, mode, message: rule.message || null, level: rule.level || 0, deny: !!rule.deny, cache: new Map() });
+            out.push({ s, corners, cols, headerRowId, when: rule.when || null, baseRow, mode, message: rule.message || null, level: rule.level || 0, deny: !!rule.deny, cap: !!rule.cap, cache: new Map() });
         }
     }
     return out;
@@ -94,7 +94,8 @@ const RANK_OF = { edit: 1, readonly: 2, hidden: 3, invisible: 4 };
 export function modeOf(wb, rules, s, r, c, revision) {
     // the host's own rules (level 0) always hold; of the access rows (policy.js) only the most specific level that covers the cell counts
     // within that level a deny wins, and among the allows the one that gives more (edit over read): "read A1:F10, edit C2:C10" opens C
-    let found = null, denied = null, allowed = null, best = 0;
+    // a deny of edit only caps what the others give ("at most read"): it gives nothing of its own, so a cell nobody lets anyone read stays unseen
+    let found = null, denied = null, allowed = null, best = 0, cap = null;
     for (const rule of rules) {
         if (rule.s !== s) continue;
         if (rule.corners) {
@@ -107,12 +108,16 @@ export function modeOf(wb, rules, s, r, c, revision) {
         // where rules of one level meet, the stronger mode wins (edit < readonly < hidden < invisible)
         const m = { mode: rule.mode, message: rule.message };
         if (!rule.level) { found = strongerMode(found, m); continue; }
+        if (rule.cap) { if (!cap || rule.level > cap.level) cap = { level: rule.level, message: rule.message }; continue; }
         if (rule.level > best) { best = rule.level; denied = null; allowed = null; }
         if (rule.level !== best) continue;
         if (rule.deny) denied = strongerMode(denied, m);
         else allowed = !allowed || RANK_OF[m.mode] < RANK_OF[allowed.mode] ? m : allowed;
     }
-    return strongerMode(found, denied || allowed);
+    let access = denied || allowed;
+    // the cap holds where it is at least as specific as what gave the edit (a user's own allow still beats a role's deny of edit)
+    if (cap && cap.level >= best && access && access.mode === 'edit') access = { mode: 'readonly', message: cap.message };
+    return strongerMode(found, access);
 }
 
 // a rule's condition for one row, worked out once per row and revision

@@ -109,7 +109,10 @@ export function resolveAccess(rows, who) {
         return best ? (deny ? 'deny' : allow ? 'allow' : null) : null;
     };
     const can = (action) => decide(action, false) === 'allow';
-    const owner = can('*') && !mine.some((r) => r.effect === 'deny');
+    // the owner: a row for their own user that allows everything, everywhere, and no row for their user that takes something back. Rows for a role
+    // or for everyone do not count here, as they do not count against a user's own rows anywhere else
+    const own = mine.filter((r) => r.level === 3);
+    const owner = own.some((r) => r.effect === 'allow' && r.action === '*' && !r.where && !r.when) && !own.some((r) => r.effect === 'deny');
 
     // the parts of the screen show unless a row hides them; a single item (ui.tool.bold, ui.menu.Insert) is hidden the same way
     const ui = allShown();
@@ -131,7 +134,7 @@ export function resolveAccess(rows, who) {
         const w = parseWhere(r.where);
         // a cell a person may only read says so in plain words, unless the row has its own message (or the rows one for every refusal)
         const said = r.message || (mode === 'readonly' ? message || 'You can only view this here' : undefined);
-        ranges.push({ sheet: w.sheet || undefined, range: w.range || undefined, columns: w.columns || undefined, when: r.when || undefined, mode, message: said, level: r.level, deny: r.effect === 'deny' });
+        ranges.push({ sheet: w.sheet || undefined, range: w.range || undefined, columns: w.columns || undefined, when: r.when || undefined, mode, message: said, level: r.level, deny: r.effect === 'deny', cap: r.effect === 'deny' && r.action === 'edit' });
     }
     if (owner) return { owner: true, roles: person.roles.slice(), can: () => true, ui: allShown(), ranges: [], message };
     ranges.push({ mode: 'invisible', level: 0.5, message: message || undefined });
