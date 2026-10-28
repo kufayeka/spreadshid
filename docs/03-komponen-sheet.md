@@ -157,6 +157,7 @@ Sama seperti Google Sheets. Di Mac, `Ctrl` adalah `⌘`.
 | `Shift+Enter` | naik satu baris |
 | `Alt+Enter` / `Ctrl+Enter` | baris baru di dalam sel saat mengedit |
 | `Escape` | batal mengedit |
+| `F4` | saat mengetik rumus: alamat di kursor berganti `A1` → `$A$1` → `A$1` → `$A1` ([5.5](05-rumus.md#55-tanda--sel-yang-tidak-ikut-bergeser)) |
 | `Delete` / `Backspace` | mengosongkan sel yang dipilih |
 | `Home` / `End` | kolom A / kolom terakhir yang berisi data, di baris itu; dengan `Ctrl`: sel A1 / sel terakhir yang berisi data |
 | `PageUp` / `PageDown` | satu layar ke atas / bawah |

@@ -4,6 +4,7 @@
 //   <!-- contoh: nama.js -->  ...  <!-- /contoh -->   the file docs/examples/nama.js, as a block of code (a page stops at its "// ----- tampilkan -----" line:
 //                                                    what is under it only puts the page on the screen for the screenshots)
 //   <!-- hasil: nama.js -->   ...  <!-- /hasil -->    what `node docs/examples/nama.js` writes, as a block of text
+//   <!-- tabel: nama.js -->   ...  <!-- /tabel -->    what it writes, put in as markdown as it is (an example that prints a table)
 //
 //   node docs/build.mjs           writes the documentation again
 //   node docs/build.mjs --check   says what is not up to date (and fails), writes nothing (test/docs.test.js runs it)
@@ -42,7 +43,9 @@ function outputOf(name) {
 export function built(text) {
     return text
         .replace(/<!-- contoh: ([\w./-]+) -->[\s\S]*?<!-- \/contoh -->/g, (m, name) => '<!-- contoh: ' + name + ' -->\n```' + (/\.page\.js$|jsx/.test(name) ? 'jsx' : /\.sql$/.test(name) ? 'sql' : 'js') + '\n' + codeOf(name) + '\n```\n<!-- /contoh -->')
-        .replace(/<!-- hasil: ([\w./-]+) -->[\s\S]*?<!-- \/hasil -->/g, (m, name) => '<!-- hasil: ' + name + ' -->\n```text\n' + outputOf(name) + '\n```\n<!-- /hasil -->');
+        .replace(/<!-- hasil: ([\w./-]+) -->[\s\S]*?<!-- \/hasil -->/g, (m, name) => '<!-- hasil: ' + name + ' -->\n```text\n' + outputOf(name) + '\n```\n<!-- /hasil -->')
+        // what the example writes is markdown itself (a table): put in as it is
+        .replace(/<!-- tabel: ([\w./-]+) -->[\s\S]*?<!-- \/tabel -->/g, (m, name) => '<!-- tabel: ' + name + ' -->\n' + outputOf(name) + '\n<!-- /tabel -->');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

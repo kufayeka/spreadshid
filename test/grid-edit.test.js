@@ -48,6 +48,13 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     await type('=H5*2');
     await Enter();
     check('a formula typed in a cell works (=H5*2 -> 84)', (await value(5, 7)) === 84, await value(5, 7));
+    // F4 while typing a formula: the reference at the caret gets its $ (A1 -> $A$1 -> A$1), as in Excel
+    await type('=H5*H6');
+    await key('F4', 'F4', 115);
+    check('F4 fixes the reference at the caret', (await q('document.querySelector(".ks-input").value')) === '=H5*$H$6', await q('document.querySelector(".ks-input").value'));
+    await key('F4', 'F4', 115);
+    await Enter();
+    check('F4 again fixes only the row, and the formula is kept', (await q('window.__workbook.input(undefined, 6, 7)')) === '=H5*H$6', await q('window.__workbook.input(undefined, 6, 7)'));
     const p = await center(5, 7);
     await mouse('mouseMoved', p.x, p.y); await mouse('mousePressed', p.x, p.y); await mouse('mouseReleased', p.x, p.y);
     await mouse('mousePressed', p.x, p.y, { clickCount: 2 }); await mouse('mouseReleased', p.x, p.y, { clickCount: 2 });

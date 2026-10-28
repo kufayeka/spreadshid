@@ -73,6 +73,12 @@ export const SHOTS = [
         for (let i = 0; i < 30 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(200);
         const p = await cellAt(js, 1, 7); await click(p.x, p.y); await wait(100); await type('99'); await key('Enter', 'Enter', 13); await wait(300);
     }, clip: { x: 0, y: 0, width: 900, height: 330 } },
+    { name: 'rumus-dasar', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
+    { name: 'rumus-sel', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 1, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
+    { name: 'rumus-sum', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 4, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
+    { name: 'rumus-fill', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 3, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
+    { name: 'rumus-dolar', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 5, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
+    { name: 'rumus-terbilang', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 7, 1); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
     { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {
         const p = await js(`(function(){ var b = document.querySelector('.ks-filter-button[data-filter-col="2"]').getBoundingClientRect(); return { x: Math.round(b.left + 8), y: Math.round(b.top + 8) }; })()`);

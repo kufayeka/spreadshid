@@ -155,7 +155,7 @@ export default function HalamanAnalisa() {
 Yang perlu diketahui:
 
 - **Sumbernya range atau named range** yang baris pertamanya berisi nama field, misalnya `'Penjualan!A1:K301'`, `'A1:K301'` di sheet yang sama, atau
-  nama seperti `'Transaksi'`. Baris kosong dilewati. Dengan named range ([5.3](05-rumus.md#53-named-range)), pivot mengikuti nama itu ke mana pun range-nya
+  nama seperti `'Transaksi'`. Baris kosong dilewati. Dengan named range ([5.11](05-rumus.md#511-named-range-dan-subtotal)), pivot mengikuti nama itu ke mana pun range-nya
   dipindah atau diperluas.
 - **Ditulis sebagai nilai.** Isi pivot adalah nilai biasa, bukan rumus, jadi rumus lain bisa membacanya (`=A2`, `=E2/E9`), dan ikut tersimpan serta
   ikut ke Excel sebagai nilai.

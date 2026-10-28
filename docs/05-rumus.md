@@ -2,21 +2,427 @@
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. API workbook](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)
 
-Rumus ditulis seperti di Excel dan dihitung oleh library sendiri, di browser maupun di server, tanpa Excel dan tanpa layanan luar. Hanya rumus yang
-terkena sebuah perubahan yang dihitung ulang, jadi mengubah satu harga di sheet 100.000 baris tetap cepat.
+Bab ini mulai dari nol. Contohnya satu nota belanja yang dibangun pelan-pelan. Setiap gambar adalah sheet sungguhan: sel yang dipilih diberi kotak
+biru, dan rumusnya terlihat di baris atas (formula bar).
 
-- [5.1 Dasar](#51-dasar)
-- [5.2 Laporan dengan rumus](#52-laporan-dengan-rumus)
-- [5.3 Named range](#53-named-range)
-- [5.4 SUBTOTAL](#54-subtotal)
-- [5.5 Error](#55-error)
-- [5.6 Rumus untuk proyek dan keuangan](#56-rumus-untuk-proyek-dan-keuangan)
-- [5.7 Daftar fungsi](#57-daftar-fungsi)
+**Dasar**
 
-## 5.1 Dasar
+- [5.1 Rumus itu apa](#51-rumus-itu-apa)
+- [5.2 Membaca sel lain](#52-membaca-sel-lain)
+- [5.3 Range dan SUM](#53-range-dan-sum)
+- [5.4 Menyalin rumus ke bawah](#54-menyalin-rumus-ke-bawah)
+- [5.5 Tanda `$`: sel yang tidak ikut bergeser](#55-tanda--sel-yang-tidak-ikut-bergeser)
+- [5.6 Teks dan tanggal di rumus](#56-teks-dan-tanggal-di-rumus)
+- [5.7 Error dan artinya](#57-error-dan-artinya)
 
-Nota penjualan ini mengambil nama dan harga produk dari sheet Produk, tarif PPN dari sheet Pengaturan, lalu menghitung subtotal, pajak, total, dan jatuh
-tempo:
+**Semua fungsi**
+
+- [5.8 Semua fungsi: buat apa, cara pakai, hasilnya](#58-semua-fungsi-buat-apa-cara-pakai-hasilnya)
+
+**Untuk developer dan lanjutan**
+
+- [5.9 Rumus dari kode](#59-rumus-dari-kode)
+- [5.10 Laporan dengan rumus](#510-laporan-dengan-rumus)
+- [5.11 Named range dan SUBTOTAL](#511-named-range-dan-subtotal)
+- [5.12 Rumus untuk proyek dan keuangan](#512-rumus-untuk-proyek-dan-keuangan)
+
+## 5.1 Rumus itu apa
+
+Rumus adalah isi sel yang diawali tanda `=`. Sel tidak menampilkan rumusnya, tetapi **hasilnya**. Ketik `=2+3` di sebuah sel, tekan Enter, dan sel itu
+menampilkan `5`. Rumusnya tetap bisa dilihat di formula bar saat sel itu dipilih:
+
+![=2+3 menampilkan 5](img/rumus-dasar.png)
+
+Tanda hitung yang bisa dipakai: `+` tambah, `-` kurang, `*` kali, `/` bagi, `^` pangkat, `%` persen (`=20%` sama dengan 0,2). Urutannya seperti
+matematika: kali dan bagi dulu, baru tambah dan kurang. Pakai kurung untuk mengubah urutan: `=(2+3)*4` hasilnya 20.
+
+Di dalam rumus, desimal selalu ditulis dengan **titik**: `=72000*1.5`, bukan `=72000*1,5`. Koma dipakai untuk memisahkan isi fungsi (5.3).
+
+## 5.2 Membaca sel lain
+
+Rumus bisa membaca isi sel lain lewat alamatnya. Di nota ini, Jumlah di D2 adalah Harga × Qty:
+
+![D2 berisi =B2*C2](img/rumus-sel.png)
+
+`=B2*C2` artinya "isi B2 dikali isi C2". Kalau Qty di C2 diubah dari 10 menjadi 12, Jumlah di D2 langsung menjadi Rp 864.000, begitu juga Subtotal,
+PPN, dan Total di bawahnya. Rumus selalu memakai isi terbaru dari sel yang dibacanya.
+
+Sel di sheet lain ditulis dengan nama sheet dan tanda seru: `=Produk!B2`. Kalau nama sheet-nya ada spasi, beri tanda kutip satu: `='Daftar Harga'!B2`.
+
+## 5.3 Range dan SUM
+
+Dua alamat yang disambung titik dua adalah **range**, yaitu kotak berisi beberapa sel. `D2:D4` berarti D2, D3, dan D4. Subtotal menjumlahkan range itu
+dengan **fungsi** `SUM`:
+
+![D5 berisi =SUM(D2:D4)](img/rumus-sum.png)
+
+Fungsi adalah rumus siap pakai yang punya nama. Bentuknya selalu `NAMA(isi)`. Isinya bisa range, sel, angka, atau teks, dipisahkan koma:
+`=SUM(D2:D4, 50000)` menjumlahkan D2 sampai D4, lalu ditambah 50.000. Ada 124 fungsi; semuanya ada di [5.8](#58-semua-fungsi-buat-apa-cara-pakai-hasilnya).
+
+Bentuk range lain: `D:D` (seluruh kolom D), `2:2` (seluruh baris 2), dan `A1:D4` (kotak empat kolom kali empat baris).
+
+## 5.4 Menyalin rumus ke bawah
+
+Rumus Jumlah di D3 dan D4 tidak diketik satu per satu. D2 dipilih, lalu **fill handle** (kotak kecil di pojok kanan bawah sel) ditarik ke bawah. Rumusnya
+ikut menyesuaikan barisnya sendiri:
+
+![D4 berisi =B4*C4](img/rumus-fill.png)
+
+| Sel | Rumus |
+|---|---|
+| D2 | `=B2*C2` |
+| D3 | `=B3*C3` |
+| D4 | `=B4*C4` |
+
+Alamat di rumus bergeser sejauh rumus itu dipindah: satu baris ke bawah, `B2` menjadi `B3`. Hal yang sama terjadi saat rumus di-copy lalu di-paste.
+
+## 5.5 Tanda `$`: sel yang tidak ikut bergeser
+
+Tarif PPN ada di **satu** sel saja, B6. Rumus PPN harus selalu membaca B6, ke mana pun rumusnya disalin. Untuk itu B6 ditulis `$B$6`:
+
+![D6 berisi =D5*$B$6](img/rumus-dolar.png)
+
+| Ditulis | Disalin satu baris ke bawah | Artinya |
+|---|---|---|
+| `=D5*B6` | `=D6*B7` | dua-duanya ikut bergeser: tarif PPN ikut pindah, salah |
+| `=D5*$B$6` | `=D6*$B$6` | `$` di depan kolom dan baris: B6 tidak bergeser, benar |
+| `=D5*B$6` | `=D6*B$6` | hanya baris yang dikunci |
+| `=D5*$B6` | `=D6*$B7` | hanya kolom yang dikunci |
+
+Tekan **F4** saat mengetik alamat di rumus untuk berganti di antara keempat bentuk itu.
+
+## 5.6 Teks dan tanggal di rumus
+
+**Teks** ditulis di antara tanda kutip dua: `="Total: " & D7`. Tanda `&` menyambung teks dengan teks atau angka. Baris Terbilang di nota memakai fungsi
+`TERBILANG` untuk mengubah angka Total menjadi kata-kata, seperti di kwitansi:
+
+![B8 berisi TERBILANG](img/rumus-terbilang.png)
+
+`=PROPER(TERBILANG(D7)) & " Rupiah"` dibaca dari dalam ke luar: `TERBILANG(D7)` mengubah angka di D7 menjadi kata-kata, `PROPER` membuat huruf pertama
+setiap kata menjadi besar, lalu `& " Rupiah"` menambahkan kata Rupiah di belakangnya.
+
+**Tanggal** di sheet sebenarnya angka, yaitu jumlah hari sejak 30 Desember 1899 (sama dengan Excel). 1 Oktober 2026 adalah 46296. Format tanggal yang
+membuatnya tampil sebagai `01/10/2026` ([bab 6](06-format.md)). Karena tanggal adalah angka, tanggal bisa dihitung:
+
+| Rumus | Hasil |
+|---|---|
+| `=A2+14` | 14 hari setelah tanggal di A2 (jatuh tempo) |
+| `=B2-A2` | selisih hari antara dua tanggal |
+| `=TODAY()` | tanggal hari ini, berubah setiap hari |
+| `=WORKDAY(A2, 10)` | 10 hari kerja setelah A2, tanpa Sabtu dan Minggu |
+
+## 5.7 Error dan artinya
+
+Kalau rumus tidak bisa dihitung, sel menampilkan kode error. Error bukan berarti sheet rusak, tetapi tanda ada yang perlu dibetulkan:
+
+<!-- contoh: 05-error.js -->
+```js
+import { createWorkbook, isError } from '@kufayeka/sheet/core';
+
+// Semua error rumus, dari mana datangnya, dan cara menangkapnya.
+const wb = createWorkbook();
+const s = wb.sheet('Sheet1');
+s.setValues('A1', [
+    ['Omzet', 0, 'Transaksi', 0],
+    ['Rata-rata', '=B1/D1', '', '=IFERROR(B1/D1, 0)'],
+    ['Kode', '=VLOOKUP("ZZZ-00", A1:B1, 2, FALSE)', '', '=IFNA(VLOOKUP("ZZZ-00", A1:B1, 2, FALSE), "tidak dijual")'],
+    ['Teks x angka', '="dua" * 3', '', '=IF(ISNUMBER(A4), A4 * 3, "bukan angka")'],
+    ['Akar negatif', '=SQRT(-4)'],
+    ['Nama salah', '=SUMM(B1:B2)'],
+    ['Melingkar', '=C7 + 1', '=B7 * 2'],
+    ['Membaca B7', '=B7']
+]);
+for (let r = 2; r <= 8; r++) {
+    const v = s.value('B' + r);
+    console.log(String(s.value('A' + r)).padEnd(13), s.input('B' + r).padEnd(36), isError(v) ? v.code : v, s.value('D' + r) !== null ? '| tertangkap: ' + s.value('D' + r) : '');
+}
+
+// error menjalar ke rumus yang membacanya, dan hilang sendiri begitu sebabnya hilang
+s.setValues('B10', '=B2 + 100');
+console.log('menjalar      :', s.value('B10').code);
+s.setValues('D1', 4);
+console.log('sebab hilang  :', s.value('B2'), '|', s.value('B10'));
+
+// #REF!: sel yang dibaca dihapus
+s.setValues('F1', [[5, '=F1*2']]);
+s.deleteCols('F');
+console.log('kolom dihapus :', s.input('F1'), '=', s.value('F1').code);
+```
+<!-- /contoh -->
+
+<!-- hasil: 05-error.js -->
+```text
+Rata-rata     =B1/D1                               #DIV/0! | tertangkap: 0
+Kode          =VLOOKUP("ZZZ-00", A1:B1, 2, FALSE)  #N/A | tertangkap: tidak dijual
+Teks x angka  ="dua" * 3                           #VALUE! | tertangkap: bukan angka
+Akar negatif  =SQRT(-4)                            #NUM! 
+Nama salah    =SUMM(B1:B2)                         #NAME? 
+Melingkar     =C7 + 1                              #CYCLE! 
+Membaca B7    =B7                                  #CYCLE! 
+menjalar      : #DIV/0!
+sebab hilang  : 0 | 100
+kolom dihapus : =#REF!*2 = #REF!
+```
+<!-- /hasil -->
+
+| Tampil | Artinya | Biasanya karena | Cara membetulkan |
+|---|---|---|---|
+| `#DIV/0!` | dibagi nol | pembaginya kosong atau 0 | isi pembaginya, atau `=IFERROR(B1/D1, 0)` |
+| `#N/A` | tidak ketemu | yang dicari `VLOOKUP`/`XLOOKUP`/`MATCH` tidak ada | cek ejaannya, atau `=IFNA(..., "tidak ada")` |
+| `#VALUE!` | jenis isi salah | teks dikali angka, atau range yang panjangnya beda | pastikan selnya berisi angka |
+| `#NAME?` | nama tidak dikenal | salah ketik nama fungsi (`SUMM`) | betulkan ejaannya |
+| `#REF!` | sel yang dibaca sudah dihapus | baris, kolom, atau sheet yang dibaca dihapus | undo, atau tulis ulang rumusnya |
+| `#NUM!` | angka tidak mungkin | `SQRT(-4)` | cek angkanya |
+| `#CYCLE!` | rumus membaca dirinya sendiri | A1 membaca B1, B1 membaca A1 | putus lingkarannya |
+
+Error menjalar: rumus yang membaca sel error ikut error. Begitu penyebabnya dibetulkan, semua yang ikut error pulih sendiri.
+
+## 5.8 Semua fungsi: buat apa, cara pakai, hasilnya
+
+Setiap fungsi dengan satu contoh. Hasilnya dihitung oleh library ini dari tabel contoh di bawah, jadi yang tertulis di sini adalah hasil sungguhan.
+Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokumentasi gagal.
+
+<!-- tabel: 05-fungsi.js -->
+**Tabel contoh.** Semua contoh di bawah membaca sheet `Data` ini:
+
+| | A | B | C | D | E | F | G |
+|---|---|---|---|---|---|---|---|
+| 1 | Produk | Harga | Qty | Kategori | Tanggal | Catatan | Arus kas |
+| 2 | Semen 50 kg | 72.000 | 10 | Bahan | 01/10/2026 | `"  semen portland  "` | -1.000.000 |
+| 3 | Besi 10 mm | 79.500 | 5 | Bahan | 05/10/2026 | PO-2611 | 300.000 |
+| 4 | Cat 5 kg | 145.000 | 2 | Finishing | 15/10/2026 |  | 400.000 |
+| 5 | Pasir m3 | 290.000 | 3 | Bahan | 22/10/2026 |  | 500.000 |
+
+**Menjumlah dan menghitung**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `SUM` | menjumlahkan angka | `=SUM(B2:B5)` | 586.500 |
+| `SUMPRODUCT` | mengalikan baris demi baris lalu menjumlahkan (harga × qty) | `=SUMPRODUCT(B2:B5, C2:C5)` | 2.277.500 |
+| `PRODUCT` | mengalikan semua angka | `=PRODUCT(C2:C3)` | 50 |
+| `AVERAGE` | rata-rata | `=AVERAGE(B2:B5)` | 146.625 |
+| `MEDIAN` | nilai tengah | `=MEDIAN(B2:B5)` | 112.250 |
+| `MAX` | angka terbesar | `=MAX(B2:B5)` | 290.000 |
+| `MIN` | angka terkecil | `=MIN(B2:B5)` | 72.000 |
+| `LARGE` | terbesar ke-n | `=LARGE(B2:B5, 2)` | 145.000 |
+| `SMALL` | terkecil ke-n | `=SMALL(B2:B5, 2)` | 79.500 |
+| `RANK` | peringkat sebuah angka (terbesar = 1) | `=RANK(B3, B2:B5)` | 3 |
+| `RANK.EQ` | sama dengan RANK | `=RANK.EQ(B5, B2:B5)` | 1 |
+| `COUNT` | banyaknya sel berisi angka | `=COUNT(A2:C5)` | 8 |
+| `COUNTA` | banyaknya sel yang tidak kosong | `=COUNTA(F2:F5)` | 2 |
+| `COUNTBLANK` | banyaknya sel kosong | `=COUNTBLANK(F2:F5)` | 2 |
+| `SUBTOTAL` | total yang melewati baris tersembunyi dan subtotal lain (9 = SUM) | `=SUBTOTAL(9, B2:B5)` | 586.500 |
+
+**Dengan syarat**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `SUMIF` | menjumlahkan yang memenuhi satu syarat | `=SUMIF(D2:D5, "Bahan", B2:B5)` | 441.500 |
+| `SUMIFS` | menjumlahkan dengan beberapa syarat | `=SUMIFS(B2:B5, D2:D5, "Bahan", C2:C5, ">3")` | 151.500 |
+| `COUNTIF` | menghitung yang memenuhi syarat | `=COUNTIF(D2:D5, "Bahan")` | 3 |
+| `COUNTIFS` | menghitung dengan beberapa syarat | `=COUNTIFS(D2:D5, "Bahan", B2:B5, ">75000")` | 2 |
+| `AVERAGEIF` | rata-rata yang memenuhi syarat | `=ROUND(AVERAGEIF(D2:D5, "Bahan", B2:B5), 0)` | 147.167 |
+| `AVERAGEIFS` | rata-rata dengan beberapa syarat | `=AVERAGEIFS(B2:B5, D2:D5, "Bahan", C2:C5, "<10")` | 184.750 |
+| `MAXIFS` | terbesar yang memenuhi syarat | `=MAXIFS(B2:B5, D2:D5, "Bahan")` | 290.000 |
+| `MINIFS` | terkecil yang memenuhi syarat | `=MINIFS(B2:B5, D2:D5, "Bahan")` | 72.000 |
+
+**Pembulatan**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `ROUND` | membulatkan ke sekian desimal | `=ROUND(1234.567, 2)` | 1.234,57 |
+| `ROUNDUP` | membulatkan ke atas (7,2 zak jadi 8 zak) | `=ROUNDUP(7.2, 0)` | 8 |
+| `ROUNDDOWN` | membulatkan ke bawah | `=ROUNDDOWN(7.8, 0)` | 7 |
+| `MROUND` | membulatkan ke kelipatan terdekat | `=MROUND(1157320, 1000)` | 1.157.000 |
+| `CEILING` | membulatkan ke atas ke kelipatan | `=CEILING(1157320, 5000)` | 1.160.000 |
+| `FLOOR` | membulatkan ke bawah ke kelipatan | `=FLOOR(1157320, 5000)` | 1.155.000 |
+| `INT` | bilangan bulat ke bawah | `=INT(7.9)` | 7 |
+| `TRUNC` | membuang desimal | `=TRUNC(-7.9)` | -7 |
+
+**Matematika**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `ABS` | nilai tanpa tanda minus | `=ABS(-1500)` | 1.500 |
+| `SIGN` | tanda: 1 positif, -1 negatif, 0 nol | `=SIGN(-1500)` | -1 |
+| `MOD` | sisa bagi | `=MOD(17, 5)` | 2 |
+| `POWER` | pangkat | `=POWER(1.1, 2)` | 1,21 |
+| `SQRT` | akar kuadrat | `=SQRT(144)` | 12 |
+| `EXP` | e pangkat angka | `=ROUND(EXP(1), 4)` | 2,7183 |
+| `LN` | logaritma natural | `=ROUND(LN(10), 4)` | 2,3026 |
+| `LOG` | logaritma dengan basis tertentu | `=LOG(1000, 10)` | 3 |
+| `LOG10` | logaritma basis 10 | `=LOG10(1000)` | 3 |
+| `PI` | bilangan π | `=ROUND(PI(), 4)` | 3,1416 |
+
+**Logika**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `IF` | satu nilai kalau syarat benar, nilai lain kalau salah | `=IF(C2>5, "Banyak", "Sedikit")` | Banyak |
+| `IFS` | beberapa syarat berurutan, yang pertama benar dipakai | `=IFS(B4>200000, "Mahal", B4>100000, "Sedang", TRUE, "Murah")` | Sedang |
+| `SWITCH` | memilih hasil menurut nilai | `=SWITCH(D4, "Bahan", "B", "Finishing", "F", "-")` | F |
+| `AND` | benar kalau semua syarat benar | `=AND(C2>5, B2<100000)` | TRUE |
+| `OR` | benar kalau salah satu syarat benar | `=OR(C2>20, B2<100000)` | TRUE |
+| `NOT` | membalik benar dan salah | `=NOT(C2>5)` | FALSE |
+| `XOR` | benar kalau jumlah syarat yang benar ganjil | `=XOR(TRUE, FALSE)` | TRUE |
+| `TRUE` | nilai benar | `=TRUE()` | TRUE |
+| `FALSE` | nilai salah | `=FALSE()` | FALSE |
+| `IFERROR` | nilai cadangan kalau rumus error | `=IFERROR(B2/0, 0)` | 0 |
+| `IFNA` | nilai cadangan kalau tidak ketemu (#N/A) | `=IFNA(VLOOKUP("Kayu", A2:B5, 2, FALSE), "tidak ada")` | tidak ada |
+
+**Mencari dan mengambil**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `VLOOKUP` | mencari di kolom pertama, mengambil dari kolom ke-n | `=VLOOKUP("Cat 5 kg", A2:C5, 2, FALSE)` | 145.000 |
+| `HLOOKUP` | mencari di baris pertama, mengambil dari baris ke-n | `=HLOOKUP("Qty", A1:G5, 3, FALSE)` | 5 |
+| `XLOOKUP` | mencari di satu range, mengambil dari range lain | `=XLOOKUP("Besi 10 mm", A2:A5, B2:B5)` | 79.500 |
+| `LOOKUP` | nilai terakhir yang tidak lebih dari yang dicari (range terurut) | `=LOOKUP(100000, B2:B5, A2:A5)` | Besi 10 mm |
+| `INDEX` | isi sel ke-n dari sebuah range | `=INDEX(A2:A5, 3)` | Cat 5 kg |
+| `MATCH` | posisi sebuah nilai di range | `=MATCH("Cat 5 kg", A2:A5, 0)` | 3 |
+| `CHOOSE` | memilih dari daftar menurut nomor | `=CHOOSE(2, "Senin", "Selasa", "Rabu")` | Selasa |
+| `OFFSET` | sel yang bergeser sekian baris dan kolom | `=OFFSET(A1, 2, 1)` | 79.500 |
+| `INDIRECT` | sel dari teks alamat | `=INDIRECT("B" & 4)` | 145.000 |
+| `TRANSPOSE` | baris jadi kolom | `=INDEX(TRANSPOSE(A2:A5), 1, 2)` | Besi 10 mm |
+| `ROW` | nomor baris sebuah sel | `=ROW(B4)` | 4 |
+| `ROWS` | banyaknya baris range | `=ROWS(A2:A5)` | 4 |
+| `COLUMN` | nomor kolom sebuah sel | `=COLUMN(D1)` | 4 |
+| `COLUMNS` | banyaknya kolom range | `=COLUMNS(A1:G1)` | 7 |
+
+**Teks**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `CONCAT` | menyambung teks | `=CONCAT(A2, " x ", C2)` | Semen 50 kg x 10 |
+| `CONCATENATE` | sama dengan CONCAT | `=CONCATENATE(A3, " (", D3, ")")` | Besi 10 mm (Bahan) |
+| `TEXTJOIN` | menyambung banyak teks dengan pemisah | `=TEXTJOIN(", ", TRUE, A2:A5)` | Semen 50 kg, Besi 10 mm, Cat 5 kg, Pasir m3 |
+| `TEXT` | angka atau tanggal jadi teks dengan pola | `=TEXT(E2, "dd/mm/yyyy")` | 01/10/2026 |
+| `TERBILANG` | angka dalam kata-kata (kwitansi, BAP) | `=TERBILANG(B2, "rupiah")` | tujuh puluh dua ribu rupiah |
+| `LEFT` | beberapa huruf dari kiri | `=LEFT(A2, 5)` | Semen |
+| `RIGHT` | beberapa huruf dari kanan | `=RIGHT(F3, 4)` | 2611 |
+| `MID` | beberapa huruf dari tengah | `=MID(F3, 4, 4)` | 2611 |
+| `LEN` | panjang teks | `=LEN(A2)` | 11 |
+| `FIND` | posisi teks (huruf besar-kecil dibedakan) | `=FIND("-", F3)` | 3 |
+| `SEARCH` | posisi teks (tidak dibedakan) | `=SEARCH("SEMEN", A2)` | 1 |
+| `REPLACE` | mengganti bagian teks menurut posisi | `=REPLACE(F3, 1, 2, "SO")` | SO-2611 |
+| `SUBSTITUTE` | mengganti teks tertentu | `=SUBSTITUTE(A2, "50 kg", "40 kg")` | Semen 40 kg |
+| `UPPER` | huruf besar semua | `=UPPER(D2)` | BAHAN |
+| `LOWER` | huruf kecil semua | `=LOWER(A3)` | besi 10 mm |
+| `PROPER` | huruf besar di awal kata | `=PROPER(TRIM(F2))` | Semen Portland |
+| `TRIM` | membuang spasi berlebih | `=TRIM(F2)` | semen portland |
+| `REPT` | mengulang teks | `=REPT("★", 3)` | ★★★ |
+| `VALUE` | teks angka jadi angka | `=VALUE("1250") + 1` | 1.251 |
+| `EXACT` | apakah dua teks sama persis | `=EXACT("Semen", "semen")` | FALSE |
+| `N` | nilai jadi angka (TRUE = 1, teks = 0) | `=N(TRUE)` | 1 |
+| `HYPERLINK` | teks yang menunjuk alamat web | `=HYPERLINK("https://contoh.id", "buka")` | buka |
+
+**Memeriksa isi**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `ISBLANK` | apakah sel kosong | `=ISBLANK(F4)` | TRUE |
+| `ISNUMBER` | apakah angka | `=ISNUMBER(B2)` | TRUE |
+| `ISTEXT` | apakah teks | `=ISTEXT(B2)` | FALSE |
+| `ISLOGICAL` | apakah TRUE atau FALSE | `=ISLOGICAL(C2>5)` | TRUE |
+| `ISERROR` | apakah error | `=ISERROR(B2/0)` | TRUE |
+| `ISNA` | apakah #N/A | `=ISNA(MATCH("Kayu", A2:A5, 0))` | TRUE |
+
+**Tanggal dan jam**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `TODAY` | tanggal hari ini | `=TODAY()` | 27/10/2026 |
+| `NOW` | tanggal dan jam sekarang | `=NOW()` | 27/10/2026 09:30 |
+| `DATE` | tanggal dari tahun, bulan, hari | `=DATE(2026, 12, 31)` | 31/12/2026 |
+| `TIME` | jam dari jam, menit, detik | `=TIME(8, 30, 0)` | 08:30 |
+| `YEAR` | tahun sebuah tanggal | `=YEAR(E2)` | 2.026 |
+| `MONTH` | bulan | `=MONTH(E2)` | 10 |
+| `DAY` | tanggal (hari ke berapa dalam bulan) | `=DAY(E3)` | 5 |
+| `HOUR` | jam | `=HOUR(NOW())` | 9 |
+| `MINUTE` | menit | `=MINUTE(NOW())` | 30 |
+| `SECOND` | detik | `=SECOND(TIME(8, 30, 15))` | 15 |
+| `WEEKDAY` | hari ke berapa dalam minggu (1 = Minggu) | `=WEEKDAY(E2)` | 5 |
+| `WEEKNUM` | minggu ke berapa dalam tahun | `=WEEKNUM(E2)` | 40 |
+| `ISOWEEKNUM` | minggu ISO (minggu dimulai Senin) | `=ISOWEEKNUM(E2)` | 40 |
+| `EDATE` | tanggal sekian bulan kemudian | `=EDATE(E2, 3)` | 01/01/2027 |
+| `EOMONTH` | tanggal terakhir bulan itu | `=EOMONTH(E2, 0)` | 31/10/2026 |
+| `DAYS` | selisih hari | `=DAYS(E5, E2)` | 21 |
+| `DATEDIF` | selisih dalam hari ("d"), bulan ("m"), atau tahun ("y") | `=DATEDIF(E2, TODAY(), "d")` | 26 |
+| `WORKDAY` | tanggal setelah sekian hari kerja (tanpa Sabtu-Minggu) | `=WORKDAY(E2, 10)` | 15/10/2026 |
+| `NETWORKDAYS` | banyaknya hari kerja di antara dua tanggal | `=NETWORKDAYS(E2, E5)` | 16 |
+
+**Keuangan**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `PMT` | cicilan per bulan (pokok ditulis negatif) | `=ROUND(PMT(1%, 12, -12000000), 0)` | 1.066.185 |
+| `FV` | nilai akhir tabungan rutin | `=ROUND(FV(1%, 12, -1000000), 0)` | 12.682.503 |
+| `PV` | nilai sekarang dari cicilan rutin | `=ROUND(PV(1%, 12, -1000000), 0)` | 11.255.077 |
+| `NPV` | nilai sekarang arus kas (mulai periode 1) | `=ROUND(NPV(10%, G3:G5) + G2, 0)` | -21.037 |
+| `IRR` | tingkat pengembalian arus kas | `=ROUND(IRR(G2:G5), 4)` | 0,089 |
+
+**Statistik**
+
+| Fungsi | Buat apa | Contoh | Hasil |
+|---|---|---|---|
+| `STDEV` | simpangan baku sampel | `=ROUND(STDEV(C2:C5), 2)` | 3,56 |
+| `STDEV.S` | sama dengan STDEV | `=ROUND(STDEV.S(C2:C5), 2)` | 3,56 |
+| `STDEV.P` | simpangan baku populasi | `=ROUND(STDEV.P(C2:C5), 2)` | 3,08 |
+| `VAR` | varians sampel | `=ROUND(VAR(C2:C5), 2)` | 12,67 |
+| `VAR.S` | sama dengan VAR | `=ROUND(VAR.S(C2:C5), 2)` | 12,67 |
+| `VAR.P` | varians populasi | `=ROUND(VAR.P(C2:C5), 2)` | 9,5 |
+<!-- /tabel -->
+
+Fungsi yang belum tersedia antara lain `NA`, `WORKDAY.INTL`, `FILTER`, `SORT`, `UNIQUE` (fungsi yang hasilnya tumpah ke banyak sel), konstanta array
+seperti `{1,2,3}`, dan `IMPORTRANGE`. Rumus dengan nama yang tidak ada menampilkan `#NAME?`.
+
+## 5.9 Rumus dari kode
+
+Bagian ini untuk developer. Nota di atas dibuat dengan kode ini:
+
+<!-- contoh: 05-nota.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// Nota belanja: semua yang dibahas di bagian dasar bab rumus ada di sini.
+export function buatNota() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setSheetProps({ name: 'Nota' });
+    s.setValues('A1', [
+        ['Produk', 'Harga', 'Qty', 'Jumlah'],
+        ['Semen 50 kg', 72000, 10, '=B2*C2'],
+        ['Besi 10 mm', 79500, 5, '=B3*C3'],
+        ['Cat 5 kg', 145000, 2, '=B4*C4'],
+        ['Subtotal', null, null, '=SUM(D2:D4)'],
+        ['PPN', 0.11, null, '=D5*$B$6'],
+        ['Total', null, null, '=D5+D6'],
+        ['Terbilang', '=PROPER(TERBILANG(D7)) & " Rupiah"']
+    ]);
+    s.setValues('F1', [['Coba sendiri'], ['=2+3']]);
+    s.setStyle('A1:D1', { bold: true, fill: '#e8f0fe' });
+    s.setStyle('A5:D7', { bold: true });
+    s.setStyle('B6', { format: { type: 'percent', decimals: 0 } });
+    s.setStyle('F1', { bold: true, color: '#5f6368' });
+    s.setColProps('B', { format: { type: 'money', decimals: 0 } });
+    s.setColProps('D', { format: { type: 'money', decimals: 0 }, width: 130 });
+    s.setColProps('A', { width: 120 });
+    return wb;
+}
+
+export default function Nota() {
+    const [wb] = useState(buatNota);
+    return <div style={{ height: 380 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Dari kode, rumus ditulis dengan `setValues` seperti mengetik di sel: teks yang diawali `=` menjadi rumus. Hasilnya dibaca dengan `value`, dan rumusnya
+dengan `input`. Contoh yang lebih lengkap, dengan sheet lain, `fillBlock`, dan sheet yang diganti nama:
 
 <!-- contoh: 05-rumus.js -->
 ```js
@@ -81,44 +487,21 @@ setelah ubah  : =ROUND(E7*'Atur Toko'!B1, 0) = 834000
 ```
 <!-- /hasil -->
 
-**Referensi.** `A1`, range `A1:C10`, kolom utuh `F:F`, baris utuh `2:2`, sheet lain `Produk!A2:B13`, atau `'Atur Toko'!B1` dengan tanda kutip kalau nama
-sheet memuat spasi. Nama sheet diganti, rumus ikut menulis nama baru, seperti terlihat di baris terakhir hasil.
+| Fungsi | Artinya |
+|---|---|
+| `setValues(alamat, '=…')` | tulis rumus |
+| `value(alamat)` | hasilnya. Error berupa `{ code }`, cek dengan `isError` |
+| `input(alamat)` | rumusnya sebagai teks, seperti di formula bar |
+| `fillBlock(wb, sheet, sumber, tujuan, arah)` | fill handle dari kode |
+| `FUNCTION_NAMES` | nama semua fungsi |
 
-**`$` mengunci saat disalin.** `$` tidak mengubah ke mana referensi menunjuk. Pengaruhnya hanya terasa saat rumus disalin, di-paste, atau di-fill:
+Hanya rumus yang terkena sebuah perubahan yang dihitung ulang, jadi mengubah satu sel di sheet 100.000 baris tetap cepat. `TODAY()` dan `NOW()` dihitung
+ulang setiap ada perubahan, atau saat `wb.tick()` dipanggil. Opsi `now` di `createWorkbook` mengganti jamnya, misalnya untuk test. Rumus di sel yang
+formatnya uang dibulatkan ke desimal formatnya, supaya total tidak meleset sepeser pun dari yang tampil.
 
-| Ditulis di F2 | Di-fill ke F3 | Artinya |
-|---|---|---|
-| `=E2*B1` | `=E3*B2` | dua-duanya bergeser |
-| `=E2*$B$1` | `=E3*$B$1` | tarif tetap di B1 |
-| `=E2*B$1` | `=E3*B$1` | baris terkunci, kolom bebas (fill ke kanan: `C$1`) |
-| `=E2*$B1` | `=E3*$B2` | kolom terkunci, baris bebas |
+## 5.10 Laporan dengan rumus
 
-`fillBlock(wb, sheet, sumber, tujuan, arah)` adalah fill handle versi kode. Arahnya `'down'`, `'up'`, `'right'`, atau `'left'`. Angka biasa di-fill
-menjadi deret (40, 41, 42, ...), sama seperti menarik fill handle di layar. Karena itu contoh di atas hanya mem-fill kolom rumus. Tambahkan `true` di
-parameter terakhir untuk menyalin apa adanya tanpa deret. `copyBlock` dan `pasteClip` dari `@kufayeka/sheet/core` melakukan copy dan paste yang sama
-seperti Ctrl+C dan Ctrl+V.
-
-**Rumus menempel ke baris, bukan ke nomor.** Baris disisipkan, dihapus, atau di-sort, referensi tetap menunjuk ke sel yang sama ([2.4](02-konsep.md)).
-Range yang kehilangan baris di ujungnya akan menyusut ([4.4](04-api-workbook.md#44-baris-dan-kolom)).
-
-**Angka di dalam rumus selalu memakai titik desimal**, apa pun locale-nya: `=E2*1.5`, bukan `=E2*1,5`, karena koma adalah pemisah argumen. Locale hanya
-berlaku untuk nilai yang diketik di sel.
-
-**Teks** ditulis dengan tanda kutip dua: `="Total " & E9`. `&` menyambung teks. Tanda kutip di dalam teks ditulis dua kali: `="ukuran ""besar"""`.
-
-**Tanggal adalah angka**, yaitu jumlah hari sejak 30 Desember 1899, sama dengan Excel. `46322` adalah 27 Oktober 2026. Karena itu `=B11+14` berarti 14
-hari setelah B11, dan `=D11-TODAY()` adalah sisa hari. Format tanggal ([bab 6](06-format.md)) membuatnya tampil sebagai `27/10/2026`.
-
-**`TODAY()` dan `NOW()`** dihitung ulang setiap ada perubahan lain, atau saat `wb.tick()` dipanggil. Opsi `now` di `createWorkbook` mengganti jamnya.
-Contoh di atas memakainya supaya hasilnya selalu sama. Di aplikasi, opsi ini berguna untuk test, atau untuk memakai jam server.
-
-**Uang dibulatkan.** Rumus di sel yang formatnya uang dibulatkan ke jumlah desimal format itu. Dengan `Rp` tanpa desimal, `=E7*0.11` menghasilkan rupiah
-utuh, dan total di bawahnya tidak meleset sepeser pun dari yang tampil.
-
-## 5.2 Laporan dengan rumus
-
-Laporan bulanan dari 300 transaksi, tanpa kode JavaScript untuk menghitung. Semuanya rumus di sheet Laporan yang membaca sheet Penjualan. Transaksi baru
-masuk, laporan langsung ikut:
+Ringkasan 300 transaksi per cabang dan per minggu, semuanya dengan rumus. Transaksi baru masuk, laporannya ikut berubah:
 
 <!-- contoh: 05-laporan.js -->
 ```js
@@ -195,22 +578,14 @@ jumlah 5 minggu = total omzet: true | 1 Oktober 2026 hari ke 4 (Senin = 1, jadi 
 ```
 <!-- /hasil -->
 
-Pola yang dipakai:
+Yang dipakai: `SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, dan `MAXIFS` untuk total dengan syarat, `$` di penyebut pangsa, `INDEX` + `MATCH` dan `XLOOKUP` +
+`LARGE` untuk "siapa yang terbesar", dan `">=" & tanggal` untuk menjumlah per periode. Semua range di satu `SUMIFS` harus sama panjang.
 
-- **`SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, `MAXIFS`, `MINIFS`**: total, jumlah, rata-rata, terbesar, dan terkecil dengan satu syarat atau lebih. Syaratnya
-  bisa berupa nilai (`A2`), perbandingan (`">0"`, `"<>Batal"`), atau perbandingan yang disambung dengan sel (`">=" & E8`). Semua range di satu
-  `SUMIFS` harus sama panjang. Kalau tidak, hasilnya `#VALUE!`, sama seperti di Excel.
-- **Pangsa dan peringkat**: `=B2/SUM($B$2:$B$4)` dengan penyebut yang dikunci `$`, lalu `RANK`.
-- **Mencari satu jawaban**: `INDEX(..., MATCH(MAX(...), ..., 0))` atau `XLOOKUP(LARGE(..., 2), ...)` untuk "siapa yang paling besar" dan "siapa yang
-  kedua".
-- **Tanggal**: `DATE(2026, 10, 1) + 7` adalah satu minggu kemudian. `SUMIFS` dengan `">=" & dari` dan `"<=" & sampai` menjumlahkan per periode.
-  `WEEKDAY(tanggal, 2)` memberi 1 untuk Senin sampai 7 untuk Minggu.
-- **Cek silang**: `=SUM(G8:G12)=B5` menghasilkan `TRUE` kalau jumlah per minggu sama dengan total. Ini berguna sebagai penjaga laporan.
+## 5.11 Named range dan SUBTOTAL
 
-## 5.3 Named range
-
-Nama untuk sebuah range membuat rumus laporan bisa dibaca seperti kalimat. `=SUMIFS(Omzet, Cabang, "Bandung")` lebih jelas daripada
-`=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`, dan tidak perlu `$`.
+**Named range** adalah nama untuk sebuah range. `=SUMIFS(Omzet, Cabang, "Bandung")` lebih mudah dibaca daripada
+`=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`. **SUBTOTAL** menjumlah tanpa menghitung subtotal lain di dalam range-nya, dan bisa
+melewati baris yang disembunyikan:
 
 <!-- contoh: 05-nama-subtotal.js -->
 ```js
@@ -297,117 +672,26 @@ filter tanpa Surabaya       : 104075000 (9) | 104075000 (109)
 ```
 <!-- /hasil -->
 
-- Rumus boleh ditulis sebelum namanya dibuat. Hasilnya `#NAME?` sampai nama itu ada, lalu langsung dihitung.
-- Mengganti nama membuat semua rumus menulis nama baru. Memindahkan atau memperluas range membuat semua rumus menghitung range baru, tanpa satu rumus pun
-  ditulis ulang.
-- Range sebuah nama mengikuti barisnya, sama seperti referensi biasa. Baris disisipkan di tengah range, nama ikut membesar. Baris ditambahkan di
-  **bawah** range, nama tidak ikut, jadi range perlu diperluas dengan `setName` seperti di contoh. Cara lain: buat range nama sedikit lebih panjang
-  dari datanya, lalu tambahkan transaksi baru di dalam range itu. Baris kosong tidak mengubah `SUMIFS`. Nama untuk seluruh kolom (`K:K`) belum didukung.
-- Di layar, nama dibuat dan diatur lewat menu Data → Named ranges.
+- Rumus boleh ditulis sebelum namanya dibuat: hasilnya `#NAME?` sampai nama itu ada.
+- Mengganti nama membuat semua rumus menulis nama baru. Memperluas range sebuah nama membuat semua rumus ikut menghitung range baru.
+- Nama tidak boleh berupa alamat sel. `PPN2026` adalah alamat (kolom PPN, baris 2026), jadi pakai `Tarif_PPN`.
+- Di layar: Data → Named ranges.
 
 | Fungsi | Artinya |
 |---|---|
-| `wb.addName(nama, sheet, range)` | buat nama. Mengembalikan id-nya |
-| `wb.setName(id, { name, sheetId, range })` | ganti nama, pindahkan ke sheet lain, atau ubah range. Boleh salah satu saja |
-| `wb.removeName(id)` | hapus. Rumus yang memakainya menjadi `#NAME?` sampai ada nama itu lagi |
-| `wb.names()` | `[{ id, name, sheetId, range, ref }]`. `ref` adalah teks seperti `'Penjualan!C2:C302'`, `range` dalam nomor |
-| `wb.nameRange(nama)` | `{ sheetId, range }`, atau `null` kalau tidak ada |
-| `wb.nameProblem(nama)` | alasan nama itu tidak boleh dipakai, atau `''` kalau boleh. Pakai ini untuk memeriksa isian di form-mu sendiri. Pesannya dalam bahasa Inggris |
+| `wb.addName(nama, sheet, range)` | buat nama |
+| `wb.setName(id, { name, sheetId, range })` | ganti nama atau range-nya |
+| `wb.removeName(id)` | hapus nama |
+| `wb.names()` | `[{ id, name, sheetId, range, ref }]` |
+| `wb.nameRange(nama)`, `wb.nameProblem(nama)` | range sebuah nama, dan alasan sebuah nama tidak boleh dipakai |
 
-Nama yang boleh mengikuti aturan Google Sheets: diawali huruf atau `_`, lalu huruf, angka, `_`, dan titik. Nama tidak boleh berupa alamat sel. `A1`
-jelas alamat, tetapi `PPN2026` juga alamat (kolom PPN, baris 2026), jadi pakai `Tarif_PPN`. Huruf besar dan kecil tidak dibedakan.
+Angka pertama `SUBTOTAL` memilih fungsinya: 1 `AVERAGE`, 2 `COUNT`, 3 `COUNTA`, 4 `MAX`, 5 `MIN`, 6 `PRODUCT`, 7 `STDEV`, 8 `STDEVP`, 9 `SUM`, 10 `VAR`,
+11 `VARP`. Ditambah 100 (`SUBTOTAL(109, ...)`), baris yang disembunyikan dengan tangan atau grup yang dilipat juga dilewati. Baris yang disaring filter
+selalu dilewati.
 
-## 5.4 SUBTOTAL
+## 5.12 Rumus untuk proyek dan keuangan
 
-Bagian akhir contoh di atas adalah rekap dengan kelompok. Baris Semen dan Besi berisi `SUBTOTAL(9, ...)` dari baris di bawahnya, dan total akhir
-`SUBTOTAL(9, B2:B9)` mencakup semuanya. `SUBTOTAL` **melewati SUBTOTAL lain** di dalam range-nya, jadi totalnya benar. `SUM` biasa menghitung subtotal
-dua kali (lihat hasil: 280 juta, bukan 140 juta).
-
-Angka pertama memilih fungsi. Kalau angkanya ditambah 100, baris yang disembunyikan dengan tangan (`hidden`, grup yang dilipat) juga dilewati. Baris
-yang disaring filter selalu dilewati:
-
-| Angka | Fungsi | | Angka | Fungsi |
-|---|---|---|---|---|
-| 1 / 101 | `AVERAGE` | | 7 / 107 | `STDEV` |
-| 2 / 102 | `COUNT` | | 8 / 108 | `STDEVP` |
-| 3 / 103 | `COUNTA` | | 9 / 109 | `SUM` |
-| 4 / 104 | `MAX` | | 10 / 110 | `VAR` |
-| 5 / 105 | `MIN` | | 11 / 111 | `VARP` |
-| 6 / 106 | `PRODUCT` | | | |
-
-Grup baris untuk melipat kelompok seperti ini dibahas di [bab 7](07-data.md). Dengan `SUBTOTAL(109, ...)`, kelompok yang dilipat ikut hilang dari total.
-
-## 5.5 Error
-
-<!-- contoh: 05-error.js -->
-```js
-import { createWorkbook, isError } from '@kufayeka/sheet/core';
-
-// Semua error rumus, dari mana datangnya, dan cara menangkapnya.
-const wb = createWorkbook();
-const s = wb.sheet('Sheet1');
-s.setValues('A1', [
-    ['Omzet', 0, 'Transaksi', 0],
-    ['Rata-rata', '=B1/D1', '', '=IFERROR(B1/D1, 0)'],
-    ['Kode', '=VLOOKUP("ZZZ-00", A1:B1, 2, FALSE)', '', '=IFNA(VLOOKUP("ZZZ-00", A1:B1, 2, FALSE), "tidak dijual")'],
-    ['Teks x angka', '="dua" * 3', '', '=IF(ISNUMBER(A4), A4 * 3, "bukan angka")'],
-    ['Akar negatif', '=SQRT(-4)'],
-    ['Nama salah', '=SUMM(B1:B2)'],
-    ['Melingkar', '=C7 + 1', '=B7 * 2'],
-    ['Membaca B7', '=B7']
-]);
-for (let r = 2; r <= 8; r++) {
-    const v = s.value('B' + r);
-    console.log(String(s.value('A' + r)).padEnd(13), s.input('B' + r).padEnd(36), isError(v) ? v.code : v, s.value('D' + r) !== null ? '| tertangkap: ' + s.value('D' + r) : '');
-}
-
-// error menjalar ke rumus yang membacanya, dan hilang sendiri begitu sebabnya hilang
-s.setValues('B10', '=B2 + 100');
-console.log('menjalar      :', s.value('B10').code);
-s.setValues('D1', 4);
-console.log('sebab hilang  :', s.value('B2'), '|', s.value('B10'));
-
-// #REF!: sel yang dibaca dihapus
-s.setValues('F1', [[5, '=F1*2']]);
-s.deleteCols('F');
-console.log('kolom dihapus :', s.input('F1'), '=', s.value('F1').code);
-```
-<!-- /contoh -->
-
-<!-- hasil: 05-error.js -->
-```text
-Rata-rata     =B1/D1                               #DIV/0! | tertangkap: 0
-Kode          =VLOOKUP("ZZZ-00", A1:B1, 2, FALSE)  #N/A | tertangkap: tidak dijual
-Teks x angka  ="dua" * 3                           #VALUE! | tertangkap: bukan angka
-Akar negatif  =SQRT(-4)                            #NUM! 
-Nama salah    =SUMM(B1:B2)                         #NAME? 
-Melingkar     =C7 + 1                              #CYCLE! 
-Membaca B7    =B7                                  #CYCLE! 
-menjalar      : #DIV/0!
-sebab hilang  : 0 | 100
-kolom dihapus : =#REF!*2 = #REF!
-```
-<!-- /hasil -->
-
-Hasil rumus yang gagal adalah objek `{ code }`. Periksa dengan `isError(v)` dari `@kufayeka/sheet/core`, dan di layar error tampil sebagai kodenya. Error
-menjalar ke setiap rumus yang membacanya, dan hilang sendiri begitu penyebabnya hilang.
-
-| Kode | Sebab | Tangkap dengan |
-|---|---|---|
-| `#DIV/0!` | dibagi nol, termasuk dibagi sel kosong | `IFERROR(..., 0)` atau `IF(D1=0, 0, B1/D1)` |
-| `#N/A` | tidak ketemu: `VLOOKUP`, `XLOOKUP` tanpa cadangan, `MATCH` | `IFNA(..., "tidak ada")` atau parameter ke-4 `XLOOKUP` |
-| `#VALUE!` | jenis nilai salah (teks dikali angka), atau range di `SUMIFS` tidak sama panjang | `ISNUMBER`, `VALUE` |
-| `#NUM!` | angka tidak mungkin: `SQRT(-4)` | |
-| `#NAME?` | fungsi atau named range tidak dikenal | betulkan namanya |
-| `#REF!` | sel tunggal, sheet, atau seluruh range yang dibaca sudah dihapus | undo, atau tulis ulang rumusnya |
-| `#CYCLE!` | rumus membaca dirinya sendiri, langsung atau memutar lewat sel lain | |
-
-`IFERROR` menangkap semua error, sedangkan `IFNA` hanya `#N/A`. Pakai `IFNA` untuk pencarian, supaya salah ketik yang menghasilkan `#NAME?` atau
-`#VALUE!` tetap terlihat dan tidak tertutup angka 0.
-
-## 5.6 Rumus untuk proyek dan keuangan
-
-AHSP, jadwal, kwitansi termin, cicilan alat, dan rekap dinamis. Rumus-rumus ini yang paling sering ada di file kontraktor:
+AHSP, jadwal hari kerja, kwitansi termin, cicilan alat, dan rekap dinamis:
 
 <!-- contoh: 05-konstruksi.js -->
 ```js
@@ -489,104 +773,15 @@ OFFSET         : 220000000 | INDIRECT 1157320
 ```
 <!-- /hasil -->
 
-**Range di dalam hitungan.** `=SUM(B2:B6*D2:D6)` mengalikan kedua range baris demi baris, lalu menjumlahkannya. Hal yang sama berlaku untuk `+`, `-`,
-`/`, `^`, `&`, dan perbandingan (`=`, `<>`, `>`, ...). Perbandingan menghasilkan `TRUE`/`FALSE` per baris, dan tanda `--` di depannya (atau dikali
-range lain) mengubahnya jadi 1 dan 0. Dengan cara ini syarat bisa ditulis langsung di dalam rumus: `=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)` hanya
-menjumlahkan baris yang satuannya bukan OH. Kalau ukuran kedua range berbeda, bagian yang tidak punya pasangan menjadi `#N/A`, sama seperti Excel. Hasil
-seperti ini yang ditulis sendirian di satu sel (`=A2:A9*2`) menampilkan nilai pertamanya saja, karena hasil yang tumpah ke banyak sel belum ada.
+**Range di dalam hitungan.** `=SUM(B2:B6*D2:D6)` mengalikan kedua range baris demi baris, lalu menjumlahkannya. Ini berlaku untuk semua tanda hitung
+dan perbandingan. Perbandingan menghasilkan `TRUE`/`FALSE` per baris, yang dihitung 1 dan 0 kalau dikali, jadi syarat bisa ditulis langsung:
+`=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)` hanya menjumlahkan baris yang satuannya bukan OH. Range yang ukurannya berbeda menghasilkan `#N/A`. Hasil
+seperti ini yang ditulis sendirian di satu sel (`=A2:A9*2`) menampilkan nilai pertamanya saja.
 
-| Fungsi | Artinya |
-|---|---|
-| `SUMPRODUCT(a, b, ...)` | kalikan baris demi baris, lalu jumlahkan. Teks dan sel kosong dihitung 0 |
-| `MROUND(angka, kelipatan)` | bulatkan ke kelipatan terdekat: `MROUND(1157320, 1000)` → 1157000 |
-| `LOOKUP(nilai, range cari, range hasil)` | nilai terakhir di range cari (yang terurut) yang tidak lebih dari nilai, dan pasangannya di range hasil |
-| `WORKDAY(mulai, hari, [libur])` | tanggal setelah sekian hari kerja. Sabtu, Minggu, dan tanggal di range libur dilewati. Hari negatif mundur |
-| `NETWORKDAYS(mulai, selesai, [libur])` | banyaknya hari kerja dari mulai sampai selesai, keduanya dihitung |
-| `EOMONTH(tanggal, bulan)` | tanggal terakhir bulan itu, atau sekian bulan sesudahnya. `0` untuk bulan yang sama |
-| `WEEKNUM(tanggal, [jenis])`, `ISOWEEKNUM(tanggal)` | nomor minggu. Jenis 1 (bawaan) dimulai Minggu, jenis 2 dimulai Senin. ISO: minggu yang memuat Kamis pertama tahun itu adalah minggu 1 |
-| `DAYS(selesai, mulai)` | selisih hari kalender |
-| `PMT(bunga, periode, pokok, [sisa], [jenis])` | cicilan per periode. Seperti Excel, uang yang keluar bertanda negatif, jadi pokok ditulis `-B1` supaya cicilannya positif |
-| `FV`, `PV` | nilai akhir dan nilai sekarang dari cicilan tetap |
-| `NPV(bunga, arus kas...)` | nilai sekarang arus kas mulai periode 1. Arus kas periode 0 (modal awal) ditambahkan di luar, seperti di contoh |
-| `IRR(range arus kas, [tebakan])` | bunga yang membuat arus kas bernilai nol |
-| `OFFSET(sel, baris, kolom, [tinggi], [lebar])` | range yang bergeser dari sel itu. Cocok untuk "ambil bulan ke-n" |
-| `INDIRECT(teks)` | sel atau range dari teks alamat: `INDIRECT("AHSP!B7")`, `INDIRECT("B" & E1)` |
-| `TRANSPOSE(range)` | baris jadi kolom |
-| `HYPERLINK(url, [teks])` | menampilkan teksnya. Supaya bisa diklik, beri sel itu gaya `link` |
-| `TERBILANG(angka, [satuan])` | angka dalam kata-kata bahasa Indonesia, untuk kwitansi dan BAP. Lihat di bawah |
+`OFFSET` dan `INDIRECT` dihitung ulang setiap ada perubahan, karena sel yang dibacanya baru diketahui saat dihitung. Excel juga begitu. Pakai secukupnya
+di sheet yang sangat besar.
 
-`OFFSET` dan `INDIRECT` dihitung ulang setelah setiap perubahan, karena sel yang dibacanya baru diketahui saat dihitung. Excel juga begitu. Pakai
-secukupnya di sheet yang sangat besar.
-
-**TERBILANG** mengubah angka jadi tulisan, seperti di kwitansi:
-
-| Rumus | Hasil |
-|---|---|
-| `=TERBILANG(1250000)` | satu juta dua ratus lima puluh ribu |
-| `=TERBILANG(7714500, "rupiah")` | tujuh juta tujuh ratus empat belas ribu lima ratus rupiah |
-| `=PROPER(TERBILANG(B3)) & " Rupiah"` | Empat Ratus Tiga Puluh Tujuh Juta Lima Ratus Ribu Rupiah |
-| `=TERBILANG(1000)`, `=TERBILANG(100)`, `=TERBILANG(11)` | seribu, seratus, sebelas |
-| `=TERBILANG(1250.75)` (di rumus, desimal selalu titik) | seribu dua ratus lima puluh koma tujuh lima |
-| `=TERBILANG(-5)` | minus lima |
-
-Angka sampai triliun (dan kuadriliun) didukung. Desimal dibaca per angka setelah koma. Excel tidak punya `TERBILANG`. Di file `.xlsx` hasilnya ikut
-tersimpan, jadi saat dibuka di Excel teksnya tampil, tetapi kalau Excel menghitung ulang sel itu hasilnya `#NAME?`.
-
-## 5.7 Daftar fungsi
-
-Daftarnya diambil dari library itu sendiri (`FUNCTION_NAMES` dari `@kufayeka/sheet/core`), jadi selalu sama dengan yang benar-benar tersedia:
-
-<!-- contoh: 05-fungsi.js -->
-```js
-import { FUNCTION_NAMES } from '@kufayeka/sheet/core';
-
-// semua fungsi yang bisa dipakai di rumus, diambil dari library itu sendiri
-console.log(FUNCTION_NAMES.length + ' fungsi:');
-for (let i = 0; i < FUNCTION_NAMES.length; i += 8) console.log(FUNCTION_NAMES.slice(i, i + 8).join(', '));
-```
-<!-- /contoh -->
-
-<!-- hasil: 05-fungsi.js -->
-```text
-124 fungsi:
-ABS, AND, AVERAGE, AVERAGEIF, AVERAGEIFS, CEILING, CHOOSE, COLUMN
-COLUMNS, CONCAT, CONCATENATE, COUNT, COUNTA, COUNTBLANK, COUNTIF, COUNTIFS
-DATE, DATEDIF, DAY, DAYS, EDATE, EOMONTH, EXACT, EXP
-FALSE, FIND, FLOOR, FV, HLOOKUP, HOUR, HYPERLINK, IF
-IFERROR, IFNA, IFS, INDEX, INDIRECT, INT, IRR, ISBLANK
-ISERROR, ISLOGICAL, ISNA, ISNUMBER, ISOWEEKNUM, ISTEXT, LARGE, LEFT
-LEN, LN, LOG, LOG10, LOOKUP, LOWER, MATCH, MAX
-MAXIFS, MEDIAN, MID, MIN, MINIFS, MINUTE, MOD, MONTH
-MROUND, N, NETWORKDAYS, NOT, NOW, NPV, OFFSET, OR
-PI, PMT, POWER, PRODUCT, PROPER, PV, RANK, RANK.EQ
-REPLACE, REPT, RIGHT, ROUND, ROUNDDOWN, ROUNDUP, ROW, ROWS
-SEARCH, SECOND, SIGN, SMALL, SQRT, STDEV, STDEV.P, STDEV.S
-SUBSTITUTE, SUBTOTAL, SUM, SUMIF, SUMIFS, SUMPRODUCT, SWITCH, TERBILANG
-TEXT, TEXTJOIN, TIME, TODAY, TRANSPOSE, TRIM, TRUE, TRUNC
-UPPER, VALUE, VAR, VAR.P, VAR.S, VLOOKUP, WEEKDAY, WEEKNUM
-WORKDAY, XLOOKUP, XOR, YEAR
-```
-<!-- /hasil -->
-
-Argumen dan hasilnya sama dengan Excel. Dikelompokkan menurut kebutuhan:
-
-| Kebutuhan | Fungsi |
-|---|---|
-| total, rata-rata, hitung | `SUM`, `SUMPRODUCT`, `AVERAGE`, `COUNT`, `COUNTA`, `COUNTBLANK`, `MAX`, `MIN`, `MEDIAN`, `PRODUCT`, `SUBTOTAL` |
-| dengan syarat | `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MAXIFS`, `MINIFS` |
-| mencari | `XLOOKUP`, `VLOOKUP`, `HLOOKUP`, `LOOKUP`, `INDEX`, `MATCH`, `CHOOSE`, `OFFSET`, `INDIRECT`, `TRANSPOSE` |
-| urutan | `LARGE`, `SMALL`, `RANK`, `RANK.EQ` |
-| kondisi | `IF`, `IFS`, `SWITCH`, `AND`, `OR`, `NOT`, `XOR`, `IFERROR`, `IFNA` |
-| memeriksa | `ISBLANK`, `ISNUMBER`, `ISTEXT`, `ISLOGICAL`, `ISERROR`, `ISNA`, `N`, `EXACT` |
-| pembulatan | `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `MROUND`, `CEILING`, `FLOOR`, `INT`, `TRUNC`, `MOD` |
-| matematika | `ABS`, `SIGN`, `SQRT`, `POWER`, `EXP`, `LN`, `LOG`, `LOG10`, `PI` |
-| statistik | `STDEV`, `STDEV.S`, `STDEV.P`, `VAR`, `VAR.S`, `VAR.P` |
-| tanggal dan jam | `TODAY`, `NOW`, `DATE`, `TIME`, `YEAR`, `MONTH`, `DAY`, `HOUR`, `MINUTE`, `SECOND`, `WEEKDAY`, `WEEKNUM`, `ISOWEEKNUM`, `EDATE`, `EOMONTH`, `DAYS`, `DATEDIF`, `WORKDAY`, `NETWORKDAYS` |
-| keuangan | `PMT`, `FV`, `PV`, `NPV`, `IRR` |
-| teks | `CONCAT`, `CONCATENATE`, `TEXTJOIN`, `TEXT`, `TERBILANG`, `LEFT`, `RIGHT`, `MID`, `LEN`, `FIND`, `SEARCH`, `REPLACE`, `SUBSTITUTE`, `UPPER`, `LOWER`, `PROPER`, `TRIM`, `REPT`, `VALUE`, `HYPERLINK` |
-| posisi | `ROW`, `ROWS`, `COLUMN`, `COLUMNS` |
-
-Fungsi yang tidak ada di daftar menghasilkan `#NAME?`. Yang belum tersedia antara lain `NA`, `WORKDAY.INTL`, `FILTER`, `SORT`, `UNIQUE` (fungsi yang
-hasilnya tumpah ke banyak sel), konstanta array seperti `{1,2,3}`, dan `IMPORTRANGE` untuk membaca file lain.
+`TERBILANG` tidak ada di Excel. Di file `.xlsx` hasilnya ikut tersimpan, jadi teksnya tampil saat dibuka di Excel, tetapi kalau Excel menghitung ulang
+sel itu, hasilnya `#NAME?`.
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. API workbook](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)

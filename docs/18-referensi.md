@@ -23,17 +23,17 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 |---|---|---|
 | `createWorkbook` | workbook baru, atau dibuka dari `toJSON()`: `createWorkbook(doc, { user, now, beforeOp, undoLimit })` | [2](02-konsep.md), [11.2](11-react.md#112-sheet-yang-sudah-berisi) |
 | `VERSION` | versi paket | |
-| `isError`, `ERR` | memeriksa hasil rumus yang error, dan daftar kode error | [5.5](05-rumus.md#55-error) |
-| `FUNCTION_NAMES` | nama semua fungsi rumus | [5.7](05-rumus.md#57-daftar-fungsi) |
+| `isError`, `ERR` | memeriksa hasil rumus yang error, dan daftar kode error | [5.7](05-rumus.md#57-error-dan-artinya) |
+| `FUNCTION_NAMES` | nama semua fungsi rumus | [5.8](05-rumus.md#58-semua-fungsi-buat-apa-cara-pakai-hasilnya) |
 | `formatValue`, `FORMAT_PRESETS`, `localeInfo` | menampilkan nilai dengan format dan locale, format siap pakai, info pemisah locale | [6](06-format.md) |
 | `displayOf` | yang tampil dari sebuah nilai dan format: `{ text, align, kind, color }` | [6](06-format.md) |
 | `dateToSerial`, `serialToDate` | `Date` menjadi nomor hari dan sebaliknya | [9](09-populate.md) |
 | `parseInput` | teks ketikan menjadi nilai menurut locale: `'1.250,5'` → 1250.5 | [6.3](06-format.md#63-locale) |
-| `roundTo` | pembulatan yang dipakai format uang | [5.1](05-rumus.md#51-dasar) |
+| `roundTo` | pembulatan yang dipakai format uang | [5.9](05-rumus.md#59-rumus-dari-kode) |
 | `colName`, `colIndex` | `2` ↔ `'C'` | [2.2](02-konsep.md#22-alamat-sel) |
 | `storeFormula`, `formulaText`, `resolveRef`, `isStoredFormula` | rumus teks ↔ rumus tersimpan `{ f, refs }`, dan ke mana sebuah referensi menunjuk | [2.3](02-konsep.md), [12.1](12-server.md#123-isi-content) |
 | `newId`, `keyBetween`, `keysBetween`, `compareKeys` | id baru, key urutan di antara dua key, dan perbandingannya | [12.1](12-server.md#123-isi-content) |
-| `fillBlock`, `copyBlock`, `pasteClip`, `pasteText` | fill handle, copy, dan paste dari kode | [5.1](05-rumus.md#51-dasar) |
+| `fillBlock`, `copyBlock`, `pasteClip`, `pasteText` | fill handle, copy, dan paste dari kode | [5.9](05-rumus.md#59-rumus-dari-kode) |
 | `sortRange` | urutkan range menurut satu kolom | [7.1](07-data.md#71-sort) |
 | `findAll`, `replaceIn` | cari dan ganti | [7.5](07-data.md#75-cari-dan-ganti) |
 | `pivot`, `tableOf`, `PIVOT_FUNCTIONS` | ringkasan per kelompok tanpa sheet, dan range sebagai daftar record | [8.3](08-pivot.md#83-tanpa-sheet-pivot-dan-tableof) |
@@ -55,7 +55,7 @@ Fungsi yang hanya ada di `wb`, bukan di handle sheet:
 | `address` | `'K21'` dari nomor | [4.2](04-api-workbook.md#42-membaca-isi) |
 | `setAutoHeights` | tinggi baris otomatis, dipakai grid | [4.4](04-api-workbook.md#44-baris-dan-kolom) |
 | `settings`, `setSettings` | locale, mata uang, named range | [4.6](04-api-workbook.md#46-pengaturan-workbook) |
-| `names`, `addName`, `setName`, `removeName`, `nameRange`, `nameProblem` | named range | [5.3](05-rumus.md#53-named-range) |
+| `names`, `addName`, `setName`, `removeName`, `nameRange`, `nameProblem` | named range | [5.11](05-rumus.md#511-named-range-dan-subtotal) |
 | `undo`, `redo`, `canUndo`, `canRedo`, `apply`, `on`, `revision`, `tick` | perubahan, event, undo | [4.7](04-api-workbook.md#47-undo-redo-dan-apply) |
 | `toJSON`, `pendingPatch`, `saved`, `unsaved`, `version` | menyimpan | [11.5](11-react.md#115-tombol-simpan), [12](12-server.md) |
 | `setRules` | aturan per sel untuk orang yang membuka | [10.1](10-aturan.md#101-aturan-hanya-baca-dan-tersembunyi) |
@@ -93,7 +93,7 @@ Handle juga punya `id` dan `name`.
 | opsi `createWorkbook` dan event workbook | [2.5](02-konsep.md#25-perubahan-event-dan-undo) |
 | jenis op | [4.8](04-api-workbook.md#48-jenis-op) |
 | kunci gaya, props baris, kolom, dan sheet | [4.3](04-api-workbook.md#43-gaya-dan-merge), [4.4](04-api-workbook.md#44-baris-dan-kolom), [4.5](04-api-workbook.md#45-sheet) |
-| fungsi rumus | [5.7](05-rumus.md#57-daftar-fungsi) |
+| fungsi rumus | [5.8](05-rumus.md#58-semua-fungsi-buat-apa-cara-pakai-hasilnya) |
 | jenis format dan huruf pola | [6.1](06-format.md#61-jenis-format) |
 | syarat conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
 | jenis validasi | [7.4](07-data.md#74-validasi-data) |

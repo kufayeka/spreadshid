@@ -356,3 +356,32 @@ export function formulaProblem(text, knownNames) {
 
 /** True for a text that is a formula: it starts with "=" and has something after it. */
 export const isFormula = (v) => typeof v === "string" && v.length > 1 && v[0] === "=";
+
+// ---- F4: the $ of the reference at the caret ---------------------------------------------------------------------------------------------------------
+
+const CYCLE = (fixedCol, fixedRow) => (fixedCol && fixedRow ? [false, true] : !fixedCol && fixedRow ? [true, false] : fixedCol && !fixedRow ? [false, false] : [true, true]);
+
+/**
+ * What F4 does while a formula is typed: the cell reference at the caret turns A1 -> $A$1 -> A$1 -> $A1 -> A1, as in Excel. A reference inside a text in
+ * quotes is left alone. Returns the new text and where the caret goes (after the reference), or null when there is no reference at the caret.
+ * @param {string} text
+ * @param {number} at  The caret.
+ */
+export function cycleReference(text, at) {
+    if (!String(text).startsWith('=')) return null;
+    const re = /\$?[A-Za-z]{1,3}\$?\d+/g;
+    let m;
+    while ((m = re.exec(text))) {
+        const start = m.index, end = start + m[0].length;
+        // a reference is a whole word: not part of a name (SUM1A2) or of a text in quotes
+        if (start > 0 && /[A-Za-z0-9_.]/.test(text[start - 1])) continue;
+        if (end < text.length && /[A-Za-z0-9_(]/.test(text[end])) continue;
+        if ((text.slice(0, start).match(/"/g) || []).length % 2) continue;
+        if (at < start || at > end) continue;
+        const parts = /^(\$?)([A-Za-z]{1,3})(\$?)(\d+)$/.exec(m[0]);
+        const [col, row] = CYCLE(!!parts[1], !!parts[3]);
+        const ref = (col ? '$' : '') + parts[2] + (row ? '$' : '') + parts[4];
+        return { text: text.slice(0, start) + ref + text.slice(end), at: start + ref.length };
+    }
+    return null;
+}

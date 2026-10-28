@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { colName } from '../core/formula/address.js';
+import { cycleReference } from '../core/formula/formula.js';
 import { Icon } from './icons.js';
 import { Gutter, gutterSize } from './Outline.js';
 import { parseAddressText } from './FormulaBar.js';
@@ -287,6 +288,12 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 el.value = el.value.slice(0, at) + '\n' + el.value.slice(el.selectionEnd);
                 el.selectionStart = el.selectionEnd = at + 1;
                 setEditing({ ...editing, text: el.value });
+                return;
+            }
+            // F4 in a formula: the reference at the caret turns A1 -> $A$1 -> A$1 -> $A1, as in Excel
+            if (e.key === 'F4') {
+                const el = e.currentTarget, next = cycleReference(el.value, el.selectionStart);
+                if (next) { e.preventDefault(); el.value = next.text; el.selectionStart = el.selectionEnd = next.at; setEditing({ ...editing, text: next.text }); }
                 return;
             }
             if (e.key === 'Enter') { e.preventDefault(); commit({ dr: e.shiftKey ? -1 : 1, dc: 0 }); return; }

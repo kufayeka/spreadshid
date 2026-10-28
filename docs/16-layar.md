@@ -59,7 +59,7 @@ Panel muncul di kanan grid, satu panel pada satu waktu:
 | Pivot table editor | memilih sel pivot, Insert → Pivot table | [8](08-pivot.md) |
 | Conditional formatting | Format → Conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
 | Data validation | Data → Data validation, Insert → Dropdown | [7.4](07-data.md#74-validasi-data) |
-| Named ranges | Data → Named ranges | [5.3](05-rumus.md#53-named-range) |
+| Named ranges | Data → Named ranges | [5.11](05-rumus.md#511-named-range-dan-subtotal) |
 | Find and replace | Ctrl+F, Ctrl+H | [7.5](07-data.md#75-cari-dan-ganti) |
 
 ## 16.4 Di dalam grid

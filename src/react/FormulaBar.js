@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { colName, colIndex } from '../core/formula/address.js';
+import { cycleReference } from '../core/formula/formula.js';
 
 /** "B7" -> { r: 6, c: 1 }; "A1:C3" -> a rectangle; null when it is not an address. */
 export function parseAddressText(text) {
@@ -60,6 +61,11 @@ export function FormulaBar({ address, content, editing, onStartEdit, onText, onC
                     if (e.key === 'Enter') { e.preventDefault(); onCommit({ dr: e.shiftKey ? -1 : 1, dc: 0 }); }
                     else if (e.key === 'Tab') { e.preventDefault(); onCommit({ dr: 0, dc: e.shiftKey ? -1 : 1 }); }
                     else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+                    else if (e.key === 'F4') {
+                        // the reference at the caret turns A1 -> $A$1 -> A$1 -> $A1 (the caret is put back once the new text is drawn)
+                        const el = e.currentTarget, next = cycleReference(el.value, el.selectionStart);
+                        if (next) { e.preventDefault(); onText(next.text); requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = next.at; }); }
+                    }
                 }} />
         </div>
     );

@@ -52,7 +52,7 @@ for (const doc of documents()) {
     const file = join(root, doc), text = readFileSync(file, 'utf8');
     for (const [, src] of text.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) assert.ok(existsSync(resolve(dirname(file), src)), doc + ': the picture ' + src + ' is there');
     for (const [, link] of text.matchAll(/\]\(([\w./-]+\.md)(#[\w.-]*)?\)/g)) assert.ok(existsSync(resolve(dirname(file), link)), doc + ': the page ' + link + ' is there');
-    for (const [, name] of text.matchAll(/<!-- (?:contoh|hasil): ([\w./-]+) -->/g)) used.add(name);
+    for (const [, name] of text.matchAll(/<!-- (?:contoh|hasil|tabel): ([\w./-]+) -->/g)) used.add(name);
 }
 const unused = readdirSync(examples).filter((f) => (f.endsWith('.js') || f.endsWith('.sql')) && !used.has(f));
 assert.deepStrictEqual(unused, [], 'every example file is in the documentation');

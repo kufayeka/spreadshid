@@ -228,7 +228,7 @@ ja-JP | ketik 2026/10/27 -> 46322 2026/10/27 | ketik 72,000 -> 72000 | x 40 = ï¿
 - Ketikan dibaca menurut locale kalau datang dari orang: diketik di sel, di-paste, atau ditulis kode dengan `{ source: 'user' }`. Dengan `id-ID`,
   `72.000` adalah tujuh puluh dua ribu, dan `27/10/2026` adalah tanggal. Tanggal yang diawali tahun empat digit (`2026-10-27`, `2026/10/27`) dibaca di
   locale mana pun.
-- Rumus **tidak** ikut locale: angka di dalam rumus selalu memakai titik desimal, dan argumennya selalu dipisah koma ([5.1](05-rumus.md#51-dasar)).
+- Rumus **tidak** ikut locale: angka di dalam rumus selalu memakai titik desimal, dan argumennya selalu dipisah koma ([5.1](05-rumus.md#51-rumus-itu-apa)).
 - Mengganti locale tidak mengubah satu nilai pun. Hanya tampilannya yang berubah.
 
 ## 6.4 Conditional formatting

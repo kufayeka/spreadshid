@@ -228,7 +228,7 @@ lepas satu level: 7 grup tersisa, level terdalam 1
 - `foldRowGroup(nomor, level, true)` melipat satu grup, ditunjuk dengan nomor baris pertamanya (dihitung dari 0) dan levelnya. `false` membukanya.
 - `showRowLevel(n)` sama dengan tombol angka di pojok kiri atas: semua grup yang lebih dalam dari `n` dilipat. `0` melipat semuanya, angka besar
   membuka semuanya.
-- Baris yang dilipat tetap dihitung `SUM`, tetapi dilewati `SUBTOTAL(10x, ...)` ([5.4](05-rumus.md#54-subtotal)).
+- Baris yang dilipat tetap dihitung `SUM`, tetapi dilewati `SUBTOTAL(10x, ...)` ([5.11](05-rumus.md#511-named-range-dan-subtotal)).
 - Fungsi kolom sama persis: `groupCols`, `ungroupCols`, `foldColGroup`, `showColLevel`, `colGroups`.
 
 | Fungsi | Artinya |
