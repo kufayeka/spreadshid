@@ -1878,7 +1878,14 @@ export function createWorkbook(doc, options) {
     // a row as it is saved: the cells of columns that were deleted are left out (they were only kept for undo)
     function rowDoc(sheet, row) {
         const cells = {}, style = {};
-        for (const cid in row.cells) if (sheet.cols.has(cid)) cells[cid] = clone(row.cells[cid]);
+        for (const cid in row.cells) {
+            if (!sheet.cols.has(cid)) continue;
+            const v = row.cells[cid];
+            // a formula is saved with its result (v), as Excel saves it: what reads the saved JSON without this library (an SQL view, a report)
+            // sees the number. On opening the result is worked out again; v is only for those readers
+            if (isStoredFormula(v)) { const value = engine.value(sheet.id, row.id, cid); cells[cid] = { f: v.f, refs: clone(v.refs), v: value === undefined ? null : clone(value) }; }
+            else cells[cid] = clone(v);
+        }
         for (const cid in row.style) if (sheet.cols.has(cid)) style[cid] = clone(row.style[cid]);
         return { id: row.id, key: row.key, cells, style, props: clone(row.props) };
     }

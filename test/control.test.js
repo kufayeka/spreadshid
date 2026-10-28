@@ -147,6 +147,24 @@ function boq() {
     ok('a hand-made patch with a row of no sheet, or a row moved to another sheet, is refused');
 }
 
+// a formula is saved with its result (v) for readers without the library (an SQL view); a result that moved because another cell changed is not
+// a change of a protected cell
+{
+    const base = createWorkbook();
+    base.setValues('Sheet1', 'A1', [['Harga', 'Stok', 'Nilai'], [72000, 420, '=A2*B2']]);
+    const doc = base.toJSON();
+    assert.strictEqual(doc.sheets[0].rows[1].cells[doc.sheets[0].columns[2].id].v, 30240000, 'the result is in the saved JSON');
+    const rules = [{ sheet: 'Sheet1', columns: ['Nilai'], mode: 'readonly' }];
+    const wb = createWorkbook(doc);
+    wb.setRules(rules);
+    wb.saved(wb.pendingPatch());
+    wb.setValues('Sheet1', 'B2', 300, { source: 'user' });
+    const patch = wb.pendingPatch();
+    assert.deepStrictEqual(checkPatch(doc, patch, { rules }), { ok: true, problems: [] }, 'the Nilai result moved, the formula did not');
+    assert.strictEqual(createWorkbook(mergePatch(doc, patch)).toJSON().sheets[0].rows[1].cells[doc.sheets[0].columns[2].id].v, 21600000);
+    ok('a formula is saved with its result, and a moved result is not a protected change');
+}
+
 // the header row of a table: the field names, titles in the order of the fields, or titles by field
 {
     const wb = createWorkbook();

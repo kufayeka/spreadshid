@@ -9,6 +9,9 @@ import { actionsOfOp, refusalOf } from './policy.js';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
+// a formula is the same formula whatever result (v) it was saved with: its result moves when other cells change
+const bare = (x) => (x && typeof x === 'object' && typeof x.f === 'string' ? { f: x.f, refs: x.refs } : x);
+
 /**
  * The stored workbook with a patch put on it (the shape pendingPatch() gives): sheets, columns and rows written whole by id, deleted ones taken out.
  * @param {import('./workbook.js').WorkbookDoc} doc
@@ -77,7 +80,7 @@ export function checkPatch(doc, patch, what) {
     }
     const storedRows = new Map();
     for (const sheet of doc.sheets || []) for (const row of sheet.rows || []) storedRows.set(row.id, { sheet: sheet.id, row });
-    const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+    const same = (a, b) => JSON.stringify(a === undefined ? null : bare(a)) === JSON.stringify(b === undefined ? null : bare(b));
     const say = (wb, s, r, c, reason) => problems.push({ sheet: wb.sheetProps(s).name, address: wb.address(r, c), reason });
 
     // the rows of a sort (their contents only moved among them) are let through where the person may sort but not edit
@@ -257,8 +260,8 @@ function sortedRows(doc, patch) {
         const cols = new Set();
         for (const x of rows) for (const part of [x.was.cells, x.now.cells, x.was.style, x.now.style]) for (const cid of Object.keys(part || {})) cols.add(cid);
         const sameIn = (cid) => {
-            const before = rows.map((x) => JSON.stringify([(x.was.cells || {})[cid], (x.was.style || {})[cid]])).sort();
-            const after = rows.map((x) => JSON.stringify([(x.now.cells || {})[cid], (x.now.style || {})[cid]])).sort();
+            const before = rows.map((x) => JSON.stringify([bare((x.was.cells || {})[cid]), (x.was.style || {})[cid]])).sort();
+            const after = rows.map((x) => JSON.stringify([bare((x.now.cells || {})[cid]), (x.now.style || {})[cid]])).sort();
             return JSON.stringify(before) === JSON.stringify(after);
         };
         if ([...cols].every(sameIn)) rows.forEach((x) => out.add(x.id));
