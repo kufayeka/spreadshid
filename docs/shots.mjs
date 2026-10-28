@@ -79,6 +79,15 @@ export const SHOTS = [
     { name: 'rumus-fill', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 3, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
     { name: 'rumus-dolar', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 5, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
     { name: 'rumus-terbilang', page: '05-nota.page.js', act: async ({ js, click, wait }) => { const p = await cellAt(js, 7, 1); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 96, width: 760, height: 252 } },
+    { name: 'editor-akses', page: '04-editor-akses.page.js', act: async ({ js, click, mouse, wait }) => {
+        const a = await cellAt(js, 1, 2), b = await cellAt(js, 4, 2);
+        await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(200);
+        const pick = (sel, v) => js(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+        await pick('.pilih-mode', 'hidden');
+        const t = await js('(function(){ var e = document.querySelector(".tambah-aturan").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
+        await click(t.x, t.y); await wait(200);
+        await pick('.lihat-sebagai', 'user:rina'); await wait(400);
+    }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
     { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {
         const p = await js(`(function(){ var b = document.querySelector('.ks-filter-button[data-filter-col="2"]').getBoundingClientRect(); return { x: Math.round(b.left + 8), y: Math.round(b.top + 8) }; })()`);

@@ -51,7 +51,7 @@ await withExample(async ({ js, click, type, key, wait }) => {
     await wait(250);
     check('two threads in the order of their cells', (await cells()) === 'A2,D4', await cells());
     await press(`Array.from(document.querySelectorAll('.ks-thread-cell')).find(function(x){ return x.textContent === 'A2'; })`);
-    check('a thread\'s address goes to its cell', (await q('JSON.stringify(window.__sheet.current.getSelection().active)')) === JSON.stringify({ r: 1, c: 0 }));
+    check('a thread\'s address goes to its cell', (await q('window.__sheet.current.getSelection().active.address')) === 'A2');
 
     await press('document.querySelector(\'.ks-thread.ks-current [aria-label="Resolve"]\')');
     check('Resolve: A2 leaves the open list and its mark goes', (await cells()) === 'D4' && !(await marked(1, 0)), await cells());

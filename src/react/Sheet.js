@@ -34,7 +34,29 @@ export function useWorkbookRevision(wb) {
     );
 }
 
+// The selection as the host gets it (onSelectionChange, getSelection): ready to show, and ready to put in a rule's range ("B2:D10, F2").
+// r and c are counted from 0; the addresses are as a person writes them.
+export function selectionOf(wb, sheetId, sel) {
+    const ranges = rectsOf(sel).map((b) => ({ r1: b.r1, c1: b.c1, r2: b.r2, c2: b.c2, address: rectText(b) }));
+    const a = sel.active;
+    return {
+        sheet: { id: sheetId, name: String(wb.sheetProps(sheetId).name || '') },
+        active: { r: a.r, c: a.c, address: rectText({ r1: a.r, c1: a.c, r2: a.r, c2: a.c }) },
+        ranges,
+        address: ranges.map((x) => x.address).join(', ')
+    };
+}
+
 const FIND_START = { open: false, dialog: false, query: '', replacement: '', matchCase: false, wholeCell: false, regex: false, inFormulas: false, allSheets: false, index: -1, status: '' };
+
+/**
+ * What is selected, as the host gets it.
+ * @typedef {object} SheetSelection
+ * @property {{ id: string, name: string }} sheet  The sheet shown.
+ * @property {{ r: number, c: number, address: string }} active  The active cell (r and c counted from 0; address as "B2").
+ * @property {{ r1: number, c1: number, r2: number, c2: number, address: string }[]} ranges  Every rectangle selected (several with Ctrl).
+ * @property {string} address  All of them as one text, "B2:D10, F2": what a rule's range takes.
+ */
 
 /**
  * What the host's code can ask of the sheet, through a ref.
@@ -45,7 +67,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {(text?: string) => void} startEdit  Start editing the active cell (with a text, or what it holds).
  * @property {() => void} focus  Give the keyboard to the grid.
  * @property {(sheetId: string) => void} showSheet
- * @property {() => object} getSelection
+ * @property {() => SheetSelection} getSelection  What is selected: see SheetSelection.
  */
 
 /**
@@ -58,7 +80,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {(event: { ops: object[], source: string }) => void} [onOp]
  * @property {(event: { reason: string, op: object, source: string }) => void} [onReject]
  * @property {(event: { address: string, field?: string, value: any, expected: string }) => void} [onCellError]
- * @property {(sel: { ranges: object[], active: { r: number, c: number } }) => void} [onSelectionChange]
+ * @property {(sel: SheetSelection) => void} [onSelectionChange]
  * @property {string} [fileName]
  * @property {{ policy: object|null, who: any }} [access]
  * @property {{ id: string, name: string }} [user]
@@ -79,7 +101,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  *   saves, sends to others, or keeps as history.
  * @param {(event: { reason: string, op: object, source: string }) => void} [props.onReject]  A change was refused (by the rules, the types, or beforeOp).
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
- * @param {(sel: { ranges: object[], active: { r: number, c: number } }) => void} [props.onSelectionChange]
+ * @param {(sel: SheetSelection) => void} [props.onSelectionChange]  The selection changed (see SheetSelection).
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
  * @param {{ policy: object|null, who: any }} [props.access]  The access policy of the workbook and the person who has it open (policy.js). It is the
  *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
@@ -174,7 +196,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
         ];
         return () => offs.forEach((off) => off());
     }, [wb]);
-    useEffect(() => { if (props.onSelectionChange) props.onSelectionChange(sel); }, [sel]);
+    useEffect(() => { if (props.onSelectionChange) props.onSelectionChange(selectionOf(wb, sheetId, sel)); }, [sel, sheetId]);
     // a notice goes after a while, a longer one (what an import left out) later
     useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), Math.min(12000, 4000 + notice.length * 40)); return () => clearTimeout(t); }, [notice]);
 
@@ -240,7 +262,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
         startEdit(text) { setEditing({ r: sel.active.r, c: sel.active.c, text: text === undefined ? wb.input(sheetId, sel.active.r, sel.active.c) : text, mode: 'edit' }); },
         focus() { toGrid(); },
         showSheet(id) { show(id); },
-        getSelection() { return sel; }
+        getSelection() { return selectionOf(wb, sheetId, sel); }
     }), [wb, sel, sheetId]);
 
     const onFind = (kind) => wb.shows('panel.find') && setFind((f) => (kind === 'find' ? { ...f, open: true, index: -1 } : { ...f, dialog: true, index: -1, status: '' }));

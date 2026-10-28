@@ -62,11 +62,11 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     check('a range named in the panel (Enter is Done)', (await q('document.querySelectorAll(".ks-panel .ks-rule-card").length')) === 2 && JSON.stringify(await q(`${W}.nameRange("biaya").range`)) === JSON.stringify({ r1: 1, c1: 5, r2: 3, c2: 5 }));
 
     await press(`Array.from(document.querySelectorAll('.ks-panel .ks-rule-open')).find(function(x){ return x.textContent.indexOf('Kuantitas') === 0; })`);
-    check('a name clicked in the list selects its range', (await selection()) === JSON.stringify({ anchor: { r: 1, c: 1 }, focus: { r: 3, c: 1 } }), await selection());
+    check('a name clicked in the list selects its range', (await selection()) === JSON.stringify({ r1: 1, c1: 1, r2: 3, c2: 1, address: 'B2:B4' }), await selection());
 
     await clickCell(8, 8);
     await typeInNameBox('biaya');
-    check('a name typed in the name box goes to its range (any case)', (await selection()) === JSON.stringify({ anchor: { r: 1, c: 5 }, focus: { r: 3, c: 5 } }) && (await nameBox()) === 'Biaya', [await selection(), await nameBox()]);
+    check('a name typed in the name box goes to its range (any case)', (await selection()) === JSON.stringify({ r1: 1, c1: 5, r2: 3, c2: 5, address: 'F2:F4' }) && (await nameBox()) === 'Biaya', [await selection(), await nameBox()]);
 
     await press('document.querySelector(\'.ks-panel [aria-label="Delete Biaya"]\')');
     check('a name deleted', (await q(`${W}.names().map(function(n){ return n.name; }).join()`)) === 'Kuantitas');

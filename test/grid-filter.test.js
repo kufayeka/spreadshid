@@ -30,11 +30,11 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     check('the Data menu offers a filter', await menuPick('Create a filter'));
     check('made on the block around the cell: the table A1:F4', JSON.stringify(await q(`${W}.filterOf(${S}).range`)) === JSON.stringify({ r1: 0, c1: 0, r2: 3, c2: 5 }), await q(`${W}.filterOf(${S})`));
     check('a button in each header cell, a frame around it', (await q('document.querySelectorAll(".ks-filter-button").length')) === 6 && (await q('!!document.querySelector(".ks-filter-frame")')));
-    check('the selection stays', (await q('JSON.stringify(window.__sheet.current.getSelection().active)')) === JSON.stringify({ r: 2, c: 2 }));
+    check('the selection stays', (await q('window.__sheet.current.getSelection().active.address')) === 'C3');
 
     await openColumn(4);
     check('the Status menu lists its values with their counts', (await q('Array.from(document.querySelectorAll(".ks-filter-values label")).map(function(l){ return l.textContent; }).join("|")')) === 'Approved1|Draft2');
-    check('the selection did not move to the header', (await q('JSON.stringify(window.__sheet.current.getSelection().active)')) === JSON.stringify({ r: 2, c: 2 }));
+    check('the selection did not move to the header', (await q('window.__sheet.current.getSelection().active.address')) === 'C3');
     await press(valueBox('Draft'));
     await press(inMenu('OK'));
     check('Draft unticked: only the Approved line shows', (await shownRows()) === '0,2', await shownRows());
