@@ -58,6 +58,12 @@ export const SHOTS = [
     { name: 'akses-kasir', page: '13-kasir.page.js', act: async ({ js, click, wait }) => {
         const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(200); await click(p.x, p.y); await wait(100);
     }, clip: { x: 0, y: 0, width: 1100, height: 400 } },
+    { name: 'komentar', page: '14-komentar.page.js', act: async ({ js, click, mouse, wait }) => {
+        const at = (expr) => js(`(function(){ var e = ${expr}; var b = e.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        let p = await at(`Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'View'; })`); await click(p.x, p.y); await wait(300);
+        p = await at(`Array.from(document.querySelectorAll('.ks-menu-item')).find(function(x){ return x.textContent.indexOf('Comments') >= 0; })`);
+        await mouse('mouseMoved', p.x - 20, p.y); await mouse('mouseMoved', p.x, p.y); await wait(200); await click(p.x, p.y); await wait(600);
+    }, clip: { x: 0, y: 0, width: 1366, height: 480 } },
     { name: 'invoice', page: '04-gaya.page.js', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {
         const p = await js(`(function(){ var b = document.querySelector('.ks-filter-button[data-filter-col="2"]').getBoundingClientRect(); return { x: Math.round(b.left + 8), y: Math.round(b.top + 8) }; })()`);
