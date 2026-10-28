@@ -24,7 +24,7 @@ export function mergePatch(doc, patch, what) {
     const sheetById = new Map(out.sheets.map((s) => [s.id, s]));
     for (const s of patch.sheets.upsert) {
         const had = sheetById.get(s.id);
-        if (had) { had.key = s.key; had.props = clone(s.props); } else { const fresh = { id: s.id, key: s.key, props: clone(s.props), columns: [], rows: [] }; out.sheets.push(fresh); sheetById.set(s.id, fresh); }
+        if (had) { had.key = s.key; had.props = clone(s.props); if (s.rowCount !== undefined) had.rowCount = s.rowCount; } else { const fresh = { id: s.id, key: s.key, props: clone(s.props), rowCount: s.rowCount, columns: [], rows: [] }; out.sheets.push(fresh); sheetById.set(s.id, fresh); }
     }
     for (const id of patch.sheets.delete) { out.sheets = out.sheets.filter((s) => s.id !== id); sheetById.delete(id); }
     for (const c of patch.columns.upsert) {

@@ -102,6 +102,19 @@ export function createWorkbook(doc, options) {
         for (const r of d.rows || []) sheet.rows.set(r.id, { id: r.id, key: r.key, cells: copyCells(r.cells || {}), style: copyCells(r.style || {}), props: clone(r.props || {}) });
         sheet.colOrder = [...sheet.cols.values()].sort((a, b) => compareKeys(a.key, b.key)).map((c) => c.id);
         sheet.rowOrder = [...sheet.rows.values()].sort((a, b) => compareKeys(a.key, b.key)).map((r) => r.id);
+        // the empty rows at the bottom were not saved (toJSON keeps only rowCount): they are made again, after the last saved row. They have new ids;
+        // they are "virtual" until one of them, or a row after them, is saved (pendingPatch sends them then, so no row moves up)
+        sheet.virtual = new Set();
+        const missing = (d.rowCount || 0) - sheet.rowOrder.length;
+        if (missing > 0) {
+            const last = sheet.rowOrder.length ? sheet.rows.get(sheet.rowOrder[sheet.rowOrder.length - 1]).key : null;
+            for (const key of keysBetween(last, null, missing)) {
+                const rid = newId();
+                sheet.rows.set(rid, { id: rid, key, cells: {}, style: {}, props: {} });
+                sheet.rowOrder.push(rid);
+                sheet.virtual.add(rid);
+            }
+        }
         for (const cid of sheet.colOrder) homeOfCol.set(cid, sheet);
         for (const rid of sheet.rowOrder) homeOfRow.set(rid, sheet);
         return sheet;
@@ -304,6 +317,7 @@ export function createWorkbook(doc, options) {
             }
             sheet.rowOrder = placeByKey(sheet.rowOrder, op.rows, (x) => sheet.rows.get(x).key);
             sheet.rowPos = null;
+            dirty.sheets.set(sheet.id, changeNo);       // the count of rows is saved with the sheet
             for (const r of op.rows) {
                 for (const cid of Object.keys(r.cells || {})) if (isStoredFormula(r.cells[cid]) && sheet.cols.has(cid)) engine.setFormula(sheet.id, r.id, cid, r.cells[cid], true);
             }
@@ -323,6 +337,8 @@ export function createWorkbook(doc, options) {
             }
             sheet.rowOrder = sheet.rowOrder.filter((rid) => !ids.has(rid));
             sheet.rowPos = null;
+            for (const rid of ids) sheet.virtual.delete(rid);
+            dirty.sheets.set(sheet.id, changeNo);       // the count of rows is saved with the sheet
             engine.rowsChanged(sheet.id, [...ids]);
         },
         insertCols(op) {
@@ -1819,12 +1835,44 @@ export function createWorkbook(doc, options) {
 
     // ---- reading ----------------------------------------------------------------------------------------------------------------------------------
 
+    // A sheet as it is saved. The empty rows at the bottom are left out and only counted (rowCount): a new sheet has 1000 rows, and a list of
+    // 12 products would otherwise save 988 empty ones. An empty row stays when something points at it (a formula's range, a named range, a rule, a
+    // comment), because it is known by its id; and the empty rows between filled ones stay, because they hold the places of the rows under them.
     function snapshotSheet(sheet) {
+        const pointed = pointedIds();
+        let keep = sheet.rowOrder.length - 1;
+        while (keep >= 0) {
+            const rid = sheet.rowOrder[keep];
+            const row = sheet.rows.get(rid);
+            if (pointed.has(rid) || Object.keys(row.cells).length || Object.keys(row.style).length || Object.keys(row.props).length) break;
+            keep--;
+        }
         return {
-            id: sheet.id, key: sheet.key, props: clone(sheet.props),
+            id: sheet.id, key: sheet.key, props: clone(sheet.props), rowCount: sheet.rowOrder.length,
             columns: sheet.colOrder.map((cid) => { const c = sheet.cols.get(cid); return { id: cid, key: c.key, props: clone(c.props) }; }),
-            rows: sheet.rowOrder.map((rid) => rowDoc(sheet, sheet.rows.get(rid)))
+            rows: sheet.rowOrder.slice(0, keep + 1).map((rid) => rowDoc(sheet, sheet.rows.get(rid)))
         };
+    }
+
+    // every id something in the workbook points at: the references of formulas (in cells, and in rules kept in props), and the corners of named
+    // ranges, merges, rules, filters, pivots and comment threads. Found by shape (any text kept in those places), so a feature added later counts too
+    function pointedIds() {
+        const out = new Set();
+        const walk = (x) => {
+            if (typeof x === 'string') out.add(x);
+            else if (Array.isArray(x)) x.forEach(walk);
+            else if (x && typeof x === 'object') for (const k of Object.keys(x)) walk(x[k]);
+        };
+        walk(settings);
+        for (const s of sheetOrder) {
+            const sheet = sheets.get(s);
+            walk(sheet.props);
+            for (const rid of sheet.rowOrder) {
+                const cells = sheet.rows.get(rid).cells;
+                for (const cid of Object.keys(cells)) if (isStoredFormula(cells[cid])) walk(cells[cid].refs);
+            }
+        }
+        return out;
     }
 
     // a row as it is saved: the cells of columns that were deleted are left out (they were only kept for undo)
@@ -1843,8 +1891,20 @@ export function createWorkbook(doc, options) {
         const upTo = changeNo;
         const rows = [], columns = [], sheetDocs = [];
         for (const rid of dirty.rows.keys()) { const sheet = homeOfRow.get(rid); if (sheet) rows.push(Object.assign({ sheetId: sheet.id }, rowDoc(sheet, sheet.rows.get(rid)))); }
+        // the empty rows made again on opening (not in the saved workbook) that now stand above a row being saved go with it: else that row would
+        // move up into their place when the workbook is opened again
+        for (const s of sheetOrder) {
+            const sheet = sheets.get(s);
+            if (!sheet.virtual.size) continue;
+            let lowest = -1;
+            sheet.rowOrder.forEach((rid, i) => { if (dirty.rows.has(rid)) lowest = i; });
+            for (let i = 0; i < lowest; i++) {
+                const rid = sheet.rowOrder[i];
+                if (sheet.virtual.has(rid) && !dirty.rows.has(rid)) rows.push(Object.assign({ sheetId: s }, rowDoc(sheet, sheet.rows.get(rid))));
+            }
+        }
         for (const cid of dirty.columns.keys()) { const sheet = homeOfCol.get(cid); if (sheet) { const c = sheet.cols.get(cid); columns.push({ sheetId: sheet.id, id: cid, key: c.key, props: clone(c.props) }); } }
-        for (const sid of dirty.sheets.keys()) { const sheet = sheets.get(sid); if (sheet) sheetDocs.push({ id: sid, key: sheet.key, props: clone(sheet.props) }); }
+        for (const sid of dirty.sheets.keys()) { const sheet = sheets.get(sid); if (sheet) sheetDocs.push({ id: sid, key: sheet.key, props: clone(sheet.props), rowCount: sheet.rowOrder.length }); }
         return {
             workbook: { id, version, settings: dirty.settings ? clone(settings) : undefined },
             upTo,
@@ -1855,22 +1915,24 @@ export function createWorkbook(doc, options) {
         };
     }
 
-    /**
-     * The server kept `patch`: forget what it carried, unless it changed again after the patch was taken.
-     * @param {ReturnType<typeof pendingPatch>} patch
-     * @param {{ version?: number }} [answer]  The new version the server gave the workbook.
-     */
     /** True when something changed since the last save (cheap: for a "not saved yet" mark; pendingPatch() makes the patch itself). */
     function unsaved() {
         return dirty.rows.size > 0 || dirty.columns.size > 0 || dirty.sheets.size > 0 || dirty.settings > 0
             || gone.rows.size > 0 || gone.columns.size > 0 || gone.sheets.size > 0;
     }
 
+    /**
+     * The server kept `patch`: forget what it carried, unless it changed again after the patch was taken.
+     * @param {ReturnType<typeof pendingPatch>} patch
+     * @param {{ version?: number }} [answer]  The new version the server gave the workbook.
+     */
     function saved(patch, answer) {
         revision++;
         const forget = (map) => { for (const [k, n] of [...map]) if (n <= patch.upTo) map.delete(k); };
         forget(dirty.rows); forget(dirty.columns); forget(dirty.sheets);
         forget(gone.rows); forget(gone.columns); forget(gone.sheets);
+        // rows that were sent are in the saved workbook now: no longer virtual
+        for (const r of patch.rows.upsert) { const sheet = homeOfRow.get(r.id); if (sheet) sheet.virtual.delete(r.id); }
         if (dirty.settings <= patch.upTo) dirty.settings = 0;
         if (answer && typeof answer.version === 'number') version = answer.version;
         emit('saved', { version });

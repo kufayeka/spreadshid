@@ -138,7 +138,7 @@ function boq() {
     const empty = wb.pendingPatch();
     const s1 = doc.sheets.find((s) => s.props.name === 'Sheet1');
     const harga = s1.columns[1].id;
-    const lain = doc.sheets.find((s) => s.id === other).rows[1];
+    const lain = doc.sheets.find((s) => s.id === other).rows[0];
     // a row of the sheet Lain, sent as a row of Sheet1 with a price in the protected column
     const moved = { ...empty, rows: { upsert: [{ ...lain, sheetId: s1.id, cells: { [harga]: 1 } }], delete: [] } };
     assert.match(checkPatch(doc, moved, { rules }).problems.map((p) => p.reason).join(), /cannot move to another sheet/);

@@ -1,7 +1,7 @@
 // The core without a screen: values and formulas, formulas that follow their rows, undo and redo, the door (beforeOp), the patch for saving, money.
 //   node test/core.test.js
 import assert from 'node:assert';
-import { createWorkbook, isError } from '../src/core/index.js';
+import { createWorkbook, isError, mergePatch } from '../src/core/index.js';
 
 let passed = 0;
 const ok = (label) => { passed++; console.log('ok   ' + label); };
@@ -273,6 +273,28 @@ const text = (v) => (isError(v) ? v.code : v);
     assert.strictEqual(w3.names()[0].ref, 'Sheet1!A2:A4');
     assert.deepStrictEqual(u.merges(), [{ r1: 1, c1: 1, r2: 3, c2: 1 }]);
     ok('named ranges, conditional formatting, validation and merges shrink too, in the same change');
+}
+
+// the empty rows at the bottom are not saved, only counted; they come back on opening, and a row filled under them later keeps its place
+{
+    const wb = createWorkbook();
+    wb.setValues('Sheet1', 'A1', [['Kode'], ['SMN-01'], ['BSI-10']]);
+    let doc = wb.toJSON();
+    assert.strictEqual(doc.sheets[0].rows.length, 3, 'only the filled rows are saved');
+    assert.strictEqual(doc.sheets[0].rowCount, 1000);
+    const b = createWorkbook(doc);
+    assert.strictEqual(b.size('Sheet1').rows, 1000, 'the empty rows come back');
+    b.saved(b.pendingPatch());
+    b.setValues('Sheet1', 'A20', 'baris 20');
+    const patch = b.pendingPatch();
+    assert.strictEqual(patch.rows.upsert.length, 17, 'the empty rows 4 to 19 go with row 20, so it cannot move up');
+    doc = mergePatch(doc, patch);
+    const c = createWorkbook(doc);
+    assert.strictEqual(c.value('Sheet1', 'A20'), 'baris 20');
+    assert.strictEqual(c.size('Sheet1').rows, 1000);
+    c.setValues('Sheet1', 'C1', '=SUM(B2:B500)');
+    assert.strictEqual(c.toJSON().sheets[0].rows.length, 500, 'an empty row a formula points at is kept');
+    ok('the empty rows at the bottom are counted, not saved, and come back in their places');
 }
 
 console.log('\n' + passed + ' passed');
