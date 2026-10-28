@@ -70,7 +70,7 @@ dikirim ke tamu : 0 diskusi
 ```
 <!-- /hasil -->
 
-Di layar, komentar ada di panel samping (View → Comments, atau klik kanan → Comment). Sel yang punya diskusi terbuka diberi tanda di pojoknya. Panel
+Di layar, komentar ada di panel samping (View → Comments, Insert → Comment, atau Ctrl+Alt+M). Sel yang punya diskusi terbuka diberi tanda di pojoknya. Panel
 memisahkan diskusi yang masih terbuka dan yang sudah selesai, dan setiap diskusi bisa dibalas di tempat:
 
 ![Panel komentar](img/komentar.png)
