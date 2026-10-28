@@ -37,5 +37,9 @@ copyFileSync(join(here, 'src', 'sheet.css'), join(here, 'dist', 'sheet.css'));
 
 if (withTypes) {
     execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', join(here, 'tsconfig.json')], { stdio: 'inherit' });
+    // the public types are written by hand (src/types): the ones made from the JSDoc lose most of what a host needs. They take the place of the
+    // made ones at the two entries of the package
+    copyFileSync(join(here, 'src', 'types', 'index.d.ts'), join(here, 'dist', 'types', 'index.d.ts'));
+    copyFileSync(join(here, 'src', 'types', 'core.d.ts'), join(here, 'dist', 'types', 'core', 'index.d.ts'));
 }
 console.log('built ' + (withTypes ? 'with' : 'without') + ' type declarations');
