@@ -1,12 +1,11 @@
 # 5. Rumus
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. API workbook](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)
 
-Bab ini mulai dari nol. Contohnya satu nota belanja yang dibangun pelan-pelan. Setiap gambar adalah sheet sungguhan: sel yang dipilih diberi kotak
-biru, dan rumusnya terlihat di baris atas (formula bar).
+Bab ini mulai dari nol. Bagian A memakai satu nota belanja yang dibangun pelan-pelan, tanpa kode: setiap gambar adalah sheet sungguhan, sel yang
+dipilih diberi kotak biru, dan rumusnya terlihat di baris atas (formula bar). Bagian B menulis rumus dari kode, dengan halaman React dan fotonya.
 
-**Dasar**
-
+**Bagian A. Rumus di layar (tanpa kode)**
 - [5.1 Rumus itu apa](#51-rumus-itu-apa)
 - [5.2 Membaca sel lain](#52-membaca-sel-lain)
 - [5.3 Range dan SUM](#53-range-dan-sum)
@@ -15,16 +14,20 @@ biru, dan rumusnya terlihat di baris atas (formula bar).
 - [5.6 Teks dan tanggal di rumus](#56-teks-dan-tanggal-di-rumus)
 - [5.7 Error dan artinya](#57-error-dan-artinya)
 
-**Semua fungsi**
-
-- [5.8 Semua fungsi: buat apa, cara pakai, hasilnya](#58-semua-fungsi-buat-apa-cara-pakai-hasilnya)
-
-**Untuk developer dan lanjutan**
-
-- [5.9 Rumus dari kode](#59-rumus-dari-kode)
+**Bagian B. Rumus dari kode**
+- [5.8 Menulis rumus dari kode](#58-menulis-rumus-dari-kode)
+- [5.9 Membaca sheet lain](#59-membaca-sheet-lain)
 - [5.10 Laporan dengan rumus](#510-laporan-dengan-rumus)
-- [5.11 Named range dan SUBTOTAL](#511-named-range-dan-subtotal)
-- [5.12 Rumus untuk proyek dan keuangan](#512-rumus-untuk-proyek-dan-keuangan)
+- [5.11 Named range](#511-named-range)
+
+**Bagian C. Contoh lengkap, semua fungsi, dan yang sering keliru**
+- [5.12 Contoh lengkap](#512-contoh-lengkap)
+- [5.13 Semua fungsi: buat apa, cara pakai, hasilnya](#513-semua-fungsi-buat-apa-cara-pakai-hasilnya)
+- [5.14 Yang sering keliru](#514-yang-sering-keliru)
+
+---
+
+# Bagian A. Rumus di layar (tanpa kode)
 
 ## 5.1 Rumus itu apa
 
@@ -57,7 +60,7 @@ dengan **fungsi** `SUM`:
 ![D5 berisi =SUM(D2:D4)](img/rumus-sum.png)
 
 Fungsi adalah rumus siap pakai yang punya nama. Bentuknya selalu `NAMA(isi)`. Isinya bisa range, sel, angka, atau teks, dipisahkan koma:
-`=SUM(D2:D4, 50000)` menjumlahkan D2 sampai D4, lalu ditambah 50.000. Ada 124 fungsi; semuanya ada di [5.8](#58-semua-fungsi-buat-apa-cara-pakai-hasilnya).
+`=SUM(D2:D4, 50000)` menjumlahkan D2 sampai D4, lalu ditambah 50.000. Ada 124 fungsi; semuanya ada di [5.13](#513-semua-fungsi-buat-apa-cara-pakai-hasilnya).
 
 Bentuk range lain: `D:D` (seluruh kolom D), `2:2` (seluruh baris 2), dan `A1:D4` (kotak empat kolom kali empat baris).
 
@@ -177,7 +180,608 @@ kolom dihapus : =#REF!*2 = #REF!
 
 Error menjalar: rumus yang membaca sel error ikut error. Begitu penyebabnya dibetulkan, semua yang ikut error pulih sendiri.
 
-## 5.8 Semua fungsi: buat apa, cara pakai, hasilnya
+---
+
+# Bagian B. Rumus dari kode
+
+## 5.8 Menulis rumus dari kode
+
+**Tujuan:** nota di bagian A, dibuat dari kode.
+
+<!-- contoh: 05-nota.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// Nota belanja: semua yang dibahas di bagian dasar bab rumus ada di sini.
+export function buatNota() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setSheetProps({ name: 'Nota' });
+    s.setValues('A1', [
+        ['Produk', 'Harga', 'Qty', 'Jumlah'],
+        ['Semen 50 kg', 72000, 10, '=B2*C2'],
+        ['Besi 10 mm', 79500, 5, '=B3*C3'],
+        ['Cat 5 kg', 145000, 2, '=B4*C4'],
+        ['Subtotal', null, null, '=SUM(D2:D4)'],
+        ['PPN', 0.11, null, '=D5*$B$6'],
+        ['Total', null, null, '=D5+D6'],
+        ['Terbilang', '=PROPER(TERBILANG(D7)) & " Rupiah"']
+    ]);
+    s.setValues('F1', [['Coba sendiri'], ['=2+3']]);
+    s.setStyle('A1:D1', { bold: true, fill: '#e8f0fe' });
+    s.setStyle('A5:D7', { bold: true });
+    s.setStyle('B6', { format: { type: 'percent', decimals: 0 } });
+    s.setStyle('F1', { bold: true, color: '#5f6368' });
+    s.setColProps('B', { format: { type: 'money', decimals: 0 } });
+    s.setColProps('D', { format: { type: 'money', decimals: 0 }, width: 130 });
+    s.setColProps('A', { width: 120 });
+    return wb;
+}
+
+export default function Nota() {
+    const [wb] = useState(buatNota);
+    return <div style={{ height: 380 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Dari kode, rumus ditulis dengan `setValues` seperti mengetik di sel: teks yang diawali `=` menjadi rumus. Hasilnya dibaca dengan `value`, dan rumusnya
+dengan `input` (bab 2).
+
+| Fungsi | Artinya |
+|---|---|
+| `setValues(alamat, '=…')` | tulis rumus |
+| `value(alamat)` | hasilnya. Error berupa `{ code }`, cek dengan `isError` |
+| `input(alamat)` | rumusnya sebagai teks, seperti di formula bar |
+| `fillBlock(wb, sheet, sumber, tujuan, arah)` | fill handle dari kode |
+| `FUNCTION_NAMES` | nama semua fungsi |
+
+Hanya rumus yang terkena sebuah perubahan yang dihitung ulang, jadi mengubah satu sel di sheet 100.000 baris tetap cepat. `TODAY()` dan `NOW()` dihitung
+ulang setiap ada perubahan, atau saat `wb.tick()` dipanggil. Opsi `now` di `createWorkbook` mengganti jamnya, misalnya untuk test. Rumus di sel yang
+formatnya uang dibulatkan ke desimal formatnya, supaya total tidak meleset sepeser pun dari yang tampil.
+
+## 5.9 Membaca sheet lain
+
+**Tujuan:** nota yang mengambil nama dan harga dari sheet Produk, dan tarif PPN dari sheet Pengaturan.
+
+<!-- contoh: 05-09-antar-sheet.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// 5.9 Rumus yang membaca sheet lain: nama dan harga diambil dari sheet Produk, tarif PPN dari sheet Pengaturan.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const produk = wb.sheet(wb.addSheet('Produk'));
+    produk.setValues('A1', [['Kode', 'Produk', 'Harga'], ['SMN-01', 'Semen Portland 50 kg', 72000], ['BSI-10', 'Besi beton 10 mm', 79500], ['CAT-05', 'Cat tembok 5 kg', 145000]]);
+    const atur = wb.sheet(wb.addSheet('Pengaturan'));
+    atur.setValues('A1', [['PPN', 0.11]]);
+
+    const nota = wb.sheet('Sheet1');
+    nota.setSheetProps({ name: 'Nota' });
+    nota.setValues('A1', [
+        ['Kode', 'Produk', 'Qty', 'Harga', 'Jumlah', 'PPN'],
+        // baru: XLOOKUP mencari kode di kolom A sheet Produk, lalu memberi nilai dari kolom B atau C
+        ['SMN-01', '=XLOOKUP(A2, Produk!$A$2:$A$4, Produk!$B$2:$B$4)', 40, '=XLOOKUP(A2, Produk!$A$2:$A$4, Produk!$C$2:$C$4)', '=C2*D2', '=E2*Pengaturan!$B$1'],
+        ['CAT-05', '=XLOOKUP(A3, Produk!$A$2:$A$4, Produk!$B$2:$B$4)', 6, '=XLOOKUP(A3, Produk!$A$2:$A$4, Produk!$C$2:$C$4)', '=C3*D3', '=E3*Pengaturan!$B$1']
+    ]);
+    nota.setStyle('A1:F1', { bold: true, fill: '#eef2f7' });
+    nota.setStyle('D2:F3', { format: { type: 'money', decimals: 0 } });
+    nota.setColProps('B', { width: 180 });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return (
+        <div style={{ height: 260 }}>
+            <Sheet workbook={wb} sheet={wb.sheetIdByName('Nota') ?? undefined} />
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+D2 dipilih:
+
+![Harga diambil dari sheet Produk](img/rumus-antar-sheet.png)
+
+**Penjelasan:**
+
+- `Produk!$A$2:$A$4` adalah range di sheet Produk. Nama sheet ditulis sebelum `!`. Nama yang mengandung spasi ditulis di antara tanda kutip
+  satu: `'Daftar Harga'!A2`.
+- `XLOOKUP(A2, kolom_kode, kolom_harga)` mencari kode di A2 di kolom kode, lalu memberi nilai di baris yang sama dari kolom harga.
+- `$` menahan range supaya tidak ikut bergeser saat rumusnya disalin ke baris berikutnya (5.5).
+- Kalau tarif PPN di sheet Pengaturan diubah, semua PPN di nota ikut berubah. Kalau sheet-nya diganti nama, rumusnya ikut menulis nama baru.
+
+## 5.10 Laporan dengan rumus
+
+**Tujuan:** 300 transaksi di sheet Penjualan, diringkas per cabang di sheet Laporan.
+
+<!-- contoh: 05-10-laporan.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan, CABANG } from './data/toko.js';
+
+// 5.10 Laporan dengan rumus: 300 transaksi di sheet Penjualan, diringkas per cabang di sheet Laporan.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const jual = wb.sheet('Sheet1');
+    jual.setSheetProps({ name: 'Penjualan' });
+    jual.setValues('A1', [KOLOM_PENJUALAN]);
+    jual.setValues('A2', barisPenjualan(penjualan(300), 2));     // A2:K301; kolom C cabang, kolom K nilai transaksi
+
+    const lap = wb.sheet(wb.addSheet('Laporan'));
+    lap.setValues('A1', [['Cabang', 'Omzet', 'Transaksi', 'Rata-rata', 'Pangsa']]);
+    // baru: satu baris rumus per cabang
+    lap.setValues('A2', CABANG.map((cabang, i) => {
+        const r = i + 2;
+        return [cabang,
+            `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r})`,       // jumlah nilai, hanya baris cabang ini
+            `=COUNTIFS(Penjualan!$C$2:$C$301, A${r})`,                             // jumlah transaksi
+            `=ROUND(B${r}/C${r}, 0)`,                                              // rata-rata per transaksi
+            `=B${r}/SUM($B$2:$B$4)`];                                              // bagian dari total
+    }));
+    lap.setValues('A5', [['Total', '=SUM(B2:B4)', '=SUM(C2:C4)', '=ROUND(B5/C5, 0)', '=SUM(E2:E4)']]);
+    lap.setStyle('A1:E1, A5:E5', { bold: true });
+    lap.setStyle('A1:E1', { fill: '#eef2f7' });
+    lap.setColProps('B', { format: { type: 'money', decimals: 0 }, width: 150 });
+    lap.setColProps('D', { format: { type: 'money', decimals: 0 }, width: 130 });
+    lap.setColProps('E', { format: { type: 'percent', decimals: 1 } });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return (
+        <div style={{ height: 290 }}>
+            <Sheet workbook={wb} sheet={wb.sheetIdByName('Laporan') ?? undefined} />
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+B2 dipilih:
+
+![Ringkasan per cabang](img/rumus-laporan.png)
+
+**Penjelasan:**
+
+- `SUMIFS(yang_dijumlah, range_syarat, syarat)` menjumlah hanya baris yang memenuhi syarat: di sini baris yang cabangnya sama dengan A2.
+- `COUNTIFS` menghitung barisnya. Rata-rata dan pangsa dihitung dari keduanya.
+- Rumusnya dibuat dengan template string di dalam `map`, satu baris rumus per cabang. `A${r}` menjadi `A2`, `A3`, `A4`.
+- Kalau ada transaksi baru di sheet Penjualan (di dalam range), laporannya ikut berubah sendiri.
+
+Yang dipakai: `SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, dan `MAXIFS` untuk total dengan syarat, `$` di penyebut pangsa, `INDEX` + `MATCH` dan `XLOOKUP` +
+`LARGE` untuk "siapa yang terbesar", dan `">=" & tanggal` untuk menjumlah per periode. Semua range di satu `SUMIFS` harus sama panjang.
+
+## 5.11 Named range
+
+**Tujuan:** memberi nama pada range, supaya rumus laporan terbaca seperti kalimat.
+
+<!-- contoh: 05-11-nama.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
+
+// 5.11 Named range: range diberi nama, sehingga rumus laporan terbaca seperti kalimat.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const jual = wb.sheet('Sheet1');
+    jual.setSheetProps({ name: 'Penjualan' });
+    jual.setValues('A1', [KOLOM_PENJUALAN]);
+    jual.setValues('A2', barisPenjualan(penjualan(300), 2));
+
+    // baru: tiga nama untuk tiga kolom data
+    wb.addName('Cabang', 'Penjualan', 'C2:C301');
+    wb.addName('Kategori', 'Penjualan', 'G2:G301');
+    wb.addName('Omzet', 'Penjualan', 'K2:K301');
+
+    const lap = wb.sheet(wb.addSheet('Laporan'));
+    lap.setValues('A1', [
+        ['Omzet Bandung', '=SUMIFS(Omzet, Cabang, "Bandung")'],              // baru: nama, bukan Penjualan!$K$2:$K$301
+        ['Omzet semen', '=SUMIFS(Omzet, Kategori, "Semen")'],
+        ['Semen di Bandung', '=SUMIFS(Omzet, Kategori, "Semen", Cabang, "Bandung")']
+    ]);
+    lap.setColProps('A', { width: 150 });
+    lap.setColProps('B', { format: { type: 'money', decimals: 0 }, width: 150 });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return (
+        <div style={{ height: 240 }}>
+            <Sheet workbook={wb} sheet={wb.sheetIdByName('Laporan') ?? undefined} />
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+B3 dipilih:
+
+![Rumus dengan nama](img/rumus-nama.png)
+
+**Penjelasan:**
+
+- `wb.addName('Omzet', 'Penjualan', 'K2:K301')` memberi nama `Omzet` pada range itu.
+- `=SUMIFS(Omzet, Cabang, "Bandung")` sama dengan `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`, tapi jauh lebih mudah
+  dibaca.
+- Kalau range sebuah nama diperluas, semua rumus yang memakainya ikut menghitung baris baru. Kalau namanya diganti, rumusnya ikut menulis nama
+  baru (5.12).
+- Nama juga bisa dibuat orang di layar, lewat Data → Named ranges, atau dengan mengetik nama di kotak nama.
+
+| Fungsi | Artinya |
+|---|---|
+| `wb.addName(nama, sheet, range)` | buat nama |
+| `wb.setName(id, { name, sheetId, range })` | ganti nama atau range-nya |
+| `wb.removeName(id)` | hapus nama |
+| `wb.names()` | `[{ id, name, sheetId, range, ref }]` |
+| `wb.nameRange(nama)`, `wb.nameProblem(nama)` | range sebuah nama, dan alasan sebuah nama tidak boleh dipakai |
+
+---
+
+# Bagian C. Contoh lengkap, semua fungsi, dan yang sering keliru
+
+## 5.12 Contoh lengkap
+
+Contoh-contoh di bawah ini lebih panjang. Hasilnya dicetak sebagai teks, supaya setiap langkahnya terlihat.
+
+### Nota dengan sheet lain, fill dari kode, dan sheet yang diganti nama
+
+<!-- contoh: 05-rumus.js -->
+```js
+import { createWorkbook, fillBlock } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK } from './data/toko.js';
+
+// Nota penjualan yang mengambil harga dari sheet Produk dan tarif PPN dari sheet Pengaturan.
+// now: jam untuk TODAY() dan NOW(), dipatok supaya hasil contoh ini selalu sama
+const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27, 9, 30) });
+wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+
+const produk = wb.sheet(wb.addSheet('Produk'));
+produk.setValues('A1', [KOLOM_PRODUK, ...PRODUK]);
+const atur = wb.sheet(wb.addSheet('Pengaturan'));
+atur.setValues('A1', [['PPN', 0.11], ['Jatuh tempo (hari)', 14]]);
+
+const nota = wb.sheet('Sheet1');
+nota.setSheetProps({ name: 'Nota' });
+nota.setValues('A1', [
+    ['Kode', 'Produk', 'Qty', 'Harga', 'Jumlah', 'PPN'],
+    ['SMN-01', '=XLOOKUP(A2, Produk!$A$2:$A$13, Produk!$B$2:$B$13, "?")', 40, '=XLOOKUP(A2, Produk!$A:$A, Produk!$F:$F)', '=C2*D2', '=E2*Pengaturan!$B$1']
+]);
+nota.setValues('A3', [['BSI-13', null, 25], ['CAT-05', null, 6], ['XXX-99', null, 1]]);
+
+// fill handle dari kode: rumus diulang ke bawah. Bagian tanpa $ ikut bergeser, yang ber-$ tetap. Kolom Qty (C) tidak ikut, karena angka
+// yang di-fill menjadi deret (40, 41, 42), sama seperti menarik fill handle di layar
+fillBlock(wb, 'Nota', 'B2', 'B3:B5', 'down');
+fillBlock(wb, 'Nota', 'D2:F2', 'D3:F5', 'down');
+console.log('rumus B3      :', nota.input('B3'));
+console.log('rumus F4      :', nota.input('F4'));
+console.log('produk        :', [2, 3, 4, 5].map((r) => nota.value('B' + r)).join(' | '));
+console.log('jumlah        :', [2, 3, 4, 5].map((r) => { const v = nota.value('E' + r); return v.code || v; }).join(' | '));
+
+nota.setValues('A7', [
+    ['Subtotal', null, null, null, '=SUMIF(A2:A5, "<>XXX-99", E2:E5)'],
+    ['PPN', null, null, null, '=ROUND(E7*Pengaturan!B1, 0)'],
+    ['Total', null, null, null, '=E7+E8'],
+    ['Ringkas', '="Total " & ROUND(E9/1000000, 1) & " juta, " & COUNTIF(D2:D5, ">0") & " barang"'],
+    ['Tanggal', '=TODAY()', 'Jatuh tempo', '=B11+Pengaturan!B2', 'Sisa hari', '=D11-TODAY()']
+]);
+console.log('subtotal      :', nota.value('E7'), '| PPN', nota.value('E8'), '| total', nota.value('E9'));
+console.log('teks          :', nota.value('B10'));
+console.log('tanggal       :', nota.value('B11'), '(27 Okt 2026) | jatuh tempo', nota.value('D11'), '| sisa', nota.value('F11'), 'hari');
+
+// sheet diganti nama, tarif PPN diubah: semua rumus ikut
+wb.setSheetProps('Pengaturan', { name: 'Atur Toko' });
+atur.setValues('B1', 0.12);
+console.log('setelah ubah  :', nota.input('E8'), '=', nota.value('E8'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 05-rumus.js -->
+```text
+rumus B3      : =XLOOKUP(A3, Produk!$A$2:$A$13, Produk!$B$2:$B$13, "?")
+rumus F4      : =E4*Pengaturan!$B$1
+produk        : Semen Portland 50 kg | Besi beton 13 mm | Cat tembok 5 kg putih | ?
+jumlah        : 2880000 | 3200000 | 870000 | #N/A
+subtotal      : 6950000 | PPN 764500 | total 7714500
+teks          : Total 7.7 juta, 3 barang
+tanggal       : 46322 (27 Okt 2026) | jatuh tempo 46336 | sisa 14 hari
+setelah ubah  : =ROUND(E7*'Atur Toko'!B1, 0) = 834000
+```
+<!-- /hasil -->
+
+### Laporan bulanan lengkap
+
+<!-- contoh: 05-laporan.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan, CABANG } from './data/toko.js';
+
+// Laporan bulanan dari 300 transaksi: ringkasan per cabang, per kategori, dan per minggu, hanya dengan rumus.
+const wb = createWorkbook();
+wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+const jual = wb.sheet('Sheet1');
+jual.setSheetProps({ name: 'Penjualan' });
+jual.setValues('A1', [KOLOM_PENJUALAN]);
+jual.setValues('A2', barisPenjualan(penjualan(300), 2));      // A2:K301, kolom K = Qty x Harga x (1 - Diskon)
+
+const lap = wb.sheet(wb.addSheet('Laporan'));
+// ---- per cabang: omzet, transaksi, rata-rata, transaksi terbesar, pangsa, peringkat
+lap.setValues('A1', [['Cabang', 'Omzet', 'Transaksi', 'Rata-rata', 'Terbesar', 'Pangsa', 'Peringkat', 'Nilai']]);
+lap.setValues('A2', CABANG.map((c, i) => {
+    const r = i + 2;
+    return [c,
+        `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r})`,
+        `=COUNTIFS(Penjualan!$C$2:$C$301, A${r})`,
+        `=ROUND(AVERAGEIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r}), 0)`,
+        `=MAXIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r})`,
+        `=B${r}/SUM($B$2:$B$4)`,
+        `=RANK(B${r}, $B$2:$B$4)`,
+        `=IFS(F${r}>=0.4, "A", F${r}>=0.25, "B", TRUE, "C")`];
+}));
+lap.setValues('A5', [['Total', '=SUM(B2:B4)', '=SUM(C2:C4)', '=ROUND(B5/C5, 0)', '=MAX(E2:E4)', '=SUM(F2:F4)']]);
+for (let r = 2; r <= 5; r++) {
+    const v = (c) => lap.value(c + r);
+    console.log(String(v('A')).padEnd(9), 'omzet', String(v('B')).padStart(9), '| trx', v('C'), '| rata2', v('D'), '| max', v('E'),
+        '| pangsa', (v('F') * 100).toFixed(1) + '%', r < 5 ? '| #' + v('G') + ' ' + v('H') : '');
+}
+
+// ---- jawaban satu sel: INDEX + MATCH, XLOOKUP + LARGE, teks yang digabung
+lap.setValues('A7', [
+    ['Cabang terbaik', '=INDEX(A2:A4, MATCH(MAX(B2:B4), B2:B4, 0))'],
+    ['Omzet kedua', '=XLOOKUP(LARGE(B2:B4, 2), B2:B4, A2:A4)'],
+    ['Diskon diberikan', '=COUNTIF(Penjualan!J2:J301, ">0") & " transaksi"'],
+    ['Qty terbanyak', '=MAX(Penjualan!H2:H301) & " x " & INDEX(Penjualan!F2:F301, MATCH(MAX(Penjualan!H2:H301), Penjualan!H2:H301, 0))'],
+    ['Semua cabang', '=TEXTJOIN(", ", TRUE, A2:A4)']
+]);
+for (let r = 7; r <= 11; r++) console.log(String(lap.value('A' + r)).padEnd(17), ':', lap.value('B' + r).code || lap.value('B' + r));
+
+// ---- per minggu: tanggal dihitung dari nomor hari, WEEKDAY dan selisih tanggal
+lap.setValues('D7', [['Minggu', 'Dari', 'Sampai', 'Omzet']]);
+lap.setValues('D8', [1, 2, 3, 4, 5].map((w, i) => [w, `=DATE(2026, 10, 1) + ${i * 7}`, `=MIN(E${i + 8} + 6, DATE(2026, 10, 31))`,
+    `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$B$2:$B$301, ">=" & E${i + 8}, Penjualan!$B$2:$B$301, "<=" & F${i + 8})`]));
+lap.setColProps('E:F', { format: { type: 'date' } });
+lap.setValues('D13', [['Cek', '=SUM(G8:G12)=B5', 'Hari pertama', '=WEEKDAY(E8, 2)']]);
+for (let r = 8; r <= 12; r++) console.log('minggu', lap.value('D' + r), lap.display('E' + r).text, '-', lap.display('F' + r).text, ':', lap.value('G' + r));
+console.log('jumlah 5 minggu = total omzet:', lap.value('E13'), '| 1 Oktober 2026 hari ke', lap.value('G13'), '(Senin = 1, jadi Kamis)');
+```
+<!-- /contoh -->
+
+<!-- hasil: 05-laporan.js -->
+```text
+Jakarta   omzet 264052400 | trx 129 | rata2 2046918 | max 12495000 | pangsa 42.6% | #1 A
+Bandung   omzet 187095250 | trx 86 | rata2 2175526 | max 12495000 | pangsa 30.2% | #2 B
+Surabaya  omzet 169305500 | trx 85 | rata2 1991829 | max 11760000 | pangsa 27.3% | #3 B
+Total     omzet 620453150 | trx 300 | rata2 2068177 | max 12495000 | pangsa 100.0% 
+Cabang terbaik    : Jakarta
+Omzet kedua       : Bandung
+Diskon diberikan  : 46 transaksi
+Qty terbanyak     : 27 x Semen Portland 50 kg
+Semua cabang      : Jakarta, Bandung, Surabaya
+minggu 1 01/10/2026 - 07/10/2026 : 143905350
+minggu 2 08/10/2026 - 14/10/2026 : 138327500
+minggu 3 15/10/2026 - 21/10/2026 : 142789900
+minggu 4 22/10/2026 - 28/10/2026 : 151715250
+minggu 5 29/10/2026 - 31/10/2026 : 43715150
+jumlah 5 minggu = total omzet: true | 1 Oktober 2026 hari ke 4 (Senin = 1, jadi Kamis)
+```
+<!-- /hasil -->
+
+### Named range dan SUBTOTAL
+
+**Named range** adalah nama untuk sebuah range. `=SUMIFS(Omzet, Cabang, "Bandung")` lebih mudah dibaca daripada
+`=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`. **SUBTOTAL** menjumlah tanpa menghitung subtotal lain di dalam range-nya, dan bisa
+melewati baris yang disembunyikan:
+
+<!-- contoh: 05-nama-subtotal.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
+
+// Named range: rumus laporan yang terbaca seperti kalimat. SUBTOTAL: total yang menghormati filter dan tidak terhitung dua kali.
+const wb = createWorkbook();
+const jual = wb.sheet('Sheet1');
+jual.setSheetProps({ name: 'Penjualan' });
+jual.setValues('A1', [KOLOM_PENJUALAN]);
+jual.setValues('A2', barisPenjualan(penjualan(300), 2));
+
+// ---- nama untuk kolom data, dan untuk satu sel tarif
+wb.addName('Cabang', 'Penjualan', 'C2:C301');
+wb.addName('Kategori', 'Penjualan', 'G2:G301');
+wb.addName('Omzet', 'Penjualan', 'K2:K301');
+const lap = wb.sheet(wb.addSheet('Laporan'));
+lap.setValues('A1', [
+    ['Omzet Bandung', '=SUMIFS(Omzet, Cabang, "Bandung")'],
+    ['Omzet semen', '=SUMIFS(Omzet, Kategori, "Semen")'],
+    ['Komisi sales', '=ROUND(B1 * Komisi, 0)']
+]);
+console.log('rumus             :', lap.input('B1'));
+console.log('omzet Bandung     :', lap.value('B1'), '| semen', lap.value('B2'));
+console.log('komisi (belum ada):', lap.value('B3').code, '<- nama Komisi belum dibuat');
+lap.setValues('D1', [['Tarif komisi', 0.015]]);
+wb.addName('Komisi', 'Laporan', 'E1');
+console.log('komisi            :', lap.value('B3'), '<- rumus jalan begitu namanya ada');
+
+// ---- nama diganti: semua rumus ikut menulis nama baru. Range-nya diperluas: semua rumus ikut menghitung baris baru
+const id = wb.names().find((n) => n.name === 'Omzet').id;
+wb.setName(id, { name: 'Total' });
+console.log('ganti nama        :', lap.input('B1'));
+jual.setValues('A302', barisPenjualan([{ No: 301, Tanggal: 46325, Cabang: 'Bandung', Sales: 'Asep', Kode: 'PSR-01', Produk: 'Pasir beton', Kategori: 'Pasir', Qty: 10, Harga: 290000, Diskon: 0 }], 302));
+wb.setName(id, { range: 'K2:K302' });
+wb.setName(wb.names().find((n) => n.name === 'Cabang').id, { range: 'C2:C302' });
+wb.setName(wb.names().find((n) => n.name === 'Kategori').id, { range: 'G2:G302' });   // range yang dipakai bersama di SUMIFS harus sama panjang
+console.log('baris baru masuk  :', lap.value('B1'), '(+2.900.000)');
+console.log('semua nama        :', wb.names().map((n) => n.name + ' = ' + n.ref).join(', '));
+console.log('nama tidak boleh  :', JSON.stringify(wb.nameProblem('A1')), '|', JSON.stringify(wb.nameProblem('Total')));
+
+// ---- SUBTOTAL: kelompok kategori di sheet Rekap, total per kelompok, total akhir yang tidak menghitung subtotal
+const rekap = wb.sheet(wb.addSheet('Rekap'));
+rekap.setValues('A1', [
+    ['Kategori / cabang', 'Omzet'],
+    ['Semen', '=SUBTOTAL(9, B3:B5)'],
+    ['  Jakarta', '=SUMIFS(Total, Kategori, "Semen", Cabang, "Jakarta")'],
+    ['  Bandung', '=SUMIFS(Total, Kategori, "Semen", Cabang, "Bandung")'],
+    ['  Surabaya', '=SUMIFS(Total, Kategori, "Semen", Cabang, "Surabaya")'],
+    ['Besi', '=SUBTOTAL(9, B7:B9)'],
+    ['  Jakarta', '=SUMIFS(Total, Kategori, "Besi", Cabang, "Jakarta")'],
+    ['  Bandung', '=SUMIFS(Total, Kategori, "Besi", Cabang, "Bandung")'],
+    ['  Surabaya', '=SUMIFS(Total, Kategori, "Besi", Cabang, "Surabaya")'],
+    ['Semen + besi', '=SUBTOTAL(9, B2:B9)'],
+    ['SUM biasa', '=SUM(B2:B9)']
+]);
+console.log('SUBTOTAL vs SUM   :', rekap.value('B10'), 'vs', rekap.value('B11'), '<- SUM menghitung subtotal dua kali');
+
+// baris yang disembunyikan: 9 tetap menghitungnya, 109 tidak. Baris yang disaring filter tidak dihitung keduanya
+rekap.setRowProps('4', { hidden: true });
+rekap.setValues('C10', [['=SUBTOTAL(109, B2:B9)']]);
+console.log('Bandung semen disembunyikan :', rekap.value('B10'), '(9) |', rekap.value('C10'), '(109)');
+rekap.setRowProps('4', { hidden: null });
+rekap.createFilter('A1:B9');
+rekap.setFilterColumn('A', { hidden: ['  Surabaya'] });
+console.log('filter tanpa Surabaya       :', rekap.value('B10'), '(9) |', rekap.value('C10'), '(109)');
+```
+<!-- /contoh -->
+
+<!-- hasil: 05-nama-subtotal.js -->
+```text
+rumus             : =SUMIFS(Omzet, Cabang, "Bandung")
+omzet Bandung     : 187095250 | semen 97448800
+komisi (belum ada): #NAME? <- nama Komisi belum dibuat
+komisi            : 2806429 <- rumus jalan begitu namanya ada
+ganti nama        : =SUMIFS(Total, Cabang, "Bandung")
+baris baru masuk  : 189995250 (+2.900.000)
+semua nama        : Cabang = Penjualan!C2:C302, Kategori = Penjualan!G2:G302, Total = Penjualan!K2:K302, Komisi = Laporan!E1
+nama tidak boleh  : "\"A1\" is the address of a cell, not a name" | "there is a named range \"Total\" already"
+SUBTOTAL vs SUM   : 140157500 vs 280315000 <- SUM menghitung subtotal dua kali
+Bandung semen disembunyikan : 140157500 (9) | 111629100 (109)
+filter tanpa Surabaya       : 104075000 (9) | 104075000 (109)
+```
+<!-- /hasil -->
+
+- Rumus boleh ditulis sebelum namanya dibuat: hasilnya `#NAME?` sampai nama itu ada.
+- Mengganti nama membuat semua rumus menulis nama baru. Memperluas range sebuah nama membuat semua rumus ikut menghitung range baru.
+- Nama tidak boleh berupa alamat sel. `PPN2026` adalah alamat (kolom PPN, baris 2026), jadi pakai `Tarif_PPN`.
+- Di layar: Data → Named ranges.
+
+Angka pertama `SUBTOTAL` memilih fungsinya: 1 `AVERAGE`, 2 `COUNT`, 3 `COUNTA`, 4 `MAX`, 5 `MIN`, 6 `PRODUCT`, 7 `STDEV`, 8 `STDEVP`, 9 `SUM`, 10 `VAR`,
+11 `VARP`. Ditambah 100 (`SUBTOTAL(109, ...)`), baris yang disembunyikan dengan tangan atau grup yang dilipat juga dilewati. Baris yang disaring filter
+selalu dilewati.
+
+### Rumus untuk proyek dan keuangan
+
+AHSP, jadwal hari kerja, kwitansi termin, cicilan alat, dan rekap dinamis:
+
+<!-- contoh: 05-konstruksi.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+
+// Rumus yang sering dipakai di RAB, jadwal, dan pembayaran proyek.
+const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27) });
+wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+
+// ---- AHSP: harga satuan = jumlah (koefisien x harga dasar)
+const ahsp = wb.sheet('Sheet1');
+ahsp.setSheetProps({ name: 'AHSP' });
+ahsp.setValues('A1', [
+    ['1 m3 beton K-225', 'Koefisien', 'Satuan', 'Harga dasar'],
+    ['Semen 50 kg', 7.4, 'zak', 72000],
+    ['Pasir beton', 0.499, 'm3', 290000],
+    ['Kerikil', 0.776, 'm3', 310000],
+    ['Pekerja', 1.65, 'OH', 120000],
+    ['Tukang batu', 0.275, 'OH', 150000],
+    ['Harga satuan', '=SUMPRODUCT(B2:B6, D2:D6)'],
+    ['Dibulatkan ke 1.000', '=MROUND(B7, 1000)'],
+    ['Bahan saja', '=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)']
+]);
+console.log('harga satuan   :', ahsp.value('B7'), '-> dibulatkan', ahsp.value('B8'), '| bahan saja', ahsp.value('B9'));
+
+// ---- jadwal: hari kerja (tanpa Sabtu, Minggu, dan tanggal merah)
+const jadwal = wb.sheet(wb.addSheet('Jadwal'));
+jadwal.setValues('A1', [
+    ['Libur', '=DATE(2026,10,28)'],
+    ['Mulai', '=DATE(2026,10,1)', 'Durasi (hari kerja)', 20],
+    ['Selesai', '=WORKDAY(B2, D2 - 1, B1)'],
+    ['Hari kerja Oktober', '=NETWORKDAYS(DATE(2026,10,1), EOMONTH(B2, 0), B1)'],
+    ['Akhir bulan termin', '=EOMONTH(B2, 1)'],
+    ['Minggu ke (ISO)', '=ISOWEEKNUM(TODAY())'],
+    ['Sisa hari kalender', '=DAYS(B3, TODAY())']
+]);
+jadwal.setColProps('B', { format: { type: 'date', pattern: 'dddd, d MMM yyyy' } });
+jadwal.setStyle('B4, B6:B7', { format: { type: 'number', decimals: 0 } });
+for (let r = 3; r <= 7; r++) console.log(String(jadwal.value('A' + r)).padEnd(19), ':', jadwal.display('B' + r).text);
+
+// ---- kwitansi termin: nominal dan terbilang
+const kw = wb.sheet(wb.addSheet('Kwitansi'));
+kw.setValues('A1', [
+    ['Nilai kontrak', 1250000000],
+    ['Progres termin 2', 0.35],
+    ['Dibayar', '=ROUND(B1*B2, 0)'],
+    ['Terbilang', '=PROPER(TERBILANG(B3)) & " Rupiah"']
+]);
+console.log('dibayar        :', kw.value('B3'));
+console.log('terbilang      :', kw.value('B4'));
+
+// ---- pembiayaan: cicilan alat berat dan kelayakan proyek
+const uang = wb.sheet(wb.addSheet('Keuangan'));
+uang.setValues('A1', [
+    ['Harga excavator', 1500000000], ['Bunga per bulan', 0.009], ['Tenor (bulan)', 36], ['Cicilan', '=PMT(B2, B3, -B1)'],
+    ['Arus kas proyek', -500000000], [null, 180000000], [null, 220000000], [null, 260000000],
+    ['IRR', '=IRR(B5:B8)'], ['NPV 10%', '=NPV(10%, B6:B8) + B5']
+]);
+console.log('cicilan/bulan  :', Math.round(uang.value('B4')), '| IRR', (uang.value('B9') * 100).toFixed(2) + '%', '| NPV', Math.round(uang.value('B10')));
+
+// ---- rekap dinamis: OFFSET dan INDIRECT
+uang.setValues('D1', [['Bulan ke', 3], ['Arus kas bulan itu', '=OFFSET(B5, E1 - 1, 0)'], ['Dari sheet lain', '=INDIRECT("AHSP!B7")']]);
+console.log('OFFSET         :', uang.value('E2'), '| INDIRECT', uang.value('E3'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 05-konstruksi.js -->
+```text
+harga satuan   : 1157320 -> dibulatkan 1157000 | bahan saja 918070
+Selesai             : Kamis, 29 Okt 2026
+Hari kerja Oktober  : 21
+Akhir bulan termin  : Senin, 30 Nov 2026
+Minggu ke (ISO)     : 44
+Sisa hari kalender  : 2
+dibayar        : 437500000
+terbilang      : Empat Ratus Tiga Puluh Tujuh Juta Lima Ratus Ribu Rupiah
+cicilan/bulan  : 48966129 | IRR 14.30% | NPV 40796394
+OFFSET         : 220000000 | INDIRECT 1157320
+```
+<!-- /hasil -->
+
+**Range di dalam hitungan.** `=SUM(B2:B6*D2:D6)` mengalikan kedua range baris demi baris, lalu menjumlahkannya. Ini berlaku untuk semua tanda hitung
+dan perbandingan. Perbandingan menghasilkan `TRUE`/`FALSE` per baris, yang dihitung 1 dan 0 kalau dikali, jadi syarat bisa ditulis langsung:
+`=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)` hanya menjumlahkan baris yang satuannya bukan OH. Range yang ukurannya berbeda menghasilkan `#N/A`. Hasil
+seperti ini yang ditulis sendirian di satu sel (`=A2:A9*2`) menampilkan nilai pertamanya saja.
+
+`OFFSET` dan `INDIRECT` dihitung ulang setiap ada perubahan, karena sel yang dibacanya baru diketahui saat dihitung. Excel juga begitu. Pakai secukupnya
+di sheet yang sangat besar.
+
+`TERBILANG` tidak ada di Excel. Di file `.xlsx` hasilnya ikut tersimpan, jadi teksnya tampil saat dibuka di Excel, tetapi kalau Excel menghitung ulang
+sel itu, hasilnya `#NAME?`.
+
+## 5.13 Semua fungsi: buat apa, cara pakai, hasilnya
 
 Setiap fungsi dengan satu contoh. Hasilnya dihitung oleh library ini dari tabel contoh di bawah, jadi yang tertulis di sini adalah hasil sungguhan.
 Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokumentasi gagal.
@@ -376,412 +980,16 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 Fungsi yang belum tersedia antara lain `NA`, `WORKDAY.INTL`, `FILTER`, `SORT`, `UNIQUE` (fungsi yang hasilnya tumpah ke banyak sel), konstanta array
 seperti `{1,2,3}`, dan `IMPORTRANGE`. Rumus dengan nama yang tidak ada menampilkan `#NAME?`.
 
-## 5.9 Rumus dari kode
+## 5.14 Yang sering keliru
 
-Bagian ini untuk developer. Nota di atas dibuat dengan kode ini:
-
-<!-- contoh: 05-nota.page.js -->
-```jsx
-import { useState } from 'react';
-import { Sheet } from '@kufayeka/sheet';
-import { createWorkbook } from '@kufayeka/sheet/core';
-import '@kufayeka/sheet/style.css';
-
-// Nota belanja: semua yang dibahas di bagian dasar bab rumus ada di sini.
-export function buatNota() {
-    const wb = createWorkbook();
-    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-    const s = wb.sheet('Sheet1');
-    s.setSheetProps({ name: 'Nota' });
-    s.setValues('A1', [
-        ['Produk', 'Harga', 'Qty', 'Jumlah'],
-        ['Semen 50 kg', 72000, 10, '=B2*C2'],
-        ['Besi 10 mm', 79500, 5, '=B3*C3'],
-        ['Cat 5 kg', 145000, 2, '=B4*C4'],
-        ['Subtotal', null, null, '=SUM(D2:D4)'],
-        ['PPN', 0.11, null, '=D5*$B$6'],
-        ['Total', null, null, '=D5+D6'],
-        ['Terbilang', '=PROPER(TERBILANG(D7)) & " Rupiah"']
-    ]);
-    s.setValues('F1', [['Coba sendiri'], ['=2+3']]);
-    s.setStyle('A1:D1', { bold: true, fill: '#e8f0fe' });
-    s.setStyle('A5:D7', { bold: true });
-    s.setStyle('B6', { format: { type: 'percent', decimals: 0 } });
-    s.setStyle('F1', { bold: true, color: '#5f6368' });
-    s.setColProps('B', { format: { type: 'money', decimals: 0 } });
-    s.setColProps('D', { format: { type: 'money', decimals: 0 }, width: 130 });
-    s.setColProps('A', { width: 120 });
-    return wb;
-}
-
-export default function Nota() {
-    const [wb] = useState(buatNota);
-    return <div style={{ height: 380 }}><Sheet workbook={wb} /></div>;
-}
-```
-<!-- /contoh -->
-
-Dari kode, rumus ditulis dengan `setValues` seperti mengetik di sel: teks yang diawali `=` menjadi rumus. Hasilnya dibaca dengan `value`, dan rumusnya
-dengan `input`. Contoh yang lebih lengkap, dengan sheet lain, `fillBlock`, dan sheet yang diganti nama:
-
-<!-- contoh: 05-rumus.js -->
-```js
-import { createWorkbook, fillBlock } from '@kufayeka/sheet/core';
-import { PRODUK, KOLOM_PRODUK } from './data/toko.js';
-
-// Nota penjualan yang mengambil harga dari sheet Produk dan tarif PPN dari sheet Pengaturan.
-// now: jam untuk TODAY() dan NOW(), dipatok supaya hasil contoh ini selalu sama
-const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27, 9, 30) });
-wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-
-const produk = wb.sheet(wb.addSheet('Produk'));
-produk.setValues('A1', [KOLOM_PRODUK, ...PRODUK]);
-const atur = wb.sheet(wb.addSheet('Pengaturan'));
-atur.setValues('A1', [['PPN', 0.11], ['Jatuh tempo (hari)', 14]]);
-
-const nota = wb.sheet('Sheet1');
-nota.setSheetProps({ name: 'Nota' });
-nota.setValues('A1', [
-    ['Kode', 'Produk', 'Qty', 'Harga', 'Jumlah', 'PPN'],
-    ['SMN-01', '=XLOOKUP(A2, Produk!$A$2:$A$13, Produk!$B$2:$B$13, "?")', 40, '=XLOOKUP(A2, Produk!$A:$A, Produk!$F:$F)', '=C2*D2', '=E2*Pengaturan!$B$1']
-]);
-nota.setValues('A3', [['BSI-13', null, 25], ['CAT-05', null, 6], ['XXX-99', null, 1]]);
-
-// fill handle dari kode: rumus diulang ke bawah. Bagian tanpa $ ikut bergeser, yang ber-$ tetap. Kolom Qty (C) tidak ikut, karena angka
-// yang di-fill menjadi deret (40, 41, 42), sama seperti menarik fill handle di layar
-fillBlock(wb, 'Nota', 'B2', 'B3:B5', 'down');
-fillBlock(wb, 'Nota', 'D2:F2', 'D3:F5', 'down');
-console.log('rumus B3      :', nota.input('B3'));
-console.log('rumus F4      :', nota.input('F4'));
-console.log('produk        :', [2, 3, 4, 5].map((r) => nota.value('B' + r)).join(' | '));
-console.log('jumlah        :', [2, 3, 4, 5].map((r) => { const v = nota.value('E' + r); return v.code || v; }).join(' | '));
-
-nota.setValues('A7', [
-    ['Subtotal', null, null, null, '=SUMIF(A2:A5, "<>XXX-99", E2:E5)'],
-    ['PPN', null, null, null, '=ROUND(E7*Pengaturan!B1, 0)'],
-    ['Total', null, null, null, '=E7+E8'],
-    ['Ringkas', '="Total " & ROUND(E9/1000000, 1) & " juta, " & COUNTIF(D2:D5, ">0") & " barang"'],
-    ['Tanggal', '=TODAY()', 'Jatuh tempo', '=B11+Pengaturan!B2', 'Sisa hari', '=D11-TODAY()']
-]);
-console.log('subtotal      :', nota.value('E7'), '| PPN', nota.value('E8'), '| total', nota.value('E9'));
-console.log('teks          :', nota.value('B10'));
-console.log('tanggal       :', nota.value('B11'), '(27 Okt 2026) | jatuh tempo', nota.value('D11'), '| sisa', nota.value('F11'), 'hari');
-
-// sheet diganti nama, tarif PPN diubah: semua rumus ikut
-wb.setSheetProps('Pengaturan', { name: 'Atur Toko' });
-atur.setValues('B1', 0.12);
-console.log('setelah ubah  :', nota.input('E8'), '=', nota.value('E8'));
-```
-<!-- /contoh -->
-
-<!-- hasil: 05-rumus.js -->
-```text
-rumus B3      : =XLOOKUP(A3, Produk!$A$2:$A$13, Produk!$B$2:$B$13, "?")
-rumus F4      : =E4*Pengaturan!$B$1
-produk        : Semen Portland 50 kg | Besi beton 13 mm | Cat tembok 5 kg putih | ?
-jumlah        : 2880000 | 3200000 | 870000 | #N/A
-subtotal      : 6950000 | PPN 764500 | total 7714500
-teks          : Total 7.7 juta, 3 barang
-tanggal       : 46322 (27 Okt 2026) | jatuh tempo 46336 | sisa 14 hari
-setelah ubah  : =ROUND(E7*'Atur Toko'!B1, 0) = 834000
-```
-<!-- /hasil -->
-
-| Fungsi | Artinya |
+| Keliru | Benar |
 |---|---|
-| `setValues(alamat, '=…')` | tulis rumus |
-| `value(alamat)` | hasilnya. Error berupa `{ code }`, cek dengan `isError` |
-| `input(alamat)` | rumusnya sebagai teks, seperti di formula bar |
-| `fillBlock(wb, sheet, sumber, tujuan, arah)` | fill handle dari kode |
-| `FUNCTION_NAMES` | nama semua fungsi |
-
-Hanya rumus yang terkena sebuah perubahan yang dihitung ulang, jadi mengubah satu sel di sheet 100.000 baris tetap cepat. `TODAY()` dan `NOW()` dihitung
-ulang setiap ada perubahan, atau saat `wb.tick()` dipanggil. Opsi `now` di `createWorkbook` mengganti jamnya, misalnya untuk test. Rumus di sel yang
-formatnya uang dibulatkan ke desimal formatnya, supaya total tidak meleset sepeser pun dari yang tampil.
-
-## 5.10 Laporan dengan rumus
-
-Ringkasan 300 transaksi per cabang dan per minggu, semuanya dengan rumus. Transaksi baru masuk, laporannya ikut berubah:
-
-<!-- contoh: 05-laporan.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-import { penjualan, KOLOM_PENJUALAN, barisPenjualan, CABANG } from './data/toko.js';
-
-// Laporan bulanan dari 300 transaksi: ringkasan per cabang, per kategori, dan per minggu, hanya dengan rumus.
-const wb = createWorkbook();
-wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-const jual = wb.sheet('Sheet1');
-jual.setSheetProps({ name: 'Penjualan' });
-jual.setValues('A1', [KOLOM_PENJUALAN]);
-jual.setValues('A2', barisPenjualan(penjualan(300), 2));      // A2:K301, kolom K = Qty x Harga x (1 - Diskon)
-
-const lap = wb.sheet(wb.addSheet('Laporan'));
-// ---- per cabang: omzet, transaksi, rata-rata, transaksi terbesar, pangsa, peringkat
-lap.setValues('A1', [['Cabang', 'Omzet', 'Transaksi', 'Rata-rata', 'Terbesar', 'Pangsa', 'Peringkat', 'Nilai']]);
-lap.setValues('A2', CABANG.map((c, i) => {
-    const r = i + 2;
-    return [c,
-        `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r})`,
-        `=COUNTIFS(Penjualan!$C$2:$C$301, A${r})`,
-        `=ROUND(AVERAGEIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r}), 0)`,
-        `=MAXIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, A${r})`,
-        `=B${r}/SUM($B$2:$B$4)`,
-        `=RANK(B${r}, $B$2:$B$4)`,
-        `=IFS(F${r}>=0.4, "A", F${r}>=0.25, "B", TRUE, "C")`];
-}));
-lap.setValues('A5', [['Total', '=SUM(B2:B4)', '=SUM(C2:C4)', '=ROUND(B5/C5, 0)', '=MAX(E2:E4)', '=SUM(F2:F4)']]);
-for (let r = 2; r <= 5; r++) {
-    const v = (c) => lap.value(c + r);
-    console.log(String(v('A')).padEnd(9), 'omzet', String(v('B')).padStart(9), '| trx', v('C'), '| rata2', v('D'), '| max', v('E'),
-        '| pangsa', (v('F') * 100).toFixed(1) + '%', r < 5 ? '| #' + v('G') + ' ' + v('H') : '');
-}
-
-// ---- jawaban satu sel: INDEX + MATCH, XLOOKUP + LARGE, teks yang digabung
-lap.setValues('A7', [
-    ['Cabang terbaik', '=INDEX(A2:A4, MATCH(MAX(B2:B4), B2:B4, 0))'],
-    ['Omzet kedua', '=XLOOKUP(LARGE(B2:B4, 2), B2:B4, A2:A4)'],
-    ['Diskon diberikan', '=COUNTIF(Penjualan!J2:J301, ">0") & " transaksi"'],
-    ['Qty terbanyak', '=MAX(Penjualan!H2:H301) & " x " & INDEX(Penjualan!F2:F301, MATCH(MAX(Penjualan!H2:H301), Penjualan!H2:H301, 0))'],
-    ['Semua cabang', '=TEXTJOIN(", ", TRUE, A2:A4)']
-]);
-for (let r = 7; r <= 11; r++) console.log(String(lap.value('A' + r)).padEnd(17), ':', lap.value('B' + r).code || lap.value('B' + r));
-
-// ---- per minggu: tanggal dihitung dari nomor hari, WEEKDAY dan selisih tanggal
-lap.setValues('D7', [['Minggu', 'Dari', 'Sampai', 'Omzet']]);
-lap.setValues('D8', [1, 2, 3, 4, 5].map((w, i) => [w, `=DATE(2026, 10, 1) + ${i * 7}`, `=MIN(E${i + 8} + 6, DATE(2026, 10, 31))`,
-    `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$B$2:$B$301, ">=" & E${i + 8}, Penjualan!$B$2:$B$301, "<=" & F${i + 8})`]));
-lap.setColProps('E:F', { format: { type: 'date' } });
-lap.setValues('D13', [['Cek', '=SUM(G8:G12)=B5', 'Hari pertama', '=WEEKDAY(E8, 2)']]);
-for (let r = 8; r <= 12; r++) console.log('minggu', lap.value('D' + r), lap.display('E' + r).text, '-', lap.display('F' + r).text, ':', lap.value('G' + r));
-console.log('jumlah 5 minggu = total omzet:', lap.value('E13'), '| 1 Oktober 2026 hari ke', lap.value('G13'), '(Senin = 1, jadi Kamis)');
-```
-<!-- /contoh -->
-
-<!-- hasil: 05-laporan.js -->
-```text
-Jakarta   omzet 264052400 | trx 129 | rata2 2046918 | max 12495000 | pangsa 42.6% | #1 A
-Bandung   omzet 187095250 | trx 86 | rata2 2175526 | max 12495000 | pangsa 30.2% | #2 B
-Surabaya  omzet 169305500 | trx 85 | rata2 1991829 | max 11760000 | pangsa 27.3% | #3 B
-Total     omzet 620453150 | trx 300 | rata2 2068177 | max 12495000 | pangsa 100.0% 
-Cabang terbaik    : Jakarta
-Omzet kedua       : Bandung
-Diskon diberikan  : 46 transaksi
-Qty terbanyak     : 27 x Semen Portland 50 kg
-Semua cabang      : Jakarta, Bandung, Surabaya
-minggu 1 01/10/2026 - 07/10/2026 : 143905350
-minggu 2 08/10/2026 - 14/10/2026 : 138327500
-minggu 3 15/10/2026 - 21/10/2026 : 142789900
-minggu 4 22/10/2026 - 28/10/2026 : 151715250
-minggu 5 29/10/2026 - 31/10/2026 : 43715150
-jumlah 5 minggu = total omzet: true | 1 Oktober 2026 hari ke 4 (Senin = 1, jadi Kamis)
-```
-<!-- /hasil -->
-
-Yang dipakai: `SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, dan `MAXIFS` untuk total dengan syarat, `$` di penyebut pangsa, `INDEX` + `MATCH` dan `XLOOKUP` +
-`LARGE` untuk "siapa yang terbesar", dan `">=" & tanggal` untuk menjumlah per periode. Semua range di satu `SUMIFS` harus sama panjang.
-
-## 5.11 Named range dan SUBTOTAL
-
-**Named range** adalah nama untuk sebuah range. `=SUMIFS(Omzet, Cabang, "Bandung")` lebih mudah dibaca daripada
-`=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`. **SUBTOTAL** menjumlah tanpa menghitung subtotal lain di dalam range-nya, dan bisa
-melewati baris yang disembunyikan:
-
-<!-- contoh: 05-nama-subtotal.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
-
-// Named range: rumus laporan yang terbaca seperti kalimat. SUBTOTAL: total yang menghormati filter dan tidak terhitung dua kali.
-const wb = createWorkbook();
-const jual = wb.sheet('Sheet1');
-jual.setSheetProps({ name: 'Penjualan' });
-jual.setValues('A1', [KOLOM_PENJUALAN]);
-jual.setValues('A2', barisPenjualan(penjualan(300), 2));
-
-// ---- nama untuk kolom data, dan untuk satu sel tarif
-wb.addName('Cabang', 'Penjualan', 'C2:C301');
-wb.addName('Kategori', 'Penjualan', 'G2:G301');
-wb.addName('Omzet', 'Penjualan', 'K2:K301');
-const lap = wb.sheet(wb.addSheet('Laporan'));
-lap.setValues('A1', [
-    ['Omzet Bandung', '=SUMIFS(Omzet, Cabang, "Bandung")'],
-    ['Omzet semen', '=SUMIFS(Omzet, Kategori, "Semen")'],
-    ['Komisi sales', '=ROUND(B1 * Komisi, 0)']
-]);
-console.log('rumus             :', lap.input('B1'));
-console.log('omzet Bandung     :', lap.value('B1'), '| semen', lap.value('B2'));
-console.log('komisi (belum ada):', lap.value('B3').code, '<- nama Komisi belum dibuat');
-lap.setValues('D1', [['Tarif komisi', 0.015]]);
-wb.addName('Komisi', 'Laporan', 'E1');
-console.log('komisi            :', lap.value('B3'), '<- rumus jalan begitu namanya ada');
-
-// ---- nama diganti: semua rumus ikut menulis nama baru. Range-nya diperluas: semua rumus ikut menghitung baris baru
-const id = wb.names().find((n) => n.name === 'Omzet').id;
-wb.setName(id, { name: 'Total' });
-console.log('ganti nama        :', lap.input('B1'));
-jual.setValues('A302', barisPenjualan([{ No: 301, Tanggal: 46325, Cabang: 'Bandung', Sales: 'Asep', Kode: 'PSR-01', Produk: 'Pasir beton', Kategori: 'Pasir', Qty: 10, Harga: 290000, Diskon: 0 }], 302));
-wb.setName(id, { range: 'K2:K302' });
-wb.setName(wb.names().find((n) => n.name === 'Cabang').id, { range: 'C2:C302' });
-wb.setName(wb.names().find((n) => n.name === 'Kategori').id, { range: 'G2:G302' });   // range yang dipakai bersama di SUMIFS harus sama panjang
-console.log('baris baru masuk  :', lap.value('B1'), '(+2.900.000)');
-console.log('semua nama        :', wb.names().map((n) => n.name + ' = ' + n.ref).join(', '));
-console.log('nama tidak boleh  :', JSON.stringify(wb.nameProblem('A1')), '|', JSON.stringify(wb.nameProblem('Total')));
-
-// ---- SUBTOTAL: kelompok kategori di sheet Rekap, total per kelompok, total akhir yang tidak menghitung subtotal
-const rekap = wb.sheet(wb.addSheet('Rekap'));
-rekap.setValues('A1', [
-    ['Kategori / cabang', 'Omzet'],
-    ['Semen', '=SUBTOTAL(9, B3:B5)'],
-    ['  Jakarta', '=SUMIFS(Total, Kategori, "Semen", Cabang, "Jakarta")'],
-    ['  Bandung', '=SUMIFS(Total, Kategori, "Semen", Cabang, "Bandung")'],
-    ['  Surabaya', '=SUMIFS(Total, Kategori, "Semen", Cabang, "Surabaya")'],
-    ['Besi', '=SUBTOTAL(9, B7:B9)'],
-    ['  Jakarta', '=SUMIFS(Total, Kategori, "Besi", Cabang, "Jakarta")'],
-    ['  Bandung', '=SUMIFS(Total, Kategori, "Besi", Cabang, "Bandung")'],
-    ['  Surabaya', '=SUMIFS(Total, Kategori, "Besi", Cabang, "Surabaya")'],
-    ['Semen + besi', '=SUBTOTAL(9, B2:B9)'],
-    ['SUM biasa', '=SUM(B2:B9)']
-]);
-console.log('SUBTOTAL vs SUM   :', rekap.value('B10'), 'vs', rekap.value('B11'), '<- SUM menghitung subtotal dua kali');
-
-// baris yang disembunyikan: 9 tetap menghitungnya, 109 tidak. Baris yang disaring filter tidak dihitung keduanya
-rekap.setRowProps('4', { hidden: true });
-rekap.setValues('C10', [['=SUBTOTAL(109, B2:B9)']]);
-console.log('Bandung semen disembunyikan :', rekap.value('B10'), '(9) |', rekap.value('C10'), '(109)');
-rekap.setRowProps('4', { hidden: null });
-rekap.createFilter('A1:B9');
-rekap.setFilterColumn('A', { hidden: ['  Surabaya'] });
-console.log('filter tanpa Surabaya       :', rekap.value('B10'), '(9) |', rekap.value('C10'), '(109)');
-```
-<!-- /contoh -->
-
-<!-- hasil: 05-nama-subtotal.js -->
-```text
-rumus             : =SUMIFS(Omzet, Cabang, "Bandung")
-omzet Bandung     : 187095250 | semen 97448800
-komisi (belum ada): #NAME? <- nama Komisi belum dibuat
-komisi            : 2806429 <- rumus jalan begitu namanya ada
-ganti nama        : =SUMIFS(Total, Cabang, "Bandung")
-baris baru masuk  : 189995250 (+2.900.000)
-semua nama        : Cabang = Penjualan!C2:C302, Kategori = Penjualan!G2:G302, Total = Penjualan!K2:K302, Komisi = Laporan!E1
-nama tidak boleh  : "\"A1\" is the address of a cell, not a name" | "there is a named range \"Total\" already"
-SUBTOTAL vs SUM   : 140157500 vs 280315000 <- SUM menghitung subtotal dua kali
-Bandung semen disembunyikan : 140157500 (9) | 111629100 (109)
-filter tanpa Surabaya       : 104075000 (9) | 104075000 (109)
-```
-<!-- /hasil -->
-
-- Rumus boleh ditulis sebelum namanya dibuat: hasilnya `#NAME?` sampai nama itu ada.
-- Mengganti nama membuat semua rumus menulis nama baru. Memperluas range sebuah nama membuat semua rumus ikut menghitung range baru.
-- Nama tidak boleh berupa alamat sel. `PPN2026` adalah alamat (kolom PPN, baris 2026), jadi pakai `Tarif_PPN`.
-- Di layar: Data → Named ranges.
-
-| Fungsi | Artinya |
-|---|---|
-| `wb.addName(nama, sheet, range)` | buat nama |
-| `wb.setName(id, { name, sheetId, range })` | ganti nama atau range-nya |
-| `wb.removeName(id)` | hapus nama |
-| `wb.names()` | `[{ id, name, sheetId, range, ref }]` |
-| `wb.nameRange(nama)`, `wb.nameProblem(nama)` | range sebuah nama, dan alasan sebuah nama tidak boleh dipakai |
-
-Angka pertama `SUBTOTAL` memilih fungsinya: 1 `AVERAGE`, 2 `COUNT`, 3 `COUNTA`, 4 `MAX`, 5 `MIN`, 6 `PRODUCT`, 7 `STDEV`, 8 `STDEVP`, 9 `SUM`, 10 `VAR`,
-11 `VARP`. Ditambah 100 (`SUBTOTAL(109, ...)`), baris yang disembunyikan dengan tangan atau grup yang dilipat juga dilewati. Baris yang disaring filter
-selalu dilewati.
-
-## 5.12 Rumus untuk proyek dan keuangan
-
-AHSP, jadwal hari kerja, kwitansi termin, cicilan alat, dan rekap dinamis:
-
-<!-- contoh: 05-konstruksi.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-
-// Rumus yang sering dipakai di RAB, jadwal, dan pembayaran proyek.
-const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27) });
-wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-
-// ---- AHSP: harga satuan = jumlah (koefisien x harga dasar)
-const ahsp = wb.sheet('Sheet1');
-ahsp.setSheetProps({ name: 'AHSP' });
-ahsp.setValues('A1', [
-    ['1 m3 beton K-225', 'Koefisien', 'Satuan', 'Harga dasar'],
-    ['Semen 50 kg', 7.4, 'zak', 72000],
-    ['Pasir beton', 0.499, 'm3', 290000],
-    ['Kerikil', 0.776, 'm3', 310000],
-    ['Pekerja', 1.65, 'OH', 120000],
-    ['Tukang batu', 0.275, 'OH', 150000],
-    ['Harga satuan', '=SUMPRODUCT(B2:B6, D2:D6)'],
-    ['Dibulatkan ke 1.000', '=MROUND(B7, 1000)'],
-    ['Bahan saja', '=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)']
-]);
-console.log('harga satuan   :', ahsp.value('B7'), '-> dibulatkan', ahsp.value('B8'), '| bahan saja', ahsp.value('B9'));
-
-// ---- jadwal: hari kerja (tanpa Sabtu, Minggu, dan tanggal merah)
-const jadwal = wb.sheet(wb.addSheet('Jadwal'));
-jadwal.setValues('A1', [
-    ['Libur', '=DATE(2026,10,28)'],
-    ['Mulai', '=DATE(2026,10,1)', 'Durasi (hari kerja)', 20],
-    ['Selesai', '=WORKDAY(B2, D2 - 1, B1)'],
-    ['Hari kerja Oktober', '=NETWORKDAYS(DATE(2026,10,1), EOMONTH(B2, 0), B1)'],
-    ['Akhir bulan termin', '=EOMONTH(B2, 1)'],
-    ['Minggu ke (ISO)', '=ISOWEEKNUM(TODAY())'],
-    ['Sisa hari kalender', '=DAYS(B3, TODAY())']
-]);
-jadwal.setColProps('B', { format: { type: 'date', pattern: 'dddd, d MMM yyyy' } });
-jadwal.setStyle('B4, B6:B7', { format: { type: 'number', decimals: 0 } });
-for (let r = 3; r <= 7; r++) console.log(String(jadwal.value('A' + r)).padEnd(19), ':', jadwal.display('B' + r).text);
-
-// ---- kwitansi termin: nominal dan terbilang
-const kw = wb.sheet(wb.addSheet('Kwitansi'));
-kw.setValues('A1', [
-    ['Nilai kontrak', 1250000000],
-    ['Progres termin 2', 0.35],
-    ['Dibayar', '=ROUND(B1*B2, 0)'],
-    ['Terbilang', '=PROPER(TERBILANG(B3)) & " Rupiah"']
-]);
-console.log('dibayar        :', kw.value('B3'));
-console.log('terbilang      :', kw.value('B4'));
-
-// ---- pembiayaan: cicilan alat berat dan kelayakan proyek
-const uang = wb.sheet(wb.addSheet('Keuangan'));
-uang.setValues('A1', [
-    ['Harga excavator', 1500000000], ['Bunga per bulan', 0.009], ['Tenor (bulan)', 36], ['Cicilan', '=PMT(B2, B3, -B1)'],
-    ['Arus kas proyek', -500000000], [null, 180000000], [null, 220000000], [null, 260000000],
-    ['IRR', '=IRR(B5:B8)'], ['NPV 10%', '=NPV(10%, B6:B8) + B5']
-]);
-console.log('cicilan/bulan  :', Math.round(uang.value('B4')), '| IRR', (uang.value('B9') * 100).toFixed(2) + '%', '| NPV', Math.round(uang.value('B10')));
-
-// ---- rekap dinamis: OFFSET dan INDIRECT
-uang.setValues('D1', [['Bulan ke', 3], ['Arus kas bulan itu', '=OFFSET(B5, E1 - 1, 0)'], ['Dari sheet lain', '=INDIRECT("AHSP!B7")']]);
-console.log('OFFSET         :', uang.value('E2'), '| INDIRECT', uang.value('E3'));
-```
-<!-- /contoh -->
-
-<!-- hasil: 05-konstruksi.js -->
-```text
-harga satuan   : 1157320 -> dibulatkan 1157000 | bahan saja 918070
-Selesai             : Kamis, 29 Okt 2026
-Hari kerja Oktober  : 21
-Akhir bulan termin  : Senin, 30 Nov 2026
-Minggu ke (ISO)     : 44
-Sisa hari kalender  : 2
-dibayar        : 437500000
-terbilang      : Empat Ratus Tiga Puluh Tujuh Juta Lima Ratus Ribu Rupiah
-cicilan/bulan  : 48966129 | IRR 14.30% | NPV 40796394
-OFFSET         : 220000000 | INDIRECT 1157320
-```
-<!-- /hasil -->
-
-**Range di dalam hitungan.** `=SUM(B2:B6*D2:D6)` mengalikan kedua range baris demi baris, lalu menjumlahkannya. Ini berlaku untuk semua tanda hitung
-dan perbandingan. Perbandingan menghasilkan `TRUE`/`FALSE` per baris, yang dihitung 1 dan 0 kalau dikali, jadi syarat bisa ditulis langsung:
-`=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)` hanya menjumlahkan baris yang satuannya bukan OH. Range yang ukurannya berbeda menghasilkan `#N/A`. Hasil
-seperti ini yang ditulis sendirian di satu sel (`=A2:A9*2`) menampilkan nilai pertamanya saja.
-
-`OFFSET` dan `INDIRECT` dihitung ulang setiap ada perubahan, karena sel yang dibacanya baru diketahui saat dihitung. Excel juga begitu. Pakai secukupnya
-di sheet yang sangat besar.
-
-`TERBILANG` tidak ada di Excel. Di file `.xlsx` hasilnya ikut tersimpan, jadi teksnya tampil saat dibuka di Excel, tetapi kalau Excel menghitung ulang
-sel itu, hasilnya `#NAME?`.
+| Rumus disalin ke bawah, tapi range-nya ikut bergeser | tahan dengan `$`: `$B$6`, `Produk!$A$2:$A$4` (5.5) |
+| Baris baru tidak ikut dijumlah | sisipkan di **dalam** range, bukan di bawahnya ([4.3](04-api-workbook.md#43-menulis-satu-baris)) |
+| `SUMIFS` memberi `#VALUE!` | semua range di satu `SUMIFS` harus sama panjang |
+| Total di sheet beda sepeser dengan yang tampil | sel bertipe uang dibulatkan ke desimal formatnya; pakai `ROUND` kalau perlu pembulatan lain |
+| Nama sheet berspasi di rumus | tulis di antara tanda kutip satu: `='Produk Nov'!E5` |
+| Menghitung dengan teks hasil `display` | pakai `value` (bab 2) |
+| `TODAY()` di tes selalu berubah | beri jam tetap lewat pilihan `now` di `createWorkbook` (bab 2) |
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. API workbook](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)
