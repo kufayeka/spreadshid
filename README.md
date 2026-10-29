@@ -61,7 +61,8 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 9. [Memuat dan menyimpan](docs/09-menyimpan.md): memuat dari API, tombol simpan, simpan otomatis, database, patch, viewFor
 10. [Hak akses](docs/10-hak-akses.md): aturan per baris, role dan akun, tanda di sel, mode pengaturan, server
 11. [Komentar dan Excel](docs/11-komentar-excel.md): komentar di sel, impor dan ekspor xlsx dan CSV
-12. [Performa dan referensi](docs/12-referensi.md): data besar, semua nama, TypeScript
+12. [Chart dan dashboard](docs/12-dashboard.md): chart di atas sel, kurva S, sparkline, data bar, form ke tabel ke dashboard
+13. [Performa dan referensi](docs/13-referensi.md): data besar, semua nama, TypeScript
 
 - [Galeri: satu proyek konstruksi](docs/galeri.md)
 

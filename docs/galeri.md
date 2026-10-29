@@ -60,7 +60,7 @@ hitung ulang semua sheet: kurang dari 50 ms
 ```
 <!-- /hasil -->
 
-Yang dihitung ulang cuma rumus yang memang terkena perubahan itu, bukan seluruh workbook. Karena itu tetap cepat walaupun sheet-nya besar ([bab 12](12-referensi.md#121-contoh-setahun-penjualan)).
+Yang dihitung ulang cuma rumus yang memang terkena perubahan itu, bukan seluruh workbook. Karena itu tetap cepat walaupun sheet-nya besar ([bab 13](13-referensi.md#131-contoh-setahun-penjualan)).
 
 ## Harga dan AHSP
 
@@ -267,6 +267,19 @@ Opname lewat named range `ProgresOpname`), dan deviasi yang merah kalau terlamba
 
 Fitur yang dipakai: rumus dengan `$` campuran untuk diisi ke banyak sel, conditional formatting berbasis rumus, named range antar sheet, freeze baris
 dan kolom, format persen, format angka dengan prefix (`M1`, `M2`, ...), validasi angka antara 1 dan 12.
+
+Kurvanya sendiri bisa digambar **di atas** jadwal ini: chart garis transparan yang titik minggu ke-n-nya jatuh di tengah kolom M-n
+([12.9](12-dashboard.md#129-kurva-s-di-atas-time-schedule)).
+
+![Kurva S transparan di atas time schedule](img/kurva-s.png)
+
+## Dashboard
+
+![Dashboard proyek](img/dashboard.png)
+
+Satu sheet yang isinya hanya rumus dan chart, membaca tabel Progres, Termin, dan PEKTAM: kartu angka, bullet progres terhadap rencana yang
+warnanya menurut deviasi, tagihan termin dengan progres kumulatif di sumbu kedua, donut status PEKTAM, waterfall dari nilai kontrak ke sisa tagih,
+dan tabel dengan data bar dan sparkline tren 8 minggu. Sheet ini dikunci untuk semua orang; angkanya masuk lewat form ([bab 12](12-dashboard.md)).
 
 <!-- contoh: proyek/kurva-s.js -->
 ```js

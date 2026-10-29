@@ -177,6 +177,26 @@ export const SHOTS = [
         await js(`(function(){ var e = document.querySelector('.lihat-sebagai'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'rina'); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
         await wait(400);
     }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
+    // chapter 12: charts and the dashboard
+    { name: 'chart-kolom', page: '12-03-kolom.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 430 } },
+    { name: 'chart-editor', page: '12-03-kolom.page.tsx', act: async ({ js, click, wait }) => {
+        const b = await js(`(function(){ var e = document.querySelector('.ks-chart').getBoundingClientRect(); return { x: Math.round(e.right - 30), y: Math.round(e.top + 30) }; })()`);
+        await click(b.x, b.y); await wait(600);
+    }, clip: { x: 0, y: 0, width: 1366, height: 430 } },
+    { name: 'chart-combo', page: '12-05-combo.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 570 } },
+    { name: 'chart-donut', page: '12-06-donut.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 570 } },
+    { name: 'chart-bullet', page: '12-07-bullet.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 570 } },
+    { name: 'chart-waterfall', page: '12-08-waterfall.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 570 } },
+    { name: 'kurva-s', page: '12-09-kurva-s.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 430 } },
+    { name: 'chart-sparkline', page: '12-10-sparkline.page.tsx', clip: { x: 0, y: 0, width: 1100, height: 360 } },
+    { name: 'chart-form', page: '12-11-form.page.tsx', act: async ({ js, click, type, wait }) => {
+        await js(`(function(){ var s = document.querySelector('.form-progres select'); var set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, 'Jababeka'); s.dispatchEvent(new Event('change', { bubbles: true })); return 0; })()`);
+        const at = (sel) => js(`(function(){ var b = document.querySelector('${sel}').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        let p = await at('.form-progres input'); await click(p.x, p.y); await type('70,5'); await wait(150);
+        p = await at('.form-progres button'); await click(p.x, p.y); await wait(600);
+    }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
+    { name: 'dashboard', page: '12-12-dashboard.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 768 } },
+    { name: 'dashboard-bawah', page: '12-12-dashboard.page.tsx', act: async ({ js, wait }) => { await js("document.querySelector('.ks-grid').scrollTop = 470"); await wait(600); }, clip: { x: 0, y: 0, width: 1366, height: 768 } },
     // chapter 11: comments, as in Excel (a card beside the cell)
     { name: 'komentar-tulis', page: '11-03-tulis.page.tsx', act: async ({ js, click, type, key, wait }) => {
         const p = await cellAt(js, 2, 4); await click(p.x, p.y); await wait(200);

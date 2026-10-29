@@ -1,6 +1,6 @@
 # 11. Komentar dan Excel
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Hak akses](10-hak-akses.md) · Berikutnya: [12. Performa dan referensi](12-referensi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Hak akses](10-hak-akses.md) · Berikutnya: [12. Chart dan dashboard](12-dashboard.md)
 
 Bab ini membahas **komentar di sel**, yaitu tempat orang bertanya dan menjawab soal isi sebuah sel tanpa mengubah isinya, lalu **impor dan ekspor
 Excel dan CSV**. Bagian komentar disusun seperti bab lain: pengenalan tanpa kode, lalu langkah demi langkah dengan halaman React dan foto hasilnya.
@@ -522,4 +522,4 @@ Tampilkan `warnings` kepada orang yang mengimpor, supaya ia tahu apa yang tidak 
 **CSV** hanya membawa teks. `exportCsv` menulis yang tampil di sel (`Rp 64.000`, `420 zak`), dan isi sel yang tersembunyi untuk orang itu ditulis
 kosong. Untuk Excel berbahasa Indonesia, yang memakai koma sebagai tanda desimal, pakai `{ delimiter: ';' }`.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Hak akses](10-hak-akses.md) · Berikutnya: [12. Performa dan referensi](12-referensi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Hak akses](10-hak-akses.md) · Berikutnya: [12. Chart dan dashboard](12-dashboard.md)
