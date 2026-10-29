@@ -317,7 +317,7 @@ Hasilnya, dijalankan di PostgreSQL 18 dengan data contoh di atas:
 Angka yang sama dengan pivot di [7.6](07-data.md#76-pivot-table). Yang perlu diingat:
 
 - **View membaca judul kolom.** Kalau orang mengganti judul "Harga jual" di sheet, view `produk` perlu disesuaikan. Untuk sheet yang dibaca SQL, kunci
-  judulnya dengan aturan `readonly` ([bab 10](10-aturan.md)).
+  judulnya dengan aturan `readonly` ([bab 8](10-aturan.md)).
 - **View hanya untuk membaca.** Menulis tetap lewat spreadsheet: buka, ubah, simpan `content`.
 - Untuk data besar yang sering di-query, ganti `create view` dengan `create materialized view`, lalu `refresh materialized view` setelah menyimpan.
 

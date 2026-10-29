@@ -1016,7 +1016,7 @@ Sejak 13.8, setiap foto memperlihatkan tanda kecil di **pojok kanan atas** sel. 
 
 Tanda ini muncul sendiri, tanpa kode tambahan. Gunanya supaya orang tahu sebelum mencoba mengetik.
 
-Tanda ini juga muncul di sel yang dikunci oleh kode aplikasimu (`setRules`, [bab 10](10-aturan.md)), bukan hanya oleh aturan akses.
+Tanda ini juga muncul di sel yang dikunci oleh kode aplikasimu (`setRules`, [bab 8](10-aturan.md)), bukan hanya oleh aturan akses.
 
 ## 13.25 Variasi tanda
 

@@ -1,6 +1,6 @@
 # 7. Data
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [10. Aturan dan tipe kolom](10-aturan.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [8. Menjaga isi yang diketik](10-aturan.md)
 
 Bab ini membahas cara mengolah tabel data: mengurutkan, menyaring, melipat kelompok baris, meringkas dengan pivot table, dan mencari serta
 mengganti. Semua yang ada di menu Data di layar juga bisa dilakukan dari kode, dan semuanya bisa di-undo. Setiap langkah adalah satu halaman
@@ -778,4 +778,4 @@ semuanya. Fungsi ini mengembalikan jumlah sel yang berubah.
 
 Di layar: Ctrl+F untuk mencari, Ctrl+H untuk mencari dan mengganti.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [10. Aturan dan tipe kolom](10-aturan.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [8. Menjaga isi yang diketik](10-aturan.md)

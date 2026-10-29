@@ -38,7 +38,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `findAll`, `replaceIn` | cari dan ganti | [7.7](07-data.md#77-mencari-dan-mengganti) |
 | `pivot`, `tableOf`, `PIVOT_FUNCTIONS` | ringkasan per kelompok tanpa sheet, dan range sebagai daftar record | [7.6](07-data.md#76-pivot-table) |
 | `populate` | data dari luar ke sheet, tetap sebagai data | [4.5](04-api-workbook.md#45-mengisi-dari-data-api) |
-| `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [10.2](10-aturan.md#102-tipe-kolom) |
+| `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [8.5](10-aturan.md#85-tipe-kolom) |
 | `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [12](12-server.md) |
 | `resolveAccess`, `validateAccess`, `parseWhere`, `ACTIONS`, `ACTION_INFO`, `UI_ITEMS` | access control | [13](13-hak-akses.md) |
 | `exportXlsx`, `importXlsx`, `importXlsxInto` | file `.xlsx` | [15](15-excel.md) |
@@ -58,7 +58,7 @@ Fungsi yang hanya ada di `wb`, bukan di handle sheet:
 | `names`, `addName`, `setName`, `removeName`, `nameRange`, `nameProblem` | named range | [5.11](05-rumus.md#511-named-range) |
 | `undo`, `redo`, `canUndo`, `canRedo`, `apply`, `on`, `revision`, `tick` | perubahan, event, undo | [12.6](12-server.md#126-undo-redo-source-dan-apply) |
 | `toJSON`, `pendingPatch`, `saved`, `unsaved`, `version` | menyimpan | [11.5](11-react.md#115-tombol-simpan), [12](12-server.md) |
-| `setRules` | aturan per sel untuk orang yang membuka | [10.1](10-aturan.md#101-aturan-hanya-baca-dan-tersembunyi) |
+| `setRules` | aturan per sel untuk orang yang membuka | [8.6](10-aturan.md#86-sel-yang-tidak-boleh-diubah) |
 | `setAccess`, `access`, `can`, `shows` | access control | [13](13-hak-akses.md) |
 | `setUser` | ganti orang yang membuka (penulis komentar dan op) | [14](14-komentar.md) |
 | `id` | id workbook | [12.1](12-server.md#123-isi-content) |
@@ -79,7 +79,7 @@ Handle juga punya `id` dan `name`.
 | conditional formatting | `addConditional`, `setConditional`, `moveConditional`, `removeConditional`, `conditionals`, `conditionalStyleAt` | [6.6](06-format.md#66-conditional-formatting) |
 | filter | `createFilter`, `setFilterColumn`, `removeFilter`, `filterOf`, `filterValues`, `filteredOut` | [7.4](07-data.md#74-menyaring) |
 | grup | `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups` | [7.5](07-data.md#75-melipat-kelompok-baris) |
-| validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [10.4](10-aturan.md#104-validasi-data) |
+| validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown) |
 | pivot | `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt` | [7.6](07-data.md#76-pivot-table) |
 | aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [10](10-aturan.md) |
 | komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `resolveComment`, `comments`, `commentAt`, `hasComment` | [14](14-komentar.md) |
@@ -96,7 +96,7 @@ Handle juga punya `id` dan `name`.
 | fungsi rumus | [5.13](05-rumus.md#513-semua-fungsi-buat-apa-cara-pakai-hasilnya) |
 | jenis format dan huruf pola | [6.9](06-format.md#69-referensi) |
 | syarat conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
-| jenis validasi | [10.4](10-aturan.md#104-validasi-data) |
+| jenis validasi | [8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown) |
 | spesifikasi pivot | [7.6](07-data.md#76-pivot-table) |
 | semua isi `action` aturan akses | [13.35](13-hak-akses.md#1335-referensi) |
 | yang ikut dan tidak ke Excel | [15](15-excel.md) |

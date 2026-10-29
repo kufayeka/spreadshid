@@ -65,6 +65,10 @@ export const SHOTS = [
     proyek('proyek-harian', 'Harian 27-10'),
     proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
     proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
+    // chapter 8: keeping what is typed in check
+    { name: 'jaga-batas', page: '08-04-batas.page.tsx', act: enter(1, 3, '20000'), clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'jaga-tipe', page: '08-05-tipe.page.tsx', act: enter(2, 3, '12,5'), clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'jaga-beforeop', page: '08-07-beforeop.page.tsx', act: enter(2, 2, '100'), clip: { x: 0, y: 0, width: 1000, height: 300 } },
     // chapter 7: data
     { name: 'data-sort', page: '07-03-sort.page.tsx', act: press('.nama'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
     { name: 'data-grup-buka', page: '07-05-grup.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 340 } },

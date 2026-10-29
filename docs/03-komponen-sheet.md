@@ -532,7 +532,7 @@ Panel muncul di kanan grid, satu panel pada satu waktu:
 | Comments | View → Comments, Insert → Comment, Ctrl+Alt+M | [14](14-komentar.md) |
 | Pivot table editor | memilih sel pivot, Insert → Pivot table | [7.6](07-data.md#76-pivot-table) |
 | Conditional formatting | Format → Conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
-| Data validation | Data → Data validation, Insert → Dropdown | [10.4](10-aturan.md#104-validasi-data) |
+| Data validation | Data → Data validation, Insert → Dropdown | [8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown) |
 | Named ranges | Data → Named ranges | [5.11](05-rumus.md#511-named-range) |
 | Find and replace | Ctrl+F, Ctrl+H | [7.7](07-data.md#77-mencari-dan-mengganti) |
 

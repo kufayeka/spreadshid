@@ -58,7 +58,7 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 5. [Rumus](docs/05-rumus.md): rumus di layar, rumus dari kode, sheet lain, laporan, named range, 124 fungsi termasuk TERBILANG
 6. [Format](docs/06-format.md): uang, persen, tanggal, satuan, locale, conditional formatting
 7. [Data](docs/07-data.md): mengurutkan, menyaring, melipat grup, pivot table, cari dan ganti
-10. [Aturan dan tipe kolom](docs/10-aturan.md)
+8. [Menjaga isi yang diketik](docs/10-aturan.md): dropdown, batas angka, tipe kolom, sel terkunci, beforeOp
 11. [Memakai di React](docs/11-react.md): langkah demi langkah, useWorkbook, memuat, menyimpan, Next.js
 12. [Menyimpan ke server](docs/12-server.md): dari sheet ke tabel database, patch, viewFor
 13. [Hak akses](docs/13-hak-akses.md)

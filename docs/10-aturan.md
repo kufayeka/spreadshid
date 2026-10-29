@@ -1,104 +1,170 @@
-# 10. Aturan dan tipe kolom
+# 8. Menjaga isi yang diketik
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [11. Memakai di React](11-react.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Menyimpan ke server](12-server.md)
 
-Dua cara aplikasimu menjaga isi sheet:
+Bab ini membahas cara menjaga supaya yang diketik orang masuk akal: pilihan dari daftar, angka dengan batas, kolom yang hanya menerima bilangan
+bulat, sel yang tidak boleh diubah, dan aturan bisnis yang membaca sel lain. Setiap langkah adalah satu halaman React dengan foto hasilnya.
 
-- **Aturan** (`setRules`): sel mana yang hanya boleh dibaca dan isi mana yang disembunyikan, untuk orang yang sedang membuka sheet. Misalnya kasir tidak
-  boleh melihat harga beli dan tidak boleh mengubah harga jual.
-- **Tipe kolom** (`setTypes`): jenis nilai yang boleh masuk ke setiap kolom, sama dengan kolom tabel di database. Stok harus bilangan bulat, kategori harus
-  salah satu dari daftar.
+**Bagian A. Pengenalan (tanpa kode)**
+- [8.1 Empat cara menjaga isi](#81-empat-cara-menjaga-isi)
+- [8.2 Kapan diperiksa](#82-kapan-diperiksa)
 
-Keduanya datang dari kode aplikasimu, bukan dari isi file. Aturan dan tipe tidak ikut disimpan dan tidak masuk undo, karena aturan yang sama dipasang lagi
-setiap kali sheet dibuka, menurut siapa yang membukanya. Pemeriksaan yang sama juga berjalan di server ([bab 12](12-server.md)), jadi orang yang mengakali
-browser tetap ditolak saat menyimpan.
+**Bagian B. Langkah demi langkah**
+- [8.3 Pilihan dari daftar (dropdown)](#83-pilihan-dari-daftar-dropdown)
+- [8.4 Angka dengan batas](#84-angka-dengan-batas)
+- [8.5 Tipe kolom](#85-tipe-kolom)
+- [8.6 Sel yang tidak boleh diubah](#86-sel-yang-tidak-boleh-diubah)
+- [8.7 Aturan yang membaca sel lain: `beforeOp`](#87-aturan-yang-membaca-sel-lain-beforeop)
 
-Untuk mengatur **siapa boleh melakukan apa** secara lengkap (menghapus baris, memakai menu tertentu, melihat sheet tertentu), lihat access control di
-[bab 13](13-hak-akses.md). Aturan di bab ini adalah bagian per sel dari access control itu.
+**Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
+- [8.8 Contoh lengkap](#88-contoh-lengkap)
+- [8.9 Yang sering keliru](#89-yang-sering-keliru)
+- [8.10 Referensi](#810-referensi)
 
-- [10.1 Aturan: hanya baca dan tersembunyi](#101-aturan-hanya-baca-dan-tersembunyi)
-- [10.2 Tipe kolom](#102-tipe-kolom)
-- [10.3 `beforeOp`: memeriksa setiap perubahan](#103-beforeop-memeriksa-setiap-perubahan)
-- [10.4 Validasi data](#104-validasi-data)
+---
 
-## 10.1 Aturan: hanya baca dan tersembunyi
+# Bagian A. Pengenalan
 
-Daftar produk yang dibuka kasir:
+## 8.1 Empat cara menjaga isi
 
-<!-- contoh: 10-aturan.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-import { PRODUK, KOLOM_PRODUK } from './data/toko.js';
+| Cara | Untuk | Disimpan di file? | Diperiksa ulang di server? | Langkah |
+|---|---|---|---|---|
+| **Validasi data** | dropdown, checkbox, angka atau tanggal dengan batas, panjang teks, email | ya, ikut file (dan Excel) | ya | 8.3, 8.4 |
+| **Tipe kolom** | jenis nilai satu kolom, seperti kolom tabel database: bilangan bulat, desimal, tanggal, salah satu dari daftar | tidak, dipasang kodemu setiap kali dibuka | ya | 8.5 |
+| **Aturan sel** | sel yang hanya boleh dibaca, atau isinya disembunyikan | tidak, dipasang kodemu | ya | 8.6 |
+| **`beforeOp`** | aturan bisnis yang membaca sel lain ("qty tidak boleh melebihi stok"), atau mengubah isian (kode jadi huruf besar) | tidak, fungsi di kodemu | tidak, jalankan juga di server kalau perlu | 8.7 |
 
-// Daftar produk yang dibuka kasir: harga beli tidak boleh terlihat, harga jual hanya boleh dibaca, produk yang dihentikan terkunci seluruhnya.
-// Kasir hanya boleh mengubah stok dan status.
-export function buatProdukKasir() {
-    const wb = createWorkbook();
-    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-    const p = wb.sheet('Sheet1');
-    p.setSheetProps({ name: 'Produk', freezeRows: 1 });
-    p.setValues('A1', [[...KOLOM_PRODUK, 'Status'], ...PRODUK.map((x, i) => [...x, i === 7 ? 'Dihentikan' : 'Aktif'])]);
-    p.setStyle('A1:I1', { bold: true, fill: '#e8f0fe' });
-    p.setColProps('E:F', { format: { type: 'money', decimals: 0 } });
-    p.setColProps('B', { width: 180 });
+Mulailah dari atas. Kalau validasi data sudah cukup, tidak perlu yang lain. `beforeOp` adalah pintu terakhir untuk yang tidak bisa ditulis dengan
+tiga cara lainnya.
 
-    // aturan dari backend untuk peran "kasir". Kolom disebut menurut judulnya, jadi tetap benar walau kolom dipindah
-    wb.setRules([
-        { sheet: 'Produk', columns: ['Harga beli'], mode: 'hidden' },
-        { sheet: 'Produk', columns: ['Kode', 'Nama produk', 'Kategori', 'Satuan', 'Harga jual', 'Stok min.'], mode: 'readonly',
-            message: 'Data produk diatur bagian pembelian' },
-        { sheet: 'Produk', range: 'A2:I1000', when: '=$I2="Dihentikan"', mode: 'readonly', message: 'Produk ini sudah dihentikan' }
-    ]);
-    return wb;
+Untuk mengatur **siapa** boleh mengubah apa (kasir, gudang, pemilik), pakai hak akses ([bab 10](13-hak-akses.md)). Aturan sel di 8.6 adalah
+bagian per sel dari hak akses itu, tanpa membedakan orang.
+
+## 8.2 Kapan diperiksa
+
+Semua pemeriksaan di bab ini berlaku untuk perubahan dari **orang** (`source: 'user'`, bab 2): yang diketik, di-paste, di-fill, atau di-drag.
+Perubahan dari kodemu sendiri tidak diperiksa, karena kodemu dipercaya. Kalau sebuah perubahan dari kode mewakili isian orang, misalnya dari
+formulir di luar sheet, tambahkan `{ source: 'user' }`.
+
+Perubahan yang ditolak tidak masuk ke sheet: sel tetap berisi nilai lama, pesannya tampil di layar, dan event `reject` memberi tahu aplikasimu.
+
+---
+
+# Bagian B. Langkah demi langkah
+
+## 8.3 Pilihan dari daftar (dropdown)
+
+**Tujuan:** sel yang isinya dipilih dari daftar, dan tanda di sel yang isinya salah.
+
+<!-- contoh: 07-validasi.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatPesanan } from './07-validasi.js';
+
+export default function HalamanPesanan() {
+    const [wb] = useState(buatPesanan);
+    return <div style={{ height: 500 }}><Sheet workbook={wb} /></div>;
 }
-
-const wb = buatProdukKasir();
-const p = wb.sheet('Produk');
-const ditolak = [];
-wb.on('reject', (e) => ditolak.push(e.reason));
-const kasir = { source: 'user' };                            // yang diketik kasir di layar
-
-p.setValues('G2', 400, kasir);                               // stok: boleh
-p.setValues('F2', 1, kasir);                                 // harga jual: ditolak
-p.setValues('G9', 30, kasir);                                // stok produk yang dihentikan: ditolak
-p.setValues('I3', 'Dihentikan', kasir);                      // status: boleh, dan baris itu langsung terkunci
-p.setValues('G3', 50, kasir);
-console.log('stok G2, G3   :', p.value('G2'), p.value('G3'));
-console.log('ditolak       :');
-for (const alasan of ditolak) console.log('  -', alasan);
-
-console.log('mode sel      :', ['E2', 'F2', 'G2', 'G9'].map((a) => a + ' ' + ((p.modeAt(a) || {}).mode || 'bebas')).join(' | '));
-console.log('harga beli E2 :', p.display('E2').text, '| input', JSON.stringify(p.input('E2')), '| judul E1 tetap:', p.display('E1').text);
-
-// kode aplikasi sendiri tidak dihalangi aturan: misalnya sinkron harga dari sistem pembelian
-p.setValues('F2', 75000);
-console.log('dari kode     :', p.display('F2').text);
-
-// aturan bukan bagian workbook: tidak disimpan, tidak masuk undo, diganti utuh oleh setRules berikutnya
-console.log('isi toJSON    :', Object.keys(wb.toJSON()).join(', '), '(aturan tidak ikut)');
-wb.setRules([]);                                             // peran manajer: tanpa aturan
-console.log('manajer       :', p.display('E2').text, '| mode F2', p.modeAt('F2'));
 ```
 <!-- /contoh -->
 
-<!-- hasil: 10-aturan.js -->
-```text
-stok G2, G3   : 400 35
-ditolak       :
-  - Data produk diatur bagian pembelian
-  - Produk ini sudah dihentikan
-  - Produk ini sudah dihentikan
-mode sel      : E2 hidden | F2 readonly | G2 bebas | G9 readonly
-harga beli E2 : ••• | input "" | judul E1 tetap: Harga beli
-dari kode     : Rp 75.000
-isi toJSON    : id, version, settings, sheets (aturan tidak ikut)
-manajer       : Rp 64.000 | mode F2 null
+Sel C4 dipilih, lalu Alt+↓ membuka daftarnya:
+
+![Dropdown kode produk, dan tanda di email yang salah](img/dropdown.png)
+
+Yang perlu diketahui:
+
+- **Aturan diperiksa untuk yang datang dari orang**: diketik, di-paste, di-fill, atau ditulis kode dengan `{ source: 'user' }`. Kode yang menulis tanpa
+  `source` (bawaannya `'code'`) tidak diperiksa. Isi dari kode tetap ditandai kalau melanggar, seperti D4 di contoh.
+- **`reject: true`** (bawaan): yang melanggar ditolak. Sel tetap berisi nilai lama, pesannya tampil di layar, dan `wb.on('reject')` menerimanya.
+  **`reject: false`**: nilainya disimpan tetapi sel diberi tanda segitiga merah, seperti email di E3.
+- **`message`**: pesan penolakanmu sendiri, dalam bahasa aplikasimu. `{cell}` diganti alamat selnya. Tanpa `message`, pesannya dibuat dari aturan, dalam
+  bahasa Inggris.
+- **`help`**: teks bantuan yang tampil saat sel di range itu dipilih.
+- Kalau dua aturan menimpa sel yang sama, aturan yang terakhir dibuat yang berlaku.
+
+## 8.4 Angka dengan batas
+
+**Tujuan:** stok harus 0 sampai 10.000. Yang di luar itu ditolak dengan pesan sendiri.
+
+<!-- contoh: 08-04-batas.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatProduk } from './data/produk.js';
+
+// 8.4 Angka dengan batas: stok harus 0 sampai 10.000. Yang di luar itu ditolak dengan pesan sendiri.
+function buat() {
+    const wb = buatProduk();
+    wb.sheet('Produk').addValidation('D2:D4', {                       // baru
+        kind: 'number', op: 'between', a: 0, b: 10000,
+        message: 'Stok di {cell} harus 0 sampai 10.000'
+    });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return <div style={{ height: 300 }}><Sheet workbook={wb} /></div>;
+}
 ```
-<!-- /hasil -->
+<!-- /contoh -->
 
-Di layar, kasir yang mengetik di kolom Harga jual mendapat pesan dari aturannya. Sel yang dilindungi diberi gembok kecil di pojok kanan atas (bawaan, bisa diganti dengan prop `marks`, lihat [13.25](13-hak-akses.md#1325-variasi-tanda)):
+Orang mengetik 20000 di D2:
 
-![Kolom terlindung dan pesan penolakan](img/aturan.png)
+![Stok di luar batas ditolak](img/jaga-batas.png)
+
+**Penjelasan:**
+
+- `addValidation(range, aturan)` memasang aturan di D2:D4. `kind: 'number'` dengan `op: 'between'` dan batas `a`, `b`.
+- `message` adalah pesanmu sendiri. `{cell}` diganti alamat selnya.
+- D2 tetap 420. Tanpa `message`, pesannya pesan bawaan.
+- Semua jenis aturan (tanggal, panjang teks, email, checkbox) ada di 8.10.
+
+## 8.5 Tipe kolom
+
+**Tujuan:** kolom Stok hanya menerima bilangan bulat, seperti kolom `INTEGER` di tabel database.
+
+<!-- contoh: 08-05-tipe.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatProduk } from './data/produk.js';
+
+// 8.5 Tipe kolom: kolom Stok hanya menerima bilangan bulat, seperti kolom INTEGER di tabel database.
+function buat() {
+    const wb = buatProduk();
+    wb.sheet('Produk').setTypes({ headerRow: 1, fields: { Stok: { kind: 'int' } } });   // baru: kolom berjudul Stok
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return <div style={{ height: 300 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Orang mengetik 12,5 di D3:
+
+![Desimal ditolak di kolom bilangan bulat](img/jaga-tipe.png)
+
+**Penjelasan:**
+
+- `setTypes({ headerRow: 1, fields: { Stok: { kind: 'int' } } })` memberi tipe ke kolom yang **judulnya** Stok. Kalau kolomnya dipindah, tipenya
+  ikut.
+- Pesannya menyebut sel dan nama kolomnya: `Expected a whole number in D3 (Stok)`. Event `cellError` juga memberi tahu aplikasimu.
+- Tipe kolom cocok kalau isi sheet nantinya masuk ke tabel database: tipenya bisa disamakan dengan tipe kolom database. Semua jenis tipe ada di
+  8.10.
+- Tipe tidak disimpan di file. Pasang lagi setiap kali workbook dibuka.
+
+## 8.6 Sel yang tidak boleh diubah
+
+**Tujuan:** kasir hanya boleh mengubah stok: harga beli disembunyikan, kolom lain hanya dibaca, dan produk yang dihentikan terkunci seluruhnya.
 
 <!-- contoh: 10-aturan.page.js -->
 ```jsx
@@ -115,35 +181,171 @@ export default function HalamanKasir() {
 ```
 <!-- /contoh -->
 
-| Kunci aturan | Artinya | Bawaan |
-|---|---|---|
-| `sheet` | nama atau id sheet | semua sheet |
-| `range` | sel yang diatur, misalnya `'A2:I1000'`. Mengikuti baris yang disisipkan | seluruh sheet |
-| `columns` | hanya kolom tertentu, menurut judulnya (`'Harga beli'`) atau hurufnya (`'E'`) | semua kolom |
-| `headerRow` | baris tempat judul kolom, dihitung dari 1 | `1` |
-| `when` | hanya di baris yang rumusnya `TRUE`. Ditulis untuk baris pertama range (atau baris di bawah judul), lalu bergeser ke baris lain | selalu |
-| `mode` | `'readonly'`: boleh dilihat, tidak boleh diubah. `'hidden'`: isinya tampil `•••` dan tidak bisa dibaca, disalin, atau dicari | |
-| `message` | pesan untuk orang yang perubahannya ditolak | pesan bawaan dalam bahasa Inggris |
+Orang mengetik di kolom yang dilindungi:
 
-Yang perlu diketahui:
+![Kolom terlindung dan pesan penolakan](img/aturan.png)
 
-- **Hanya untuk orang.** Perubahan dari orang (diketik, di-paste, di-fill, dihapus, atau ditulis kode dengan `{ source: 'user' }`) diperiksa. Kode
-  aplikasimu sendiri tidak dihalangi.
-- **`when` dihitung terus.** Begitu status sebuah produk diubah menjadi "Dihentikan", barisnya langsung terkunci, seperti G3 di contoh.
-- **`hidden` hanya di layar.** Nilai asli tetap ada di workbook dan rumus tetap menghitungnya. Kalau nilainya sama sekali tidak boleh sampai ke browser,
-  jangan kirim nilainya. `viewFor` di server membuang nilai itu sebelum dikirim ([bab 12](12-server.md)).
-- **Judul kolom tetap tampil.** Baris judul (`headerRow`) tidak ikut disembunyikan atau dikunci oleh aturan `columns`.
-- **Menghapus baris yang memuat sel terlindung** ditolak, begitu juga menghapus kolomnya.
-- `setRules(daftar)` mengganti seluruh aturan. `setRules([])` membuang semuanya.
+**Penjelasan:**
 
-| Fungsi | Artinya |
+- `wb.setRules([...])` memasang aturan sel untuk orang yang sedang membuka. Setiap aturan berisi `range` atau `columns` (judul kolom), dan `mode`:
+  `'readonly'` (hanya baca) atau `'hidden'` (`•••`).
+- `when` membuat aturan hanya berlaku di baris yang rumusnya `TRUE`: di sini baris yang statusnya Dihentikan. Rumusnya ditulis untuk baris
+  pertama range, lalu bergeser ke setiap baris.
+- Sel yang dilindungi diberi gembok kecil di pojok (bawaan). Tandanya bisa diganti dengan prop `marks` ([10.25](13-hak-akses.md#1325-variasi-tanda)).
+- Aturan sel sama untuk semua orang. Untuk aturan yang berbeda per orang atau per role, pakai hak akses ([bab 10](13-hak-akses.md)).
+
+## 8.7 Aturan yang membaca sel lain: `beforeOp`
+
+**Tujuan:** qty yang dipesan tidak boleh melebihi stok di baris yang sama.
+
+<!-- contoh: 08-07-beforeop.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { Op, OpContext } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// 8.7 beforeOp: aturan yang membaca sel lain. Qty yang dipesan (kolom C) tidak boleh melebihi stok (kolom B) di baris yang sama.
+function periksa(op: Op, ctx: OpContext): Op | { reject: string } {
+    if (op.t !== 'cells' || ctx.source !== 'user') return op;                  // hanya yang diketik orang
+    const sheet = op.sheet ?? '';
+    for (const ch of op.changes) {
+        if (ctx.workbook.colIndex(sheet, ch.col) !== 2 || typeof ch.after !== 'number') continue;   // hanya kolom C
+        const r = ctx.workbook.rowIndex(sheet, ch.row);
+        const stok = ctx.workbook.value(sheet, r, 1);
+        if (typeof stok === 'number' && ch.after > stok) return { reject: 'Qty melebihi stok (' + stok + ')' };
+    }
+    return op;
+}
+
+function buat() {
+    const wb = createWorkbook(null, { beforeOp: periksa });                    // baru
+    wb.sheet('Sheet1').setValues('A1', [['Produk', 'Stok', 'Dipesan'], ['Semen Portland 50 kg', 420, 0], ['Cat tembok 5 kg', 64, 0]]);
+    wb.sheet('Sheet1').setStyle('A1:C1', { bold: true, fill: '#eef2f7' });
+    wb.sheet('Sheet1').setColProps('A', { width: 180 });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return <div style={{ height: 300 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Orang mengetik 100 di C3, padahal stok cat hanya 64:
+
+![Qty melebihi stok ditolak](img/jaga-beforeop.png)
+
+**Penjelasan:**
+
+- `createWorkbook(null, { beforeOp })` memasang fungsi yang dipanggil untuk **setiap** perubahan, sebelum diterapkan.
+- Fungsinya menerima op (2.4) dan konteks (`source`, `workbook`). Di sini hanya perubahan sel dari orang, di kolom C, yang diperiksa.
+- `{ reject: 'alasan' }` menolak seluruh perubahan, dan alasannya tampil di layar.
+- `beforeOp` tidak berjalan di server sendirian. Kalau aturan ini penting, jalankan pemeriksaan yang sama di server sebelum menyimpan.
+
+| Dikembalikan | Akibatnya |
 |---|---|
-| `wb.setRules(daftar)` | pasang aturan untuk orang yang membuka sheet |
-| `modeAt(alamat)` | `{ mode, message }` untuk sel itu, atau `null` kalau bebas |
+| `op` | diloloskan apa adanya |
+| salinan op yang diubah | yang diterapkan adalah salinan itu (contoh: kode produk jadi huruf besar) |
+| `null` atau `false` | op itu dibuang diam-diam, op lain di perubahan yang sama tetap jalan |
+| `{ reject: 'alasan' }` | **seluruh** perubahan ditolak, event `reject` membawa alasannya, dan alasannya tampil di layar |
 
-## 10.2 Tipe kolom
+Kapan memakai `beforeOp` dan kapan memakai fitur bawaan:
 
-Master produk yang nanti disimpan ke tabel database:
+---
+
+# Bagian C. Contoh lengkap, yang sering keliru, dan referensi
+
+## 8.8 Contoh lengkap
+
+### Validasi data, dengan hasilnya
+
+<!-- contoh: 07-validasi.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK, CABANG } from './data/toko.js';
+
+// Lembar pesanan pelanggan: setiap kolom punya aturan isian. Pilihan produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown.
+export function buatPesanan() {
+    const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27, 9, 0) });
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const produk = wb.sheet(wb.addSheet('Produk'));
+    produk.setValues('A1', [KOLOM_PRODUK, ...PRODUK]);
+
+    const psn = wb.sheet('Sheet1');
+    psn.setSheetProps({ name: 'Pesanan', freezeRows: 1 });
+    psn.setValues('A1', [['Tanggal kirim', 'Cabang', 'Kode', 'Qty', 'Email pelanggan', 'Catatan', 'Lunas']]);
+    psn.setStyle('A1:G1', { bold: true, fill: '#e8f0fe' });
+    psn.setColProps('A', { format: { type: 'date' }, width: 110 });
+    psn.setColProps('E', { width: 200 });
+    psn.setColProps('F', { width: 180 });
+
+    psn.addValidation('A2:A200', { kind: 'date', op: 'gte', a: 'today', reject: true, help: 'Tanggal kirim tidak boleh lewat' });
+    psn.addValidation('B2:B200', { kind: 'list', values: CABANG, help: 'Cabang yang mengirim' });
+    psn.addValidation('C2:C200', { kind: 'listFrom', source: 'Produk!A2:A50', reject: true, message: 'Kode di {cell} tidak ada di daftar produk' });
+    psn.addValidation('D2:D200', { kind: 'number', op: 'between', a: 1, b: 500, reject: true, help: 'Qty 1 sampai 500',
+        message: 'Qty di {cell} harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.' });
+    psn.addValidation('E2:E200', { kind: 'text', op: 'email', reject: false });   // salah ketik diterima tapi ditandai
+    psn.addValidation('F2:F200', { kind: 'textLength', op: 'lte', a: 40, reject: true });
+    psn.addValidation('G2:G200', { kind: 'checkbox' });
+    psn.setValues('A2', [[46324, 'Jakarta', 'SMN-01', 40, 'cv.bangunkarya@mail.com', 'Kirim pagi', true],
+        [46325, 'Bandung', 'BSI-13', 25, 'toko.maju@mail', '', false]]);
+    return wb;
+}
+
+const wb = buatPesanan();
+const psn = wb.sheet('Pesanan');
+const ditolak = [];
+wb.on('reject', (e) => ditolak.push(e.reason));
+const orang = { source: 'user' };                          // seperti diketik di layar: aturan diperiksa
+
+psn.setValues('C3', 'XXX-99', orang);                      // bukan kode produk
+psn.setValues('D3', 0, orang);                             // di luar 1..500
+psn.setValues('A3', 46300, orang);                         // sebelum hari ini
+psn.setValues('F3', 'Tolong telepon dulu sebelum truk berangkat ke lokasi proyek', orang);
+psn.setValues('B3', 'Medan', orang);                       // list tanpa reject: ditolak juga (bawaannya menolak)
+console.log('ditolak:');
+for (const alasan of ditolak) console.log('  -', alasan);
+console.log('isi tetap    :', psn.value('C3'), psn.value('D3'), psn.value('B3'));
+
+// aturan yang hanya menandai: nilainya disimpan, sel diberi tanda
+console.log('E3           :', psn.value('E3'), '-> tidak valid:', psn.invalidAt('E3'));
+console.log('E2           :', psn.value('E2'), '-> tidak valid:', psn.invalidAt('E2'));
+
+// pilihan dropdown dibaca dari sheet Produk: produk baru langsung jadi pilihan
+console.log('pilihan C    :', psn.choicesAt('C2').length, 'kode, pertama', psn.choicesAt('C2').slice(0, 3).join(', '));
+wb.setValues('Produk', 'A14', [['GNT-01', 'Genteng metal', 'Atap', 'lembar', 38000, 45000, 500, 100]]);
+console.log('produk baru  :', psn.choicesAt('C2').length, 'kode, terakhir', psn.choicesAt('C2').slice(-1)[0]);
+psn.setValues('C3', 'GNT-01', orang);
+console.log('C3 sekarang  :', psn.value('C3'), '| bantuan D2:', psn.validationAt('D2').help);
+
+// kode tetap bisa menulis apa saja: aturan hanya untuk yang datang dari orang
+psn.setValues('D4', 9999);
+console.log('dari kode    :', psn.value('D4'), '| ditandai:', psn.invalidAt('D4'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 07-validasi.js -->
+```text
+ditolak:
+  - Kode di C3 tidak ada di daftar produk
+  - Qty di D3 harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.
+  - The value in A3 must be at least today
+  - The value in F3 must be a text whose length is at most 40
+  - The value in B3 must be one of: Jakarta, Bandung, Surabaya
+isi tetap    : BSI-13 25 Bandung
+E3           : toko.maju@mail -> tidak valid: an email address
+E2           : cv.bangunkarya@mail.com -> tidak valid: null
+pilihan C    : 12 kode, pertama SMN-01, SMN-02, BSI-10
+produk baru  : 13 kode, terakhir GNT-01
+C3 sekarang  : GNT-01 | bantuan D2: Qty 1 sampai 500
+dari kode    : 9999 | ditandai: between 1 and 500
+```
+<!-- /hasil -->
+
+### Tipe kolom
 
 <!-- contoh: 10-tipe.js -->
 ```js
@@ -230,30 +432,80 @@ Tipe dipasang per sheet dengan salah satu dari dua cara:
 
 `setTypes(null)` membuang tipe sheet itu.
 
-| `kind` | Sel menerima | Contoh salah |
-|---|---|---|
-| `string` | teks apa saja. Angka yang diketik tetap teks, jadi `0081` tetap `0081` | |
-| `string` dengan `enum: [...]` | salah satu nilai di daftar | `Pasir` kalau tidak ada di daftar |
-| `int` | bilangan bulat | `12,5` |
-| `number` | angka | `banyak` |
-| `decimal` dengan `scale` | angka dengan desimal paling banyak `scale` digit | `72.000,5` dengan `scale: 0` |
-| `boolean` | `TRUE` atau `FALSE` | `ya` |
-| `date` | tanggal (satu hari penuh) | `minggu depan` |
-| `datetime` | tanggal dan jam | |
-| `json` | apa saja, tidak diperiksa | |
+### Aturan sel
 
-Yang perlu diketahui:
+<!-- contoh: 10-aturan.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK } from './data/toko.js';
 
-- **Sel kosong selalu boleh.** Apakah sebuah kolom wajib diisi ditentukan saat data disimpan, bukan di sheet.
-- **Yang salah ditolak**, nilainya tidak masuk, dan event `cellError` (prop `onCellError` di `<Sheet>`) menerima `{ address, field, value, expected }`
-  untuk ditampilkan dengan caramu sendiri. Pesan `expected` dalam bahasa Inggris.
-- **Ketikan dibaca menurut locale dulu**, baru diperiksa. Dengan `id-ID`, `72.000` di kolom `decimal` adalah 72000.
-- `typeAt(alamat)` memberi tipe sebuah sel, termasuk nama field-nya.
-- `checkValue(tipe, nilai)` menjalankan pemeriksaan yang sama tanpa sheet, misalnya di server. Hasilnya `null` kalau cocok, atau teks yang diharapkan.
+// Daftar produk yang dibuka kasir: harga beli tidak boleh terlihat, harga jual hanya boleh dibaca, produk yang dihentikan terkunci seluruhnya.
+// Kasir hanya boleh mengubah stok dan status.
+export function buatProdukKasir() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const p = wb.sheet('Sheet1');
+    p.setSheetProps({ name: 'Produk', freezeRows: 1 });
+    p.setValues('A1', [[...KOLOM_PRODUK, 'Status'], ...PRODUK.map((x, i) => [...x, i === 7 ? 'Dihentikan' : 'Aktif'])]);
+    p.setStyle('A1:I1', { bold: true, fill: '#e8f0fe' });
+    p.setColProps('E:F', { format: { type: 'money', decimals: 0 } });
+    p.setColProps('B', { width: 180 });
 
-## 10.3 `beforeOp`: memeriksa setiap perubahan
+    // aturan dari backend untuk peran "kasir". Kolom disebut menurut judulnya, jadi tetap benar walau kolom dipindah
+    wb.setRules([
+        { sheet: 'Produk', columns: ['Harga beli'], mode: 'hidden' },
+        { sheet: 'Produk', columns: ['Kode', 'Nama produk', 'Kategori', 'Satuan', 'Harga jual', 'Stok min.'], mode: 'readonly',
+            message: 'Data produk diatur bagian pembelian' },
+        { sheet: 'Produk', range: 'A2:I1000', when: '=$I2="Dihentikan"', mode: 'readonly', message: 'Produk ini sudah dihentikan' }
+    ]);
+    return wb;
+}
 
-`beforeOp` adalah pintu yang dilewati **setiap** op sebelum diterapkan. Dipasang sekali saat membuat workbook:
+const wb = buatProdukKasir();
+const p = wb.sheet('Produk');
+const ditolak = [];
+wb.on('reject', (e) => ditolak.push(e.reason));
+const kasir = { source: 'user' };                            // yang diketik kasir di layar
+
+p.setValues('G2', 400, kasir);                               // stok: boleh
+p.setValues('F2', 1, kasir);                                 // harga jual: ditolak
+p.setValues('G9', 30, kasir);                                // stok produk yang dihentikan: ditolak
+p.setValues('I3', 'Dihentikan', kasir);                      // status: boleh, dan baris itu langsung terkunci
+p.setValues('G3', 50, kasir);
+console.log('stok G2, G3   :', p.value('G2'), p.value('G3'));
+console.log('ditolak       :');
+for (const alasan of ditolak) console.log('  -', alasan);
+
+console.log('mode sel      :', ['E2', 'F2', 'G2', 'G9'].map((a) => a + ' ' + ((p.modeAt(a) || {}).mode || 'bebas')).join(' | '));
+console.log('harga beli E2 :', p.display('E2').text, '| input', JSON.stringify(p.input('E2')), '| judul E1 tetap:', p.display('E1').text);
+
+// kode aplikasi sendiri tidak dihalangi aturan: misalnya sinkron harga dari sistem pembelian
+p.setValues('F2', 75000);
+console.log('dari kode     :', p.display('F2').text);
+
+// aturan bukan bagian workbook: tidak disimpan, tidak masuk undo, diganti utuh oleh setRules berikutnya
+console.log('isi toJSON    :', Object.keys(wb.toJSON()).join(', '), '(aturan tidak ikut)');
+wb.setRules([]);                                             // peran manajer: tanpa aturan
+console.log('manajer       :', p.display('E2').text, '| mode F2', p.modeAt('F2'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 10-aturan.js -->
+```text
+stok G2, G3   : 400 35
+ditolak       :
+  - Data produk diatur bagian pembelian
+  - Produk ini sudah dihentikan
+  - Produk ini sudah dihentikan
+mode sel      : E2 hidden | F2 readonly | G2 bebas | G9 readonly
+harga beli E2 : ••• | input "" | judul E1 tetap: Harga beli
+dari kode     : Rp 75.000
+isi toJSON    : id, version, settings, sheets (aturan tidak ikut)
+manajer       : Rp 64.000 | mode F2 null
+```
+<!-- /hasil -->
+
+### `beforeOp`: meloloskan, mengubah, membuang, menolak
 
 <!-- contoh: 04-10-beforeop.ts -->
 ```ts
@@ -309,137 +561,19 @@ dari kode                  : 999
 
 `beforeOp(op, ctx)` menerima op (4.12) dan `ctx` berisi `{ source, user, workbook }`. Kembalikan salah satu dari empat:
 
-| Dikembalikan | Akibatnya |
+## 8.9 Yang sering keliru
+
+| Keliru | Benar |
 |---|---|
-| `op` | diloloskan apa adanya |
-| salinan op yang diubah | yang diterapkan adalah salinan itu (contoh: kode produk jadi huruf besar) |
-| `null` atau `false` | op itu dibuang diam-diam, op lain di perubahan yang sama tetap jalan |
-| `{ reject: 'alasan' }` | **seluruh** perubahan ditolak, event `reject` membawa alasannya, dan alasannya tampil di layar |
+| Isian dari kode tidak diperiksa | memang tidak; tambahkan `{ source: 'user' }` kalau mewakili isian orang (8.2) |
+| Tipe kolom hilang setelah dibuka ulang | tipe dan aturan sel tidak disimpan; pasang lagi setiap kali dibuka |
+| Memakai `beforeOp` untuk batas angka sederhana | pakai validasi data (8.4): ikut file, ikut Excel, dan diperiksa server |
+| Aturan sel diharapkan berbeda per kasir | aturan sel sama untuk semua orang; pakai hak akses (bab 10) |
+| `beforeOp` dianggap aman dari browser yang diakali | jalankan pemeriksaan yang sama di server |
 
-Kapan memakai `beforeOp` dan kapan memakai fitur bawaan:
+## 8.10 Referensi
 
-| Kebutuhan | Pakai |
-|---|---|
-| angka harus di antara 1 dan 500, daftar pilihan | validasi data ([10.4](10-aturan.md#104-validasi-data)) |
-| kolom harus bilangan bulat, tanggal | tipe kolom ([10.2](10-aturan.md#102-tipe-kolom)) |
-| kolom tertentu hanya boleh dibaca, per orang | aturan dan hak akses ([bab 10](10-aturan.md), [bab 13](13-hak-akses.md)) |
-| syarat yang membaca sel lain ("qty tidak boleh melebihi stok"), atau mengubah isi | `beforeOp` |
-
-`beforeOp` hanya berjalan di browser itu. Pemeriksaan yang harus aman dari orang yang mengakali browser tetap dilakukan di server ([bab 12](12-server.md)).
-
-## 10.4 Validasi data
-
-Lembar pesanan yang setiap kolomnya punya aturan isian. Kode produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown:
-
-<!-- contoh: 07-validasi.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-import { PRODUK, KOLOM_PRODUK, CABANG } from './data/toko.js';
-
-// Lembar pesanan pelanggan: setiap kolom punya aturan isian. Pilihan produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown.
-export function buatPesanan() {
-    const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27, 9, 0) });
-    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-    const produk = wb.sheet(wb.addSheet('Produk'));
-    produk.setValues('A1', [KOLOM_PRODUK, ...PRODUK]);
-
-    const psn = wb.sheet('Sheet1');
-    psn.setSheetProps({ name: 'Pesanan', freezeRows: 1 });
-    psn.setValues('A1', [['Tanggal kirim', 'Cabang', 'Kode', 'Qty', 'Email pelanggan', 'Catatan', 'Lunas']]);
-    psn.setStyle('A1:G1', { bold: true, fill: '#e8f0fe' });
-    psn.setColProps('A', { format: { type: 'date' }, width: 110 });
-    psn.setColProps('E', { width: 200 });
-    psn.setColProps('F', { width: 180 });
-
-    psn.addValidation('A2:A200', { kind: 'date', op: 'gte', a: 'today', reject: true, help: 'Tanggal kirim tidak boleh lewat' });
-    psn.addValidation('B2:B200', { kind: 'list', values: CABANG, help: 'Cabang yang mengirim' });
-    psn.addValidation('C2:C200', { kind: 'listFrom', source: 'Produk!A2:A50', reject: true, message: 'Kode di {cell} tidak ada di daftar produk' });
-    psn.addValidation('D2:D200', { kind: 'number', op: 'between', a: 1, b: 500, reject: true, help: 'Qty 1 sampai 500',
-        message: 'Qty di {cell} harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.' });
-    psn.addValidation('E2:E200', { kind: 'text', op: 'email', reject: false });   // salah ketik diterima tapi ditandai
-    psn.addValidation('F2:F200', { kind: 'textLength', op: 'lte', a: 40, reject: true });
-    psn.addValidation('G2:G200', { kind: 'checkbox' });
-    psn.setValues('A2', [[46324, 'Jakarta', 'SMN-01', 40, 'cv.bangunkarya@mail.com', 'Kirim pagi', true],
-        [46325, 'Bandung', 'BSI-13', 25, 'toko.maju@mail', '', false]]);
-    return wb;
-}
-
-const wb = buatPesanan();
-const psn = wb.sheet('Pesanan');
-const ditolak = [];
-wb.on('reject', (e) => ditolak.push(e.reason));
-const orang = { source: 'user' };                          // seperti diketik di layar: aturan diperiksa
-
-psn.setValues('C3', 'XXX-99', orang);                      // bukan kode produk
-psn.setValues('D3', 0, orang);                             // di luar 1..500
-psn.setValues('A3', 46300, orang);                         // sebelum hari ini
-psn.setValues('F3', 'Tolong telepon dulu sebelum truk berangkat ke lokasi proyek', orang);
-psn.setValues('B3', 'Medan', orang);                       // list tanpa reject: ditolak juga (bawaannya menolak)
-console.log('ditolak:');
-for (const alasan of ditolak) console.log('  -', alasan);
-console.log('isi tetap    :', psn.value('C3'), psn.value('D3'), psn.value('B3'));
-
-// aturan yang hanya menandai: nilainya disimpan, sel diberi tanda
-console.log('E3           :', psn.value('E3'), '-> tidak valid:', psn.invalidAt('E3'));
-console.log('E2           :', psn.value('E2'), '-> tidak valid:', psn.invalidAt('E2'));
-
-// pilihan dropdown dibaca dari sheet Produk: produk baru langsung jadi pilihan
-console.log('pilihan C    :', psn.choicesAt('C2').length, 'kode, pertama', psn.choicesAt('C2').slice(0, 3).join(', '));
-wb.setValues('Produk', 'A14', [['GNT-01', 'Genteng metal', 'Atap', 'lembar', 38000, 45000, 500, 100]]);
-console.log('produk baru  :', psn.choicesAt('C2').length, 'kode, terakhir', psn.choicesAt('C2').slice(-1)[0]);
-psn.setValues('C3', 'GNT-01', orang);
-console.log('C3 sekarang  :', psn.value('C3'), '| bantuan D2:', psn.validationAt('D2').help);
-
-// kode tetap bisa menulis apa saja: aturan hanya untuk yang datang dari orang
-psn.setValues('D4', 9999);
-console.log('dari kode    :', psn.value('D4'), '| ditandai:', psn.invalidAt('D4'));
-```
-<!-- /contoh -->
-
-<!-- hasil: 07-validasi.js -->
-```text
-ditolak:
-  - Kode di C3 tidak ada di daftar produk
-  - Qty di D3 harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.
-  - The value in A3 must be at least today
-  - The value in F3 must be a text whose length is at most 40
-  - The value in B3 must be one of: Jakarta, Bandung, Surabaya
-isi tetap    : BSI-13 25 Bandung
-E3           : toko.maju@mail -> tidak valid: an email address
-E2           : cv.bangunkarya@mail.com -> tidak valid: null
-pilihan C    : 12 kode, pertama SMN-01, SMN-02, BSI-10
-produk baru  : 13 kode, terakhir GNT-01
-C3 sekarang  : GNT-01 | bantuan D2: Qty 1 sampai 500
-dari kode    : 9999 | ditandai: between 1 and 500
-```
-<!-- /hasil -->
-
-![Dropdown kode produk, dan tanda di email yang salah](img/dropdown.png)
-
-<!-- contoh: 07-validasi.page.js -->
-```jsx
-import { useState } from 'react';
-import { Sheet } from '@kufayeka/sheet';
-import '@kufayeka/sheet/style.css';
-import { buatPesanan } from './07-validasi.js';
-
-export default function HalamanPesanan() {
-    const [wb] = useState(buatPesanan);
-    return <div style={{ height: 500 }}><Sheet workbook={wb} /></div>;
-}
-```
-<!-- /contoh -->
-
-Yang perlu diketahui:
-
-- **Aturan diperiksa untuk yang datang dari orang**: diketik, di-paste, di-fill, atau ditulis kode dengan `{ source: 'user' }`. Kode yang menulis tanpa
-  `source` (bawaannya `'code'`) tidak diperiksa. Isi dari kode tetap ditandai kalau melanggar, seperti D4 di contoh.
-- **`reject: true`** (bawaan): yang melanggar ditolak. Sel tetap berisi nilai lama, pesannya tampil di layar, dan `wb.on('reject')` menerimanya.
-  **`reject: false`**: nilainya disimpan tetapi sel diberi tanda segitiga merah, seperti email di E3.
-- **`message`**: pesan penolakanmu sendiri, dalam bahasa aplikasimu. `{cell}` diganti alamat selnya. Tanpa `message`, pesannya dibuat dari aturan, dalam
-  bahasa Inggris.
-- **`help`**: teks bantuan yang tampil saat sel di range itu dipilih.
-- Kalau dua aturan menimpa sel yang sama, aturan yang terakhir dibuat yang berlaku.
+### Validasi data
 
 | `kind` | Isinya | Pilihan |
 |---|---|---|
@@ -460,7 +594,58 @@ Yang perlu diketahui:
 | `choicesAt(alamat)` | pilihan dropdown sebuah sel |
 | `invalidAt(alamat)` | apa yang dilanggar nilai sel itu (teks), atau `null` kalau sesuai |
 
-Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([10.3](10-aturan.md#103-beforeop-memeriksa-setiap-perubahan))
-atau aturan dan tipe kolom ([bab 10](10-aturan.md)).
+Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([8.7](10-aturan.md#87-aturan-yang-membaca-sel-lain-beforeop))
+atau aturan dan tipe kolom ([bab 8](10-aturan.md)).
+
+### Tipe kolom
+
+| `kind` | Sel menerima | Contoh salah |
+|---|---|---|
+| `string` | teks apa saja. Angka yang diketik tetap teks, jadi `0081` tetap `0081` | |
+| `string` dengan `enum: [...]` | salah satu nilai di daftar | `Pasir` kalau tidak ada di daftar |
+| `int` | bilangan bulat | `12,5` |
+| `number` | angka | `banyak` |
+| `decimal` dengan `scale` | angka dengan desimal paling banyak `scale` digit | `72.000,5` dengan `scale: 0` |
+| `boolean` | `TRUE` atau `FALSE` | `ya` |
+| `date` | tanggal (satu hari penuh) | `minggu depan` |
+| `datetime` | tanggal dan jam | |
+| `json` | apa saja, tidak diperiksa | |
+
+Yang perlu diketahui:
+
+- **Sel kosong selalu boleh.** Apakah sebuah kolom wajib diisi ditentukan saat data disimpan, bukan di sheet.
+- **Yang salah ditolak**, nilainya tidak masuk, dan event `cellError` (prop `onCellError` di `<Sheet>`) menerima `{ address, field, value, expected }`
+  untuk ditampilkan dengan caramu sendiri. Pesan `expected` dalam bahasa Inggris.
+- **Ketikan dibaca menurut locale dulu**, baru diperiksa. Dengan `id-ID`, `72.000` di kolom `decimal` adalah 72000.
+- `typeAt(alamat)` memberi tipe sebuah sel, termasuk nama field-nya.
+- `checkValue(tipe, nilai)` menjalankan pemeriksaan yang sama tanpa sheet, misalnya di server. Hasilnya `null` kalau cocok, atau teks yang diharapkan.
+
+### Aturan sel (`setRules`)
+
+| Kunci aturan | Artinya | Bawaan |
+|---|---|---|
+| `sheet` | nama atau id sheet | semua sheet |
+| `range` | sel yang diatur, misalnya `'A2:I1000'`. Mengikuti baris yang disisipkan | seluruh sheet |
+| `columns` | hanya kolom tertentu, menurut judulnya (`'Harga beli'`) atau hurufnya (`'E'`) | semua kolom |
+| `headerRow` | baris tempat judul kolom, dihitung dari 1 | `1` |
+| `when` | hanya di baris yang rumusnya `TRUE`. Ditulis untuk baris pertama range (atau baris di bawah judul), lalu bergeser ke baris lain | selalu |
+| `mode` | `'readonly'`: boleh dilihat, tidak boleh diubah. `'hidden'`: isinya tampil `•••` dan tidak bisa dibaca, disalin, atau dicari | |
+| `message` | pesan untuk orang yang perubahannya ditolak | pesan bawaan dalam bahasa Inggris |
+
+Yang perlu diketahui:
+
+- **Hanya untuk orang.** Perubahan dari orang (diketik, di-paste, di-fill, dihapus, atau ditulis kode dengan `{ source: 'user' }`) diperiksa. Kode
+  aplikasimu sendiri tidak dihalangi.
+- **`when` dihitung terus.** Begitu status sebuah produk diubah menjadi "Dihentikan", barisnya langsung terkunci, seperti G3 di contoh.
+- **`hidden` hanya di layar.** Nilai asli tetap ada di workbook dan rumus tetap menghitungnya. Kalau nilainya sama sekali tidak boleh sampai ke browser,
+  jangan kirim nilainya. `viewFor` di server membuang nilai itu sebelum dikirim ([bab 12](12-server.md)).
+- **Judul kolom tetap tampil.** Baris judul (`headerRow`) tidak ikut disembunyikan atau dikunci oleh aturan `columns`.
+- **Menghapus baris yang memuat sel terlindung** ditolak, begitu juga menghapus kolomnya.
+- `setRules(daftar)` mengganti seluruh aturan. `setRules([])` membuang semuanya.
+
+| Fungsi | Artinya |
+|---|---|
+| `wb.setRules(daftar)` | pasang aturan untuk orang yang membuka sheet |
+| `modeAt(alamat)` | `{ mode, message }` untuk sel itu, atau `null` kalau bebas |
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [11. Memakai di React](11-react.md)

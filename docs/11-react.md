@@ -504,8 +504,8 @@ Yang dipakai di sini:
   [3.6](03-komponen-sheet.md#36-memberi-perintah-lewat-ref).
 - **`onSelectionChange`** memberi seleksi dalam nomor. Yang disimpan di state adalah **id baris** (`wb.rowId(...)`), bukan nomornya, jadi panel detail
   tetap menunjuk transaksi yang sama walaupun sheet di-sort atau disisipi baris.
-- **Form React menulis ke sheet** dengan `{ source: 'user' }`, jadi validasi dan aturan sheet ([10.4](10-aturan.md#104-validasi-data),
-  [bab 10](10-aturan.md)) tetap berlaku seperti kalau orang mengetiknya sendiri. Perubahan itu juga masuk undo dan ikut tersimpan otomatis.
+- **Form React menulis ke sheet** dengan `{ source: 'user' }`, jadi validasi dan aturan sheet ([8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown),
+  [bab 8](10-aturan.md)) tetap berlaku seperti kalau orang mengetiknya sendiri. Perubahan itu juga masuk undo dan ikut tersimpan otomatis.
 - **Tombol Undo di luar sheet** cukup memanggil `wb.undo()`. Sheet dan header ikut berubah.
 
 ## 11.11 Data dari props
