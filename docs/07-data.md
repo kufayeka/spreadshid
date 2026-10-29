@@ -1,6 +1,6 @@
 # 7. Data: sort, filter, grup, validasi, cari
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format, locale, dan conditional formatting](06-format.md) · Berikutnya: [8. Pivot table](08-pivot.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [8. Pivot table](08-pivot.md)
 
 Alat untuk mengolah tabel data: mengurutkan, menyaring, melipat kelompok baris, membatasi isian, dan mencari. Semua yang ada di menu Data di layar juga
 bisa dilakukan lewat kode, dan semuanya bisa di-undo.
@@ -96,7 +96,7 @@ menghitung yang tampil saja:
 
 - **Menurut nilai**: `{ hidden: ['Bandung', 'Surabaya'] }`, yaitu nilai yang disembunyikan, sama seperti mencentang daftar di menu filter. `''` berarti
   sel kosong. `filterValues(kolom)` memberi daftar nilai beserta jumlahnya, untuk menu buatanmu sendiri.
-- **Menurut kondisi**: syarat yang sama dengan conditional formatting ([6.4](06-format.md#64-conditional-formatting)), misalnya `{ op: 'gt', a: 5000000 }`,
+- **Menurut kondisi**: syarat yang sama dengan conditional formatting ([6.6](06-format.md#66-conditional-formatting)), misalnya `{ op: 'gt', a: 5000000 }`,
   `{ op: 'textContains', a: 'semen' }`, atau `{ op: 'between', a: 1, b: 10 }`.
 - **Menurut rumus**: `{ op: 'formula', formula: '=AND(J2>0, OR(G2="Semen", G2="Besi"))' }`, ditulis untuk baris pertama di bawah judul dan bergeser
   untuk baris lain. Dengan rumus, syarat boleh membaca kolom mana saja.
@@ -439,4 +439,4 @@ semuanya. Fungsi ini mengembalikan jumlah sel yang berubah.
 
 Di layar: Ctrl+F untuk mencari, Ctrl+H untuk mencari dan mengganti.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format, locale, dan conditional formatting](06-format.md) · Berikutnya: [8. Pivot table](08-pivot.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [8. Pivot table](08-pivot.md)

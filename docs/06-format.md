@@ -1,19 +1,258 @@
-# 6. Format, locale, dan conditional formatting
+# 6. Format
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [5. Rumus](05-rumus.md) · Berikutnya: [7. Data](07-data.md)
 
-Format mengatur **cara angka ditampilkan**, bukan nilainya. Sel berisi 72000 dengan format uang tampil `Rp 72.000`, tetapi rumus yang membacanya tetap
-mendapat 72000. Conditional formatting mengatur **warna** menurut isi: stok habis merah, margin tebal hijau. Isi selnya juga tidak berubah.
+Bab ini membahas **cara angka ditampilkan** (uang, persen, tanggal, satuan), kebiasaan menulis angka di negara lain (locale), dan **warna yang
+mengikuti isi** (conditional formatting). Setiap langkah adalah satu halaman React dengan foto hasilnya.
 
-- [6.1 Jenis format](#61-jenis-format)
-- [6.2 Format kolom dan satuan dari kolom lain](#62-format-kolom-dan-satuan-dari-kolom-lain)
-- [6.3 Locale](#63-locale)
-- [6.4 Conditional formatting](#64-conditional-formatting)
+**Bagian A. Pengenalan (tanpa kode)**
+- [6.1 Format mengubah tampilan, bukan nilai](#61-format-mengubah-tampilan-bukan-nilai)
+- [6.2 Di mana format dipasang](#62-di-mana-format-dipasang)
 
-## 6.1 Jenis format
+**Bagian B. Langkah demi langkah**
+- [6.3 Uang, persen, tanggal, desimal](#63-uang-persen-tanggal-desimal)
+- [6.4 Format satu kolom, dan satuan](#64-format-satu-kolom-dan-satuan)
+- [6.5 Locale](#65-locale)
+- [6.6 Conditional formatting](#66-conditional-formatting)
 
-Format adalah bagian dari gaya sel (`setStyle(range, { format })`) atau props kolom (`setColProps(kolom, { format })`, 6.2). Semua jenisnya dengan angka
-yang biasa ada di toko:
+**Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
+- [6.7 Contoh lengkap](#67-contoh-lengkap)
+- [6.8 Yang sering keliru](#68-yang-sering-keliru)
+- [6.9 Referensi](#69-referensi)
+
+---
+
+# Bagian A. Pengenalan
+
+## 6.1 Format mengubah tampilan, bukan nilai
+
+Sel berisi `72000` dengan format uang tampil `Rp 72.000`, tetapi nilainya tetap `72000`: rumus yang membacanya, `value()`, dan data yang dikirim
+ke server mendapat angka itu. Format hanya mengubah **display** (2.3).
+
+| Isi sel (value) | Format | Yang tampil (display) |
+|---|---|---|
+| `1250000` | uang | `Rp 1.250.000` |
+| `0.115` | persen, 1 desimal | `11,5%` |
+| `46323` | tanggal | `28/10/2026` |
+| `420` | angka, akhiran dari kolom Satuan | `420 zak` |
+
+Tanggal disimpan sebagai **nomor hari** (`46323` adalah 28 Oktober 2026), sama seperti Excel. Itu yang membuat tanggal bisa dijumlah, dikurangi,
+dan dibandingkan di rumus.
+
+## 6.2 Di mana format dipasang
+
+| Tempat | Caranya | Berlaku untuk |
+|---|---|---|
+| satu sel atau range | `setStyle('C2', { format: ... })` | sel itu saja |
+| satu kolom | `setColProps('E', { format: ... })` | semua sel kolom itu yang tidak punya format sendiri, termasuk baris yang ditambah nanti |
+| seluruh workbook | `setSettings({ locale, currency })` | cara menulis angka, tanggal, dan mata uang bawaan |
+
+Format sel mengalahkan format kolom. Locale berlaku untuk semuanya.
+
+---
+
+# Bagian B. Langkah demi langkah
+
+## 6.3 Uang, persen, tanggal, desimal
+
+**Tujuan:** nilai yang sama, ditampilkan dengan lima format.
+
+<!-- contoh: 06-03-angka.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// 6.3 Format angka: nilai yang sama, ditampilkan sebagai uang, persen, tanggal, dan angka dengan desimal.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setValues('A1', [
+        ['Format', 'Nilai yang disimpan', 'Yang tampil'],
+        ['money', 1250000, 1250000],
+        ['percent', 0.115, 0.115],
+        ['date', 46323, 46323],
+        ['number, 2 desimal', 1250.5, 1250.5],
+        ['money, simbol sendiri', 1250000, 1250000]
+    ]);
+    s.setStyle('A1:C1', { bold: true, fill: '#eef2f7' });
+    // baru: satu format per sel di kolom C; kolom B dibiarkan tanpa format, supaya terlihat nilai aslinya
+    s.setStyle('C2', { format: { type: 'money', decimals: 0 } });
+    s.setStyle('C3', { format: { type: 'percent', decimals: 1 } });
+    s.setStyle('C4', { format: { type: 'date', pattern: 'dddd, d MMMM yyyy' } });
+    s.setStyle('C5', { format: { type: 'number', decimals: 2 } });
+    s.setStyle('C6', { format: { type: 'money', decimals: 0, symbol: 'IDR' } });
+    s.setColProps('A', { width: 170 });
+    s.setColProps('B:C', { width: 190 });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return <div style={{ height: 320 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+![Kolom B nilai asli, kolom C setelah diformat](img/format-angka.png)
+
+**Penjelasan:**
+
+- Kolom B dibiarkan tanpa format, supaya terlihat nilai yang sebenarnya disimpan. Kolom C berisi nilai yang sama, dengan format.
+- `{ type: 'money', decimals: 0 }`: uang tanpa desimal, dengan mata uang workbook (`IDR` → `Rp`). `symbol: 'IDR'` memakai simbol sendiri.
+- `{ type: 'percent', decimals: 1 }`: dikali 100, satu desimal.
+- `{ type: 'date', pattern: 'dddd, d MMMM yyyy' }`: nama hari dan nama bulan menurut locale. Tanpa `pattern`, dipakai pola tanggal locale
+  (`28/10/2026`).
+- Semua jenis format dan huruf pola tanggal ada di 6.9.
+
+## 6.4 Format satu kolom, dan satuan
+
+**Tujuan:** harga dalam Rupiah untuk seluruh kolom, dan stok yang tampil dengan satuannya sendiri: zak, batang, dus.
+
+<!-- contoh: 06-04-kolom.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { PRODUK, KOLOM_PRODUK } from './data/toko.js';
+
+// 6.4 Format satu kolom, dan stok yang tampil dengan satuannya sendiri (zak, batang, dus) dari kolom Satuan di baris yang sama.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setValues('A1', [KOLOM_PRODUK, ...PRODUK.slice(0, 6)]);
+    s.setStyle('A1:H1', { bold: true, fill: '#eef2f7' });
+    // baru: format di kolom berlaku untuk semua selnya, termasuk baris yang ditambah nanti
+    s.setColProps('E:F', { format: { type: 'money', decimals: 0 } });
+    // baru: akhiran diambil dari kolom D (Satuan) di baris yang sama
+    s.setColProps('G:H', { format: { type: 'number', decimals: 0, suffixFrom: s.colId(3) } });
+    s.setColProps('D', { hidden: true });                   // satuannya sudah tampil di stok
+    s.setColProps('B', { width: 180 });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return <div style={{ height: 290 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+![Harga dalam Rupiah, stok dengan satuannya](img/format-kolom.png)
+
+**Penjelasan:**
+
+- `setColProps('E:F', { format })` memasang format di dua kolom sekaligus. Baris yang ditambah nanti ikut berformat.
+- `suffixFrom: s.colId(3)` mengambil akhiran dari kolom D (Satuan) **di baris yang sama**. Disimpan sebagai id kolom, jadi tetap benar kalau
+  kolomnya dipindah.
+- Kolom Satuan disembunyikan, karena isinya sudah tampil di stok. Nilai stok tetap angka `420`, jadi tetap bisa dijumlah.
+
+## 6.5 Locale
+
+**Tujuan:** isi yang sama, ditulis menurut kebiasaan Indonesia, Amerika, dan Jerman.
+
+<!-- contoh: 06-05-locale.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// 6.5 Locale: isi yang sama, ditulis menurut kebiasaan negara lain. Tombol mengganti locale dan mata uang workbook.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setValues('A1', [['Harga', 'Tanggal', 'Diskon', 'Qty'], [1250000, 46323, 0.115, 1250.5]]);
+    s.setStyle('A1:D1', { bold: true, fill: '#eef2f7' });
+    s.setStyle('A2', { format: { type: 'money', decimals: 0 } });
+    s.setStyle('B2', { format: { type: 'date' } });
+    s.setStyle('C2', { format: { type: 'percent', decimals: 1 } });
+    s.setStyle('D2', { format: { type: 'number', decimals: 1 } });
+    s.setColProps('A:D', { width: 140 });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return (
+        <div>
+            <p>
+                {/* baru: setSettings mengganti locale dan mata uang; semua sel ikut ditampilkan ulang */}
+                <button className="id" onClick={() => wb.setSettings({ locale: 'id-ID', currency: 'IDR' })}>Indonesia</button>{' '}
+                <button className="us" onClick={() => wb.setSettings({ locale: 'en-US', currency: 'USD' })}>Amerika</button>{' '}
+                <button className="de" onClick={() => wb.setSettings({ locale: 'de-DE', currency: 'EUR' })}>Jerman</button>
+            </p>
+            <div style={{ height: 230 }}><Sheet workbook={wb} /></div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Indonesia (`id-ID`, `IDR`):
+
+![Locale Indonesia](img/format-locale-id.png)
+
+Amerika (`en-US`, `USD`):
+
+![Locale Amerika](img/format-locale-us.png)
+
+Jerman (`de-DE`, `EUR`):
+
+![Locale Jerman](img/format-locale-de.png)
+
+**Penjelasan:**
+
+- `wb.setSettings({ locale, currency })` mengganti kebiasaan menulis angka untuk seluruh workbook, dan semua sel ditampilkan ulang.
+- Nilainya tidak berubah. Yang berubah hanya pemisah ribuan dan desimal, urutan tanggal, dan simbol mata uang.
+- Locale juga dipakai saat **membaca** yang diketik orang: di `id-ID`, mengetik `1.250,5` menghasilkan angka 1250,5, dan `28/10/2026` menjadi
+  tanggal.
+
+## 6.6 Conditional formatting
+
+**Tujuan:** daftar stok yang menandai dirinya sendiri: stok habis merah, stok di bawah minimum merah muda, margin dengan skala warna.
+
+Daftar stok yang menandai dirinya sendiri: stok habis merah tua, stok di bawah minimum merah muda sebaris penuh, margin dari tipis ke tebal dengan skala
+merah-putih-hijau, dan kategori Semen dimiringkan:
+
+<!-- contoh: 06-kondisional.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './06-kondisional.js';
+
+export default function HalamanStok() {
+    const [wb] = useState(buatStok);
+    return <div style={{ height: 480 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+![Stok dengan conditional formatting](img/kondisional.png)
+
+Cara kerjanya:
+
+- **Aturan disimpan di sheet, isi sel tidak diubah.** `style('G9')` tetap kosong, sedangkan `shownStyle('G9')` memberi warna yang digambar. Begitu stok
+  datang, tandanya hilang sendiri.
+- **Aturan pertama yang cocok yang dipakai.** Itu sebabnya "Semen" di baris SMN-02 berwarna merah, bukan biru miring: aturan stok kurang ada di urutan
+  sebelum aturan kategori. Urutannya diubah dengan `moveConditional`.
+- **Range aturan mengikuti barisnya.** Baris disisipkan di tengah, aturan ikut melebar. Baris di ujung dihapus, aturan menyusut.
+- **Ikut ke Excel.** Aturan-aturan ini diekspor ke `.xlsx` sebagai conditional formatting Excel dan dibaca kembali saat impor ([bab 15](15-excel.md)).
+- Di layar, aturan dibuat lewat Format → Conditional formatting, dengan panel di sebelah kanan.
+
+---
+
+# Bagian C. Contoh lengkap, yang sering keliru, dan referensi
+
+## 6.7 Contoh lengkap
+
+### Semua jenis format
 
 <!-- contoh: 06-format.js -->
 ```js
@@ -77,64 +316,7 @@ teks                {"type":"text"}                                            -
 ```
 <!-- /hasil -->
 
-| `type` | Pilihan | Keterangan |
-|---|---|---|
-| `general` | | seperti diketik, sampai 15 digit |
-| `number` | `decimals` (bawaan 2), `thousands` (pemisah ribuan, bawaan `true`) | |
-| `money` | `decimals` (bawaan 2), `currency` (bawaan: mata uang workbook), `symbol` (simbol sendiri, misalnya `'IDR'`), `symbolSpace: false` | rumus di sel uang dibulatkan ke `decimals`. Simbol diletakkan di sisi yang dipakai locale |
-| `percent` | `decimals` | 0,1111 tampil `11,1%` |
-| `scientific` | `decimals` | |
-| `date`, `time`, `datetime` | `pattern` (bawaan: pola locale) | lihat huruf pola di bawah |
-| `duration` | | jam bisa lebih dari 24: `1.25` hari tampil `30:00:00` |
-| `text` | | yang diketik disimpan sebagai teks: kode `0081234` tetap dengan nol di depannya. Pasang formatnya **sebelum** isinya ditulis |
-| `custom` | `pattern` | kode format seperti Excel, lihat di bawah |
-
-Pilihan untuk format angka (`number`, `money`, `percent`, `scientific`, `general`):
-
-| Kunci | Artinya | Contoh |
-|---|---|---|
-| `prefix` | teks di depan angka | `'Rak '` → `Rak 12` |
-| `suffix` | teks di belakang angka | `' zak'` → `40 zak` |
-| `suffixFrom` | id kolom yang teksnya di baris yang sama menjadi akhiran (6.2) | `stok.colId(3)` |
-| `negative` | angka negatif: `'minus'` (bawaan) → `-1.250`, `'parens'` → `(1.250)`, `'red'` → merah | |
-
-Awalan dan akhiran hanya menempel ke angka. Judul kolom yang berupa teks tetap tampil apa adanya.
-
-**Huruf pola tanggal dan jam.** Huruf besar dan kecil dibedakan: `M` bulan, `m` menit.
-
-| Huruf | Artinya | Huruf | Artinya |
-|---|---|---|---|
-| `d`, `dd` | tanggal: `7`, `07` | `H`, `HH` | jam 0-23: `9`, `09` |
-| `ddd`, `dddd` | nama hari menurut locale: `Sel`, `Selasa` | `h`, `hh` | jam 1-12, dipakai dengan `a` |
-| `M`, `MM` | bulan: `3`, `03` | `m`, `mm` | menit |
-| `MMM`, `MMMM` | nama bulan: `Okt`, `Oktober` | `s`, `ss` | detik |
-| `yy`, `yyyy` | tahun: `26`, `2026` | `a` | `AM` atau `PM` |
-
-Teks di dalam pola ditulis dengan tanda kutip: `'"Jam" HH:mm'`. Jam dibulatkan ke detik sebelum ditampilkan, sama seperti Excel, jadi 8:00 yang
-tersimpan sebagai 0,333333 tetap tampil `08:00`.
-
-**Kode format `custom`.** Sama dengan kode format Excel, dengan sampai empat bagian dipisah `;` (positif; negatif; nol; teks):
-
-| Kode | Artinya |
-|---|---|
-| `0` | satu digit, selalu tampil (`000` → `007`) |
-| `#` | satu digit, tampil kalau ada |
-| `,` di bagian bulat | pemisah ribuan (tampil menurut locale: titik di Indonesia) |
-| `.` | tanda desimal (tampil menurut locale: koma di Indonesia) |
-| `%` | dikali 100 dan diberi `%` |
-| `E+00` | ilmiah |
-| `"teks"` atau `\x` | teks apa adanya |
-| `@` | isi teks sel itu sendiri |
-| `[Red]`, `[Blue]`, `[Green]`, ... | warna untuk bagian itu |
-
-Contoh: `#,##0;[Red](#,##0);"-"` menampilkan positif biasa, negatif merah dalam kurung, dan nol sebagai tanda strip, sesuai yang biasa dipakai di
-laporan keuangan.
-
-Di layar, format dipilih lewat toolbar (`Rp`, `%`, `.0←`, `.00→`, `123`) dan menu Format → Number. `FORMAT_PRESETS` dari `@kufayeka/sheet/core` berisi
-format siap pakai yang sama dengan menu itu, dan `formatValue(nilai, format, { locale, currency })` menampilkan sebuah nilai tanpa workbook (misalnya untuk
-email atau PDF buatanmu sendiri).
-
-## 6.2 Format kolom dan satuan dari kolom lain
+### Format kolom dan satuan dari kolom lain
 
 <!-- contoh: 06-kolom.js -->
 ```js
@@ -183,10 +365,7 @@ baris baru          : Rp 0 | 15% (format sendiri) | 5 paket
   angka, jadi tetap bisa dijumlahkan. Kolom asalnya disimpan sebagai id, jadi tetap benar walaupun kolom dipindah atau disisipi kolom lain. Kolom asalnya
   boleh disembunyikan.
 
-## 6.3 Locale
-
-Locale mengatur pemisah desimal dan ribuan, urutan hari-bulan-tahun, nama bulan dan hari, serta letak simbol uang. Locale berlaku untuk tampilan **dan**
-untuk membaca yang diketik orang:
+### Locale
 
 <!-- contoh: 06-locale.js -->
 ```js
@@ -231,10 +410,7 @@ ja-JP | ketik 2026/10/27 -> 46322 2026/10/27 | ketik 72,000 -> 72000 | x 40 = �
 - Rumus **tidak** ikut locale: angka di dalam rumus selalu memakai titik desimal, dan argumennya selalu dipisah koma ([5.1](05-rumus.md#51-rumus-itu-apa)).
 - Mengganti locale tidak mengubah satu nilai pun. Hanya tampilannya yang berubah.
 
-## 6.4 Conditional formatting
-
-Daftar stok yang menandai dirinya sendiri: stok habis merah tua, stok di bawah minimum merah muda sebaris penuh, margin dari tipis ke tebal dengan skala
-merah-putih-hijau, dan kategori Semen dimiringkan:
+### Conditional formatting, dengan hasilnya
 
 <!-- contoh: 06-kondisional.js -->
 ```js
@@ -308,31 +484,79 @@ setelah hapus : 3 aturan | G9: {"color":"#a50e0e","fill":"#fce8e6"}
 
 Ditampilkan di `<Sheet>`:
 
-<!-- contoh: 06-kondisional.page.js -->
-```jsx
-import { useState } from 'react';
-import { Sheet } from '@kufayeka/sheet';
-import '@kufayeka/sheet/style.css';
-import { buatStok } from './06-kondisional.js';
+## 6.8 Yang sering keliru
 
-export default function HalamanStok() {
-    const [wb] = useState(buatStok);
-    return <div style={{ height: 480 }}><Sheet workbook={wb} /></div>;
-}
-```
-<!-- /contoh -->
+| Keliru | Benar |
+|---|---|
+| Menyimpan `'Rp 72.000'` sebagai teks | simpan angka `72000`, lalu beri format uang. Teks tidak bisa dijumlah |
+| Kode `0081234` kehilangan nol di depan | pasang format `text` **sebelum** mengisi, atau tulis `"'0081234"` |
+| Format kolom tidak berlaku di satu sel | sel itu punya format sendiri; format sel mengalahkan format kolom (6.2) |
+| Tanggal tampil sebagai angka `46323` | sel belum diberi format tanggal |
+| Angka tampil `1250.5`, bukan `1.250,5` | locale bawaan `en-US`; pasang `setSettings({ locale: 'id-ID' })` |
+| Warna conditional formatting tidak muncul | aturan pertama yang cocok yang dipakai; cek urutannya (6.6) |
 
-![Stok dengan conditional formatting](img/kondisional.png)
+## 6.9 Referensi
 
-Cara kerjanya:
+### Jenis format
 
-- **Aturan disimpan di sheet, isi sel tidak diubah.** `style('G9')` tetap kosong, sedangkan `shownStyle('G9')` memberi warna yang digambar. Begitu stok
-  datang, tandanya hilang sendiri.
-- **Aturan pertama yang cocok yang dipakai.** Itu sebabnya "Semen" di baris SMN-02 berwarna merah, bukan biru miring: aturan stok kurang ada di urutan
-  sebelum aturan kategori. Urutannya diubah dengan `moveConditional`.
-- **Range aturan mengikuti barisnya.** Baris disisipkan di tengah, aturan ikut melebar. Baris di ujung dihapus, aturan menyusut.
-- **Ikut ke Excel.** Aturan-aturan ini diekspor ke `.xlsx` sebagai conditional formatting Excel dan dibaca kembali saat impor ([bab 15](15-excel.md)).
-- Di layar, aturan dibuat lewat Format → Conditional formatting, dengan panel di sebelah kanan.
+| `type` | Pilihan | Keterangan |
+|---|---|---|
+| `general` | | seperti diketik, sampai 15 digit |
+| `number` | `decimals` (bawaan 2), `thousands` (pemisah ribuan, bawaan `true`) | |
+| `money` | `decimals` (bawaan 2), `currency` (bawaan: mata uang workbook), `symbol` (simbol sendiri, misalnya `'IDR'`), `symbolSpace: false` | rumus di sel uang dibulatkan ke `decimals`. Simbol diletakkan di sisi yang dipakai locale |
+| `percent` | `decimals` | 0,1111 tampil `11,1%` |
+| `scientific` | `decimals` | |
+| `date`, `time`, `datetime` | `pattern` (bawaan: pola locale) | lihat huruf pola di bawah |
+| `duration` | | jam bisa lebih dari 24: `1.25` hari tampil `30:00:00` |
+| `text` | | yang diketik disimpan sebagai teks: kode `0081234` tetap dengan nol di depannya. Pasang formatnya **sebelum** isinya ditulis |
+| `custom` | `pattern` | kode format seperti Excel, lihat di bawah |
+
+Pilihan untuk format angka (`number`, `money`, `percent`, `scientific`, `general`):
+
+| Kunci | Artinya | Contoh |
+|---|---|---|
+| `prefix` | teks di depan angka | `'Rak '` → `Rak 12` |
+| `suffix` | teks di belakang angka | `' zak'` → `40 zak` |
+| `suffixFrom` | id kolom yang teksnya di baris yang sama menjadi akhiran (6.2) | `stok.colId(3)` |
+| `negative` | angka negatif: `'minus'` (bawaan) → `-1.250`, `'parens'` → `(1.250)`, `'red'` → merah | |
+
+Awalan dan akhiran hanya menempel ke angka. Judul kolom yang berupa teks tetap tampil apa adanya.
+
+**Huruf pola tanggal dan jam.** Huruf besar dan kecil dibedakan: `M` bulan, `m` menit.
+
+| Huruf | Artinya | Huruf | Artinya |
+|---|---|---|---|
+| `d`, `dd` | tanggal: `7`, `07` | `H`, `HH` | jam 0-23: `9`, `09` |
+| `ddd`, `dddd` | nama hari menurut locale: `Sel`, `Selasa` | `h`, `hh` | jam 1-12, dipakai dengan `a` |
+| `M`, `MM` | bulan: `3`, `03` | `m`, `mm` | menit |
+| `MMM`, `MMMM` | nama bulan: `Okt`, `Oktober` | `s`, `ss` | detik |
+| `yy`, `yyyy` | tahun: `26`, `2026` | `a` | `AM` atau `PM` |
+
+Teks di dalam pola ditulis dengan tanda kutip: `'"Jam" HH:mm'`. Jam dibulatkan ke detik sebelum ditampilkan, sama seperti Excel, jadi 8:00 yang
+tersimpan sebagai 0,333333 tetap tampil `08:00`.
+
+**Kode format `custom`.** Sama dengan kode format Excel, dengan sampai empat bagian dipisah `;` (positif; negatif; nol; teks):
+
+| Kode | Artinya |
+|---|---|
+| `0` | satu digit, selalu tampil (`000` → `007`) |
+| `#` | satu digit, tampil kalau ada |
+| `,` di bagian bulat | pemisah ribuan (tampil menurut locale: titik di Indonesia) |
+| `.` | tanda desimal (tampil menurut locale: koma di Indonesia) |
+| `%` | dikali 100 dan diberi `%` |
+| `E+00` | ilmiah |
+| `"teks"` atau `\x` | teks apa adanya |
+| `@` | isi teks sel itu sendiri |
+| `[Red]`, `[Blue]`, `[Green]`, ... | warna untuk bagian itu |
+
+Contoh: `#,##0;[Red](#,##0);"-"` menampilkan positif biasa, negatif merah dalam kurung, dan nol sebagai tanda strip, sesuai yang biasa dipakai di
+laporan keuangan.
+
+Di layar, format dipilih lewat toolbar (`Rp`, `%`, `.0←`, `.00→`, `123`) dan menu Format → Number. `FORMAT_PRESETS` dari `@kufayeka/sheet/core` berisi
+format siap pakai yang sama dengan menu itu, dan `formatValue(nilai, format, { locale, currency })` menampilkan sebuah nilai tanpa workbook (misalnya untuk
+email atau PDF buatanmu sendiri).
+
+### Conditional formatting
 
 **Jenis aturan.** Aturan satu warna (`op`) memberi gaya kalau syaratnya terpenuhi:
 

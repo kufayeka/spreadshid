@@ -65,6 +65,12 @@ export const SHOTS = [
     proyek('proyek-harian', 'Harian 27-10'),
     proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
     proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
+    // chapter 6: formats
+    { name: 'format-angka', page: '06-03-angka.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 320 } },
+    { name: 'format-kolom', page: '06-04-kolom.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 290 } },
+    { name: 'format-locale-id', page: '06-05-locale.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 270 } },
+    { name: 'format-locale-us', page: '06-05-locale.page.tsx', act: press('.us'), clip: { x: 0, y: 0, width: 1000, height: 270 } },
+    { name: 'format-locale-de', page: '06-05-locale.page.tsx', act: press('.de'), clip: { x: 0, y: 0, width: 1000, height: 270 } },
     // chapter 5: formulas from code
     { name: 'rumus-antar-sheet', page: '05-09-antar-sheet.page.tsx', act: async ({ js, click, wait }) => { const p = await cellAt(js, 1, 3); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 260 } },
     { name: 'rumus-laporan', page: '05-10-laporan.page.tsx', act: async ({ js, click, wait }) => { const p = await cellAt(js, 1, 1); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 290 } },

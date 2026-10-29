@@ -1,6 +1,6 @@
 # 5. Rumus
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md) · Berikutnya: [6. Format](06-format.md)
 
 Bab ini mulai dari nol. Bagian A memakai satu nota belanja yang dibangun pelan-pelan, tanpa kode: setiap gambar adalah sheet sungguhan, sel yang
 dipilih diberi kotak biru, dan rumusnya terlihat di baris atas (formula bar). Bagian B menulis rumus dari kode, dengan halaman React dan fotonya.
@@ -992,4 +992,4 @@ seperti `{1,2,3}`, dan `IMPORTRANGE`. Rumus dengan nama yang tidak ada menampilk
 | Menghitung dengan teks hasil `display` | pakai `value` (bab 2) |
 | `TODAY()` di tes selalu berubah | beri jam tetap lewat pilihan `now` di `createWorkbook` (bab 2) |
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. API workbook](04-api-workbook.md) · Berikutnya: [6. Format dan locale](06-format.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. API workbook](04-api-workbook.md) · Berikutnya: [6. Format](06-format.md)

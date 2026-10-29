@@ -28,7 +28,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `formatValue`, `FORMAT_PRESETS`, `localeInfo` | menampilkan nilai dengan format dan locale, format siap pakai, info pemisah locale | [6](06-format.md) |
 | `displayOf` | yang tampil dari sebuah nilai dan format: `{ text, align, kind, color }` | [6](06-format.md) |
 | `dateToSerial`, `serialToDate` | `Date` menjadi nomor hari dan sebaliknya | [4.5](04-api-workbook.md#45-mengisi-dari-data-api) |
-| `parseInput` | teks ketikan menjadi nilai menurut locale: `'1.250,5'` → 1250.5 | [6.3](06-format.md#63-locale) |
+| `parseInput` | teks ketikan menjadi nilai menurut locale: `'1.250,5'` → 1250.5 | [6.5](06-format.md#65-locale) |
 | `roundTo` | pembulatan yang dipakai format uang | [5.8](05-rumus.md#58-menulis-rumus-dari-kode) |
 | `colName`, `colIndex` | `2` ↔ `'C'` | [2.2](02-konsep.md#22-alamat-sel) |
 | `storeFormula`, `formulaText`, `resolveRef`, `isStoredFormula` | rumus teks ↔ rumus tersimpan `{ f, refs }`, dan ke mana sebuah referensi menunjuk | [2.3](02-konsep.md), [12.1](12-server.md#123-isi-content) |
@@ -76,7 +76,7 @@ Handle juga punya `id` dan `name`.
 | gaya | `setStyle`, `mergeCells`, `unmergeCells`, `merges` | [4.10](04-api-workbook.md#410-referensi) |
 | baris dan kolom | `insertRows`, `deleteRows`, `moveRows`, `insertCols`, `moveCols`, `deleteCols`, `setRowProps`, `setColProps`, `rowProps`, `colProps`, `rowAxis`, `colAxis` | [4.10](04-api-workbook.md#410-referensi) |
 | sheet | `sheetProps`, `setSheetProps`, `duplicateSheet`, `removeSheet`, `hideSheet`, `moveSheet`, `sheetShown` | [4.10](04-api-workbook.md#410-referensi) |
-| conditional formatting | `addConditional`, `setConditional`, `moveConditional`, `removeConditional`, `conditionals`, `conditionalStyleAt` | [6.4](06-format.md#64-conditional-formatting) |
+| conditional formatting | `addConditional`, `setConditional`, `moveConditional`, `removeConditional`, `conditionals`, `conditionalStyleAt` | [6.6](06-format.md#66-conditional-formatting) |
 | filter | `createFilter`, `setFilterColumn`, `removeFilter`, `filterOf`, `filterValues`, `filteredOut` | [7.2](07-data.md#72-filter) |
 | grup | `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups` | [7.3](07-data.md#73-grup-baris-dan-kolom) |
 | validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [7.4](07-data.md#74-validasi-data) |
@@ -94,8 +94,8 @@ Handle juga punya `id` dan `name`.
 | jenis op | [12.7](12-server.md#127-jenis-op) |
 | kunci gaya, props baris, kolom, dan sheet | [4.10](04-api-workbook.md#410-referensi), [4.10](04-api-workbook.md#410-referensi), [4.10](04-api-workbook.md#410-referensi) |
 | fungsi rumus | [5.13](05-rumus.md#513-semua-fungsi-buat-apa-cara-pakai-hasilnya) |
-| jenis format dan huruf pola | [6.1](06-format.md#61-jenis-format) |
-| syarat conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
+| jenis format dan huruf pola | [6.9](06-format.md#69-referensi) |
+| syarat conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
 | jenis validasi | [7.4](07-data.md#74-validasi-data) |
 | spesifikasi pivot | [8.2](08-pivot.md#82-spesifikasi) |
 | semua isi `action` aturan akses | [13.35](13-hak-akses.md#1335-referensi) |

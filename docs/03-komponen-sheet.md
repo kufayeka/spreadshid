@@ -531,7 +531,7 @@ Panel muncul di kanan grid, satu panel pada satu waktu:
 |---|---|---|
 | Comments | View → Comments, Insert → Comment, Ctrl+Alt+M | [14](14-komentar.md) |
 | Pivot table editor | memilih sel pivot, Insert → Pivot table | [8](08-pivot.md) |
-| Conditional formatting | Format → Conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
+| Conditional formatting | Format → Conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
 | Data validation | Data → Data validation, Insert → Dropdown | [7.4](07-data.md#74-validasi-data) |
 | Named ranges | Data → Named ranges | [5.11](05-rumus.md#511-named-range) |
 | Find and replace | Ctrl+F, Ctrl+H | [7.5](07-data.md#75-cari-dan-ganti) |
