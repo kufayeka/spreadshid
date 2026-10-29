@@ -1,6 +1,6 @@
 # 10. Aturan dan tipe kolom
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [8. Pivot table](08-pivot.md) · Berikutnya: [11. Memakai di React](11-react.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [11. Memakai di React](11-react.md)
 
 Dua cara aplikasimu menjaga isi sheet:
 
@@ -19,6 +19,7 @@ Untuk mengatur **siapa boleh melakukan apa** secara lengkap (menghapus baris, me
 - [10.1 Aturan: hanya baca dan tersembunyi](#101-aturan-hanya-baca-dan-tersembunyi)
 - [10.2 Tipe kolom](#102-tipe-kolom)
 - [10.3 `beforeOp`: memeriksa setiap perubahan](#103-beforeop-memeriksa-setiap-perubahan)
+- [10.4 Validasi data](#104-validasi-data)
 
 ## 10.1 Aturan: hanya baca dan tersembunyi
 
@@ -319,11 +320,147 @@ Kapan memakai `beforeOp` dan kapan memakai fitur bawaan:
 
 | Kebutuhan | Pakai |
 |---|---|
-| angka harus di antara 1 dan 500, daftar pilihan | validasi data ([7.4](07-data.md#74-validasi-data)) |
+| angka harus di antara 1 dan 500, daftar pilihan | validasi data ([10.4](10-aturan.md#104-validasi-data)) |
 | kolom harus bilangan bulat, tanggal | tipe kolom ([10.2](10-aturan.md#102-tipe-kolom)) |
 | kolom tertentu hanya boleh dibaca, per orang | aturan dan hak akses ([bab 10](10-aturan.md), [bab 13](13-hak-akses.md)) |
 | syarat yang membaca sel lain ("qty tidak boleh melebihi stok"), atau mengubah isi | `beforeOp` |
 
 `beforeOp` hanya berjalan di browser itu. Pemeriksaan yang harus aman dari orang yang mengakali browser tetap dilakukan di server ([bab 12](12-server.md)).
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [8. Pivot table](08-pivot.md) · Berikutnya: [11. Memakai di React](11-react.md)
+## 10.4 Validasi data
+
+Lembar pesanan yang setiap kolomnya punya aturan isian. Kode produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown:
+
+<!-- contoh: 07-validasi.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK, CABANG } from './data/toko.js';
+
+// Lembar pesanan pelanggan: setiap kolom punya aturan isian. Pilihan produk diambil dari sheet Produk, jadi produk baru langsung muncul di dropdown.
+export function buatPesanan() {
+    const wb = createWorkbook(null, { now: () => new Date(2026, 9, 27, 9, 0) });
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const produk = wb.sheet(wb.addSheet('Produk'));
+    produk.setValues('A1', [KOLOM_PRODUK, ...PRODUK]);
+
+    const psn = wb.sheet('Sheet1');
+    psn.setSheetProps({ name: 'Pesanan', freezeRows: 1 });
+    psn.setValues('A1', [['Tanggal kirim', 'Cabang', 'Kode', 'Qty', 'Email pelanggan', 'Catatan', 'Lunas']]);
+    psn.setStyle('A1:G1', { bold: true, fill: '#e8f0fe' });
+    psn.setColProps('A', { format: { type: 'date' }, width: 110 });
+    psn.setColProps('E', { width: 200 });
+    psn.setColProps('F', { width: 180 });
+
+    psn.addValidation('A2:A200', { kind: 'date', op: 'gte', a: 'today', reject: true, help: 'Tanggal kirim tidak boleh lewat' });
+    psn.addValidation('B2:B200', { kind: 'list', values: CABANG, help: 'Cabang yang mengirim' });
+    psn.addValidation('C2:C200', { kind: 'listFrom', source: 'Produk!A2:A50', reject: true, message: 'Kode di {cell} tidak ada di daftar produk' });
+    psn.addValidation('D2:D200', { kind: 'number', op: 'between', a: 1, b: 500, reject: true, help: 'Qty 1 sampai 500',
+        message: 'Qty di {cell} harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.' });
+    psn.addValidation('E2:E200', { kind: 'text', op: 'email', reject: false });   // salah ketik diterima tapi ditandai
+    psn.addValidation('F2:F200', { kind: 'textLength', op: 'lte', a: 40, reject: true });
+    psn.addValidation('G2:G200', { kind: 'checkbox' });
+    psn.setValues('A2', [[46324, 'Jakarta', 'SMN-01', 40, 'cv.bangunkarya@mail.com', 'Kirim pagi', true],
+        [46325, 'Bandung', 'BSI-13', 25, 'toko.maju@mail', '', false]]);
+    return wb;
+}
+
+const wb = buatPesanan();
+const psn = wb.sheet('Pesanan');
+const ditolak = [];
+wb.on('reject', (e) => ditolak.push(e.reason));
+const orang = { source: 'user' };                          // seperti diketik di layar: aturan diperiksa
+
+psn.setValues('C3', 'XXX-99', orang);                      // bukan kode produk
+psn.setValues('D3', 0, orang);                             // di luar 1..500
+psn.setValues('A3', 46300, orang);                         // sebelum hari ini
+psn.setValues('F3', 'Tolong telepon dulu sebelum truk berangkat ke lokasi proyek', orang);
+psn.setValues('B3', 'Medan', orang);                       // list tanpa reject: ditolak juga (bawaannya menolak)
+console.log('ditolak:');
+for (const alasan of ditolak) console.log('  -', alasan);
+console.log('isi tetap    :', psn.value('C3'), psn.value('D3'), psn.value('B3'));
+
+// aturan yang hanya menandai: nilainya disimpan, sel diberi tanda
+console.log('E3           :', psn.value('E3'), '-> tidak valid:', psn.invalidAt('E3'));
+console.log('E2           :', psn.value('E2'), '-> tidak valid:', psn.invalidAt('E2'));
+
+// pilihan dropdown dibaca dari sheet Produk: produk baru langsung jadi pilihan
+console.log('pilihan C    :', psn.choicesAt('C2').length, 'kode, pertama', psn.choicesAt('C2').slice(0, 3).join(', '));
+wb.setValues('Produk', 'A14', [['GNT-01', 'Genteng metal', 'Atap', 'lembar', 38000, 45000, 500, 100]]);
+console.log('produk baru  :', psn.choicesAt('C2').length, 'kode, terakhir', psn.choicesAt('C2').slice(-1)[0]);
+psn.setValues('C3', 'GNT-01', orang);
+console.log('C3 sekarang  :', psn.value('C3'), '| bantuan D2:', psn.validationAt('D2').help);
+
+// kode tetap bisa menulis apa saja: aturan hanya untuk yang datang dari orang
+psn.setValues('D4', 9999);
+console.log('dari kode    :', psn.value('D4'), '| ditandai:', psn.invalidAt('D4'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 07-validasi.js -->
+```text
+ditolak:
+  - Kode di C3 tidak ada di daftar produk
+  - Qty di D3 harus 1 sampai 500. Pesanan lebih besar lewat bagian proyek.
+  - The value in A3 must be at least today
+  - The value in F3 must be a text whose length is at most 40
+  - The value in B3 must be one of: Jakarta, Bandung, Surabaya
+isi tetap    : BSI-13 25 Bandung
+E3           : toko.maju@mail -> tidak valid: an email address
+E2           : cv.bangunkarya@mail.com -> tidak valid: null
+pilihan C    : 12 kode, pertama SMN-01, SMN-02, BSI-10
+produk baru  : 13 kode, terakhir GNT-01
+C3 sekarang  : GNT-01 | bantuan D2: Qty 1 sampai 500
+dari kode    : 9999 | ditandai: between 1 and 500
+```
+<!-- /hasil -->
+
+![Dropdown kode produk, dan tanda di email yang salah](img/dropdown.png)
+
+<!-- contoh: 07-validasi.page.js -->
+```jsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatPesanan } from './07-validasi.js';
+
+export default function HalamanPesanan() {
+    const [wb] = useState(buatPesanan);
+    return <div style={{ height: 500 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+Yang perlu diketahui:
+
+- **Aturan diperiksa untuk yang datang dari orang**: diketik, di-paste, di-fill, atau ditulis kode dengan `{ source: 'user' }`. Kode yang menulis tanpa
+  `source` (bawaannya `'code'`) tidak diperiksa. Isi dari kode tetap ditandai kalau melanggar, seperti D4 di contoh.
+- **`reject: true`** (bawaan): yang melanggar ditolak. Sel tetap berisi nilai lama, pesannya tampil di layar, dan `wb.on('reject')` menerimanya.
+  **`reject: false`**: nilainya disimpan tetapi sel diberi tanda segitiga merah, seperti email di E3.
+- **`message`**: pesan penolakanmu sendiri, dalam bahasa aplikasimu. `{cell}` diganti alamat selnya. Tanpa `message`, pesannya dibuat dari aturan, dalam
+  bahasa Inggris.
+- **`help`**: teks bantuan yang tampil saat sel di range itu dipilih.
+- Kalau dua aturan menimpa sel yang sama, aturan yang terakhir dibuat yang berlaku.
+
+| `kind` | Isinya | Pilihan |
+|---|---|---|
+| `list` | dropdown dari daftar tetap | `values: ['Jakarta', 'Bandung']` |
+| `listFrom` | dropdown dari isi range lain, termasuk sheet lain | `source: 'Produk!A2:A50'`. Sel kosong di range dilewati |
+| `checkbox` | kotak centang. Isinya `true` atau `false` | |
+| `number` | angka dengan syarat | `op`: `between`, `notBetween`, `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, lalu `a`, `b` |
+| `date` | tanggal dengan syarat | `op` sama dengan angka. `a` boleh nomor hari atau `'today'` |
+| `textLength` | panjang teks dengan syarat | `op` sama dengan angka |
+| `text` | teks dengan syarat | `op`: `contains`, `notContains` (dengan `a`), `email`, `url` |
+
+| Fungsi | Artinya |
+|---|---|
+| `addValidation(range, aturan)` | tambah aturan. Mengembalikan id |
+| `setValidation(range, aturan)` | pasang aturan menggantikan aturan yang menimpa range itu (yang dilakukan tombol Done di dialog) |
+| `removeValidation(range)` | buang aturan yang menimpa range |
+| `validationAt(alamat)` | aturan sebuah sel, atau `null` |
+| `choicesAt(alamat)` | pilihan dropdown sebuah sel |
+| `invalidAt(alamat)` | apa yang dilanggar nilai sel itu (teks), atau `null` kalau sesuai |
+
+Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([10.3](10-aturan.md#103-beforeop-memeriksa-setiap-perubahan))
+atau aturan dan tipe kolom ([bab 10](10-aturan.md)).
+
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [11. Memakai di React](11-react.md)

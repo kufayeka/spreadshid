@@ -314,7 +314,7 @@ Hasilnya, dijalankan di PostgreSQL 18 dengan data contoh di atas:
  Besi     |  405 |  42708700
 ```
 
-Angka yang sama dengan pivot di [bab 8](08-pivot.md). Yang perlu diingat:
+Angka yang sama dengan pivot di [7.6](07-data.md#76-pivot-table). Yang perlu diingat:
 
 - **View membaca judul kolom.** Kalau orang mengganti judul "Harga jual" di sheet, view `produk` perlu disesuaikan. Untuk sheet yang dibaca SQL, kunci
   judulnya dengan aturan `readonly` ([bab 10](10-aturan.md)).

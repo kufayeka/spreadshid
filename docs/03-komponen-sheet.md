@@ -530,18 +530,18 @@ Panel muncul di kanan grid, satu panel pada satu waktu:
 | Panel | Dibuka dari | Bab |
 |---|---|---|
 | Comments | View → Comments, Insert → Comment, Ctrl+Alt+M | [14](14-komentar.md) |
-| Pivot table editor | memilih sel pivot, Insert → Pivot table | [8](08-pivot.md) |
+| Pivot table editor | memilih sel pivot, Insert → Pivot table | [7.6](07-data.md#76-pivot-table) |
 | Conditional formatting | Format → Conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
-| Data validation | Data → Data validation, Insert → Dropdown | [7.4](07-data.md#74-validasi-data) |
+| Data validation | Data → Data validation, Insert → Dropdown | [10.4](10-aturan.md#104-validasi-data) |
 | Named ranges | Data → Named ranges | [5.11](05-rumus.md#511-named-range) |
-| Find and replace | Ctrl+F, Ctrl+H | [7.5](07-data.md#75-cari-dan-ganti) |
+| Find and replace | Ctrl+F, Ctrl+H | [7.7](07-data.md#77-mencari-dan-mengganti) |
 
 ### Di dalam grid
 
 - **Fill handle**: kotak kecil di pojok kanan bawah seleksi. Tarik untuk melanjutkan deret (1, 2, 3 · Senin, Selasa · Item 1, Item 2) atau menyalin
   rumus. Tahan Ctrl untuk menyalin apa adanya.
 - **Mengubah ukuran**: tarik garis di antara judul kolom atau nomor baris. Klik dua kali untuk menyesuaikan dengan isi.
-- **Filter**: tombol di judul kolom membuka urut dan saring ([7.2](07-data.md#72-filter)).
+- **Filter**: tombol di judul kolom membuka urut dan saring ([7.4](07-data.md#74-menyaring)).
 - **Dropdown dan checkbox** dari validasi data: klik panahnya, atau tekan Alt+↓.
 - **Tanda di pojok sel**: oranye berarti ada komentar terbuka, merah berarti nilainya melanggar validasi yang hanya menandai.
 - **Grup**: tombol `[-]` dan `[+]` di samping nomor baris dan di atas judul kolom, dan tombol level di pojok kiri atas.

@@ -65,6 +65,11 @@ export const SHOTS = [
     proyek('proyek-harian', 'Harian 27-10'),
     proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
     proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
+    // chapter 7: data
+    { name: 'data-sort', page: '07-03-sort.page.tsx', act: press('.nama'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'data-grup-buka', page: '07-05-grup.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'data-grup-lipat', page: '07-05-grup.page.tsx', act: press('.lipat'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'data-cari', page: '07-07-cari.page.tsx', act: press('.ganti'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
     // chapter 6: formats
     { name: 'format-angka', page: '06-03-angka.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 320 } },
     { name: 'format-kolom', page: '06-04-kolom.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 290 } },
