@@ -663,7 +663,7 @@ export function LembarPenjualan({ id, doc }) {
 
 - `doc` adalah JSON biasa (hasil `wb.toJSON()` yang dulu disimpan), jadi bisa melewati batas server ke client. Workbook-nya sendiri dibuat di client.
 - Komponen yang memanggil `createWorkbook`, `useState`, atau `useWorkbook` harus client component (`'use client'`). `<Sheet>` sendiri sudah client
-  component, jadi bisa dipakai langsung di halaman yang tidak membuat workbook ([1.5](01-mulai-cepat.md#15-nextjs)).
+  component, jadi bisa dipakai langsung di halaman yang tidak membuat workbook ([1.9](01-mulai-cepat.md#19-di-nextjs)).
 - Untuk halaman yang memuat dari API di browser (11.8), server merender teks memuatnya dulu. `<Sheet>` juga aman dirender di server karena tidak
   menyentuh `window` atau `document` saat render.
 

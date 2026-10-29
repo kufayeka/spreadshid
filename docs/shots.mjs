@@ -51,14 +51,20 @@ export const SHOTS = [
     proyek('proyek-harian', 'Harian 27-10'),
     proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
     proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
-    { name: 'mulai-cepat', page: '01-halaman.page.js', clip: { x: 0, y: 0, width: 1000, height: 420 } },
-    { name: 'boq', page: '01-boq.page.js', clip: { x: 0, y: 0, width: 1000, height: 330 } },
-    { name: 'bagian-layar', page: '01-boq.page.js', clip: { x: 0, y: 0, width: 1366, height: 768 } },
     { name: 'handle-select', page: '03-handle.page.js', act: async ({ js, wait }) => { await js('document.querySelector("#pilih").click()'); await wait(400); }, clip: { x: 0, y: 0, width: 1000, height: 380 } },
     { name: 'events', page: '03-events.page.js', act: async ({ js, click, type, key, wait }) => {
         const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(150); await type('15'); await key('Enter', 'Enter', 13); await wait(300);
         const q = await cellAt(js, 1, 1); await click(q.x, q.y); await wait(150); await type('Besi'); await key('Enter', 'Enter', 13); await wait(400);
     }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
+    // chapter 1, one picture per step
+    { name: 'mulai-kosong', page: '01-05-kosong.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 420 } },
+    { name: 'mulai-isi', page: '01-06-isi.page.tsx', act: async ({ js, click, wait }) => { const p = await cellAt(js, 4, 4); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'mulai-rapi', page: '01-07-rapi.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'bagian-layar', page: '01-07-rapi.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 300 } },
+    { name: 'mulai-simpan', page: '01-08-simpan.page.tsx', act: async ({ js, click, type, key, wait }) => {
+        await js("localStorage.removeItem('stok-toko'); 0");
+        const p = await cellAt(js, 1, 3); await click(p.x, p.y); await wait(150); await type('400'); await key('Enter', 'Enter', 13); await wait(400);
+    }, clip: { x: 0, y: 0, width: 1000, height: 340 } },
     { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } },
     { name: 'kondisional', page: '06-kondisional.page.js', clip: { x: 0, y: 110, width: 1000, height: 330 } },
     { name: 'pivot', page: '08-pivot.page.js', act: async ({ js, click, wait }) => {

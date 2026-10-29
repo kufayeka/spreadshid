@@ -27,7 +27,7 @@ ok('every example in the documentation runs, and its code and output are the one
 
 // every page example renders to HTML on a server (the part above its "tampilkan" line: what a reader copies)
 const tmp = join(here, '.docs-ssr');
-const pages = readdirSync(examples).filter((f) => f.endsWith('.page.js') || f.endsWith('.page.tsx') || f === '01-next-page.js');
+const pages = readdirSync(examples).filter((f) => f.endsWith('.page.js') || f.endsWith('.page.tsx'));
 for (const name of pages) {
     const text = readFileSync(join(examples, name), 'utf8');
     const code = text.split('// ----- tampilkan -----')[0];

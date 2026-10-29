@@ -1,15 +1,15 @@
 import { Sheet } from '@kufayeka/sheet';
 import '@kufayeka/sheet/style.css';
 
-// Halaman paling sederhana: sheet kosong seperti Google Sheets.
-// Sheet mengisi tinggi pembungkusnya, jadi pembungkus harus punya tinggi.
+// 1.5 Sheet pertama: satu komponen, satu tinggi. Belum ada isi.
 export default function Halaman() {
     return (
-        <div style={{ height: 600 }}>
+        <div style={{ height: 420 }}>
             <Sheet />
         </div>
     );
 }
 // ----- tampilkan -----
 import { createRoot } from 'react-dom/client';
-createRoot(document.getElementById('root')).render(<Halaman />);
+const root = document.getElementById('root');
+if (root) createRoot(root).render(<Halaman />);

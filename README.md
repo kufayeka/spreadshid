@@ -4,7 +4,7 @@ Spreadsheet untuk React yang rasanya seperti Google Sheets. Orang bisa bikin dan
 Rupiah, merge, filter, grup baris, komentar, import dan download Excel. Kode aplikasimu tetap pegang kendali: tiap perubahan bisa diizinkan, diubah,
 atau ditolak, dan tiap orang cuma bisa melakukan apa yang dikasih perannya.
 
-![Sheet BOQ dengan rumus dan format Rupiah](docs/img/boq.png)
+![Sheet stok dengan rumus dan format Rupiah](docs/img/mulai-rapi.png)
 
 Ditulis dalam JavaScript dengan JSDoc. File `.d.ts` untuk TypeScript dibuat dari situ waktu build, jadi editor tetap kasih saran nama fungsi dan
 parameter.
@@ -22,16 +22,15 @@ Butuh `react` dan `react-dom` versi 18 ke atas.
 
 ## Contoh terkecil
 
-<!-- contoh: 01-halaman.page.js -->
-```jsx
+<!-- contoh: 01-05-kosong.page.tsx -->
+```tsx
 import { Sheet } from '@kufayeka/sheet';
 import '@kufayeka/sheet/style.css';
 
-// Halaman paling sederhana: sheet kosong seperti Google Sheets.
-// Sheet mengisi tinggi pembungkusnya, jadi pembungkus harus punya tinggi.
+// 1.5 Sheet pertama: satu komponen, satu tinggi. Belum ada isi.
 export default function Halaman() {
     return (
-        <div style={{ height: 600 }}>
+        <div style={{ height: 420 }}>
             <Sheet />
         </div>
     );
@@ -51,7 +50,7 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 
 ## Daftar isi
 
-1. [Mulai cepat](docs/01-mulai-cepat.md): pasang, halaman pertama, workbook buatan sendiri, Next.js
+1. [Mulai dalam 5 menit](docs/01-mulai-cepat.md): pasang, sheet pertama, isi dari kode, dirapikan, disimpan, Next.js
 2. [Konsep dasar](docs/02-konsep.md): workbook, sheet, alamat sel, id baris dan kolom, perubahan (op), undo, menyimpan
 3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): semua props, event, handle (`ref`), keyboard, tema
 - [Galeri: satu proyek konstruksi](docs/galeri.md)
