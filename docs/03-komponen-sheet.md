@@ -148,7 +148,7 @@ Setelah tombol **Pilih B2:C4** diklik:
 
 ## 3.4 Keyboard
 
-Sama seperti Google Sheets. Di Mac, `Ctrl` adalah `⌘`.
+Di Mac, `Ctrl` adalah `⌘`.
 
 | Tombol | Fungsi |
 |---|---|
@@ -164,7 +164,7 @@ Sama seperti Google Sheets. Di Mac, `Ctrl` adalah `⌘`.
 | `PageUp` / `PageDown` | satu layar ke atas / bawah |
 | `Ctrl+A` | memilih semua |
 | `Ctrl+Z` / `Ctrl+Y` (`Ctrl+Shift+Z`) | undo / redo |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy / cut / paste (dari dan ke Excel atau Google Sheets juga) |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy / cut / paste (dari dan ke Excel juga) |
 | `Ctrl+Shift+V` | paste nilai saja |
 | `Ctrl+B` / `Ctrl+I` / `Ctrl+U` | tebal / miring / garis bawah |
 | `Alt+Shift+5` | coret |

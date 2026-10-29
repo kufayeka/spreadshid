@@ -840,7 +840,7 @@ import { Sheet } from '@kufayeka/sheet';
 import '@kufayeka/sheet/style.css';
 import { buatProyek } from './proyek/index.js';
 
-// Workbook proyek di layar: sepuluh sheet yang saling terhubung, bisa diedit seperti Google Sheets.
+// Workbook proyek di layar: sepuluh sheet yang saling terhubung, bisa diedit langsung di layar.
 export default function HalamanProyek() {
     const [wb] = useState(() => buatProyek());
     return (

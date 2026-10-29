@@ -28,7 +28,7 @@ menambah **satu hal baru**, dengan foto hasilnya.
 
 ## 1.1 Apa yang kamu dapat
 
-Sebuah komponen React yang menampilkan spreadsheet lengkap, seperti Google Sheets, di dalam aplikasimu sendiri:
+Sebuah komponen React yang menampilkan spreadsheet lengkap di dalam aplikasimu sendiri:
 
 ![Spreadsheet stok dengan rumus dan Rupiah](img/mulai-rapi.png)
 
@@ -62,7 +62,7 @@ Ada tiga hal yang di-import:
 
 | Bagian | Isinya |
 |---|---|
-| **Menu bar** | File, Edit, View, Insert, Format, Data, mirip Google Sheets |
+| **Menu bar** | File, Edit, View, Insert, Format, Data |
 | **Toolbar** | undo/redo, zoom, format angka (Rp, %, desimal), font, tebal/miring, warna, border, merge, rata, dan lainnya |
 | **Formula bar** | kotak nama di kiri (alamat sel aktif; ketik alamat lalu Enter untuk loncat), lalu isi sel aktif |
 | **Grid** | huruf kolom, nomor baris, dan sel |

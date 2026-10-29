@@ -3,7 +3,7 @@
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Mengisi sheet dari data](09-populate.md)
 
 Pivot table meringkas tabel data per kelompok: omzet per kategori dan cabang, transaksi per minggu, penjualan per sales. Cara kerjanya sama dengan pivot
-table di Google Sheets dan Excel. Pivot disimpan di sheet, ditulis sebagai nilai biasa, dan dihitung ulang setiap kali datanya berubah. Fungsi yang sama
+table di Excel. Pivot disimpan di sheet, ditulis sebagai nilai biasa, dan dihitung ulang setiap kali datanya berubah. Fungsi yang sama
 juga bisa dipakai tanpa sheet, misalnya di server, untuk meringkas data dari database.
 
 - [8.1 Pivot di sheet](#81-pivot-di-sheet)

@@ -3,7 +3,7 @@
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [15. Excel dan CSV](15-excel.md) · Berikutnya: [17. Performa](17-performa.md)
 
 Bab ini untuk orang yang **memakai** sheet di aplikasimu: semua menu, tombol toolbar, dan panel, beserta fungsi kode yang setara untuk developer.
-Tampilan dan tombolnya mengikuti Google Sheets, jadi orang yang sudah biasa memakai Google Sheets atau Excel langsung bisa bekerja. Teks di layar dalam
+Tampilan dan tombolnya mengikuti spreadsheet pada umumnya, jadi orang yang sudah biasa memakai Excel langsung bisa bekerja. Teks di layar dalam
 bahasa Inggris.
 
 ![Bagian-bagian layar](img/bagian-layar.png)

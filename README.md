@@ -1,6 +1,6 @@
 # @kufayeka/sheet
 
-Spreadsheet untuk React yang rasanya seperti Google Sheets. Orang bisa bikin dan merapikan sheet sendiri lewat toolbar dan menu: rumus, format
+Spreadsheet untuk React. Orang bisa bikin dan merapikan sheet sendiri lewat toolbar dan menu: rumus, format
 Rupiah, merge, filter, grup baris, komentar, import dan download Excel. Kode aplikasimu tetap pegang kendali: tiap perubahan bisa diizinkan, diubah,
 atau ditolak, dan tiap orang cuma bisa melakukan apa yang dikasih perannya.
 
