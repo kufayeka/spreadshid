@@ -58,6 +58,17 @@ export const SHOTS = [
     { name: 'akses-kasir', page: '13-08-kasir.page.tsx', act: async ({ js, click, wait }) => {
         const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(200); await click(p.x, p.y); await wait(100);
     }, clip: { x: 0, y: 0, width: 1100, height: 400 } },
+    { name: 'akses-tanda', page: '13-12-tanda.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 420 } },
+    { name: 'editor-akses-live', page: '04-13-editor-akses.page.tsx', act: async ({ js, click, mouse, wait }) => {
+        // the same rule as the editor's picture (Harga beli hidden for kasir), then the sheet as Rina sees it
+        const a = await cellAt(js, 1, 2), b = await cellAt(js, 4, 2);
+        await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(200);
+        await js(`(function(){ var e = document.querySelector('.pilih-mode'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'hidden'); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+        const t = await js('(function(){ var e = document.querySelector(".tambah-aturan").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
+        await click(t.x, t.y); await wait(300);
+        await js(`(function(){ var e = document.querySelector('.lihat-sebagai'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'rina'); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+        await wait(400);
+    }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
     { name: 'akses-pesan', page: '13-11-pesan.page.tsx', act: async ({ js, click, type, wait }) => {
         const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(200); await type('x'); await wait(300);
     }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
@@ -88,8 +99,7 @@ export const SHOTS = [
         const pick = (sel, v) => js(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
         await pick('.pilih-mode', 'hidden');
         const t = await js('(function(){ var e = document.querySelector(".tambah-aturan").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
-        await click(t.x, t.y); await wait(200);
-        await pick('.lihat-sebagai', 'user:rina'); await wait(400);
+        await click(t.x, t.y); await wait(400);
     }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
     { name: 'invoice', page: '04-05-invoice.page.tsx', clip: { x: 0, y: 110, width: 720, height: 330 } },
     { name: 'filter', page: '07-filter.page.js', act: async ({ js, click, wait }) => {

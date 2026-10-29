@@ -484,4 +484,12 @@ export const ACTIONS: string[];
 export const ACTION_INFO: Array<{ id: string; label: string; group: string }>;
 export const UI_ITEMS: Array<{ id: string; label: string; group: string }>;
 export function validateAccess(rows: unknown): Array<{ row: number; problem: string }>;
+/** The colour of a who, the same everywhere: for your own list of rules, so it matches the squares of the rules editor. */
+export function accessColor(who: string, colors?: Record<string, string>): string;
+/** Where each access row touches a workbook (what the rules editor draws). */
+export function accessPlaces(wb: Workbook, rows: AccessRow[], colors?: Record<string, string>): {
+    colorOf(index: number): string | null;
+    at(sheet: string, r: number, c: number): Array<{ who: string; color: string; rows: number[] }>;
+    rects(index: number, sheet: string): Array<{ r1: number; c1: number; r2: number; c2: number }>;
+};
 export function parseWhere(where: string | null | undefined): { sheet: string | null; range: string | null; columns: string[] | null };

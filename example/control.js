@@ -34,7 +34,7 @@ window.__noticeAnswer = undefined;
 window.__sheet = createRef();
 window.__populate = (spec, value) => populate(wb, s, spec, value);
 createRoot(document.getElementById('root')).render(
-    <Sheet ref={window.__sheet} workbook={wb} showProtected style={{ height: '100%' }}
+    <Sheet ref={window.__sheet} workbook={wb} marks={{ stripes: true }} style={{ height: '100%' }}
         onOp={(e) => window.__events.op.push(e)}
         onReject={(e) => window.__events.reject.push(e.reason)}
         onCellError={(e) => window.__events.cellError.push(e)}

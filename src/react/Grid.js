@@ -62,13 +62,13 @@ function bordersCss(borders) {
 // A cell is drawn only when it shows something (a value, a fill, a border). It leaves the last pixel on its right and at its bottom to the grid lines,
 // which are drawn once per row and once per column under the cells; a cell that must hide the lines inside it (a merged block, a text that runs on over
 // empty cells) covers them with the sheet's colour, as Google Sheets does.
-function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded, rule, invalid, noted }) {
+function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded, rule, invalid, noted, whos }) {
     const css = cellCss(style, display);
     // A text that runs on over the empty cells on its right takes only its text there: the cell's own fill (and its stripes when protected) stay
     // inside the cell itself, as in Google Sheets; the rest of the run is the sheet's colour, which hides the grid lines under the text.
     const own = cover && (css.background || guarded);
     return (
-        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '') + (noted ? ' ks-noted' : '')} data-r={r} data-c={c}
+        <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '') + (noted ? ' ks-noted' : '')} data-r={r} data-c={c} data-mode={guarded || undefined}
             style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: own ? undefined : css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
             {own ? <span className={'ks-own' + (guarded ? ' ks-guarded' : '')} style={{ width: Math.max(0, ownWidth - 1), background: css.background }} /> : null}
             {rule && rule.kind === 'checkbox'
@@ -78,7 +78,21 @@ function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guard
             {rule && (rule.kind === 'list' || rule.kind === 'listFrom') ? <span className="ks-drop" data-drop="" aria-label="Choices">&#9662;</span> : null}
             {invalid ? <span className="ks-invalid" title={'Invalid: must be ' + invalid} /> : null}
             {style && style.borders ? <span className="ks-borders" style={bordersCss(style.borders)} /> : null}
+            {whos && whos.length ? <WhoMarks whos={whos} /> : null}
         </div>
+    );
+}
+
+// The squares of the rules editor in a cell's top right corner: one per who that has a rule there, in that who's colour. Four fit; with more, three
+// and a plus. Each tells, when the pointer rests on it, who it is and which rules (by their number in the list, counted from 1).
+function WhoMarks({ whos }) {
+    const shown = whos.length > 4 ? whos.slice(0, 3) : whos;
+    const title = whos.map((x) => x.who + ' (rule ' + x.rows.map((i) => i + 1).join(', ') + ')').join('\n');
+    return (
+        <span className="ks-whos" title={title}>
+            {shown.map((x) => <i key={x.who} data-rule={x.rows[0]} style={{ background: x.color }} />)}
+            {whos.length > 4 ? <b>+{whos.length - 3}</b> : null}
+        </span>
     );
 }
 
@@ -87,7 +101,7 @@ function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guard
  * on screen while scrolling up or down keeps all its props and is not drawn again: a scroll only draws the rows that come in.
  * `revision` is the workbook's: a change anywhere draws the rows again (their values may have changed through formulas).
  */
-const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, colAxis, blocks, revision, showProtected }) {
+const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, colAxis, blocks, revision, showProtected, setup }) {
     void revision;
     const cells = [];
     // the columns of this row that a merged block covers (the block itself is drawn by the pane)
@@ -99,15 +113,17 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         if (!w) continue;
         const display = wb.display(sheetId, r, c);
         const style = wb.shownStyle(sheetId, r, c); // its own style, and over it what the rules of conditional formatting give it
-        // a protected cell, drawn striped when the host asks (showProtected)
+        // a protected cell, marked as the host asks (marks: a lock, an eye, a tint, stripes)
         const guarded = showProtected && wb.modeAt(sheetId, r, c);
+        // the rules editor: who has a rule here (a coloured square each)
+        const whos = setup ? setup.places.at(sheetId, r, c) : null;
         // a cell under a rule of data validation shows a checkbox or a dropdown's arrow, and a mark when its value breaks a rule that only warns
         const rule = wb.validationAt(sheetId, r, c);
         const invalid = rule && rule.reject === false ? wb.invalidAt(sheetId, r, c) : null;
         // a cell with an open thread of comments shows a mark in its corner
         const noted = wb.hasComment(sheetId, r, c) && wb.shows('cell.commentMark');
         // an empty cell with no style is not drawn: the grid lines are all it shows
-        if (display.kind === 'empty' && !style && !guarded && !rule && !noted) continue;
+        if (display.kind === 'empty' && !style && !guarded && !rule && !noted && !(whos && whos.length)) continue;
         // A text that does not wrap and sits on the left runs on into the empty cells on its right, which are then not drawn (their grid lines would
         // cross the text). It stops at a protected cell that is shown striped. A centred text (the dots of a hidden cell) stays in its cell.
         let width = w;
@@ -120,7 +136,7 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
                 next++;
             }
         }
-        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={!!guarded} rule={rule} invalid={invalid} noted={noted} />);
+        cells.push(<Cell key={c} r={r} c={c} x={colAxis.start(c) - xBase} y={top} w={width} h={height} cover={width > w} ownWidth={w} display={display} style={style} guarded={guarded ? guarded.mode : null} rule={rule} invalid={invalid} noted={noted} whos={whos} />);
     }
     return cells;
 });
@@ -150,7 +166,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectStart, onSelectEnd, onLink, painting, showProtected, onFilterMenu, ui, onComment }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectStart, onSelectEnd, onLink, painting, showProtected, setup, onFilterMenu, ui, onComment }) {
     // what the access policy lets this person see (policy.js): no headers, no grid lines, only an area of the sheet
     const seen = ui || {};
     const HW = seen.headers === false ? 0 : ROW_HEADER_WIDTH, HH = seen.headers === false ? 0 : HEADER_HEIGHT;
@@ -507,6 +523,9 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     function onMouseDown(e) {
         if (e.button !== 0) return;
         const edge = e.target && e.target.dataset;
+        // a square of the rules editor: the host is told which rule it stands for (the cell is selected as well, as a click on it would)
+        const square = e.target && e.target.closest && e.target.closest('[data-rule]');
+        if (square && setup && setup.onSelect) setup.onSelect(Number(square.dataset.rule));
         // a button of the filter's header: its menu opens under it (the selection stays)
         const filterButton = e.target && e.target.closest && e.target.closest('[data-filter-col]');
         if (filterButton) {
@@ -782,7 +801,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             const h = rowAxis.size(r);
             if (!h) continue;
             out.push(<Row key={r} wb={wb} sheetId={sheetId} r={r} top={rowAxis.start(r) - yBase} height={h} from={cols.from} to={cols.to} xBase={xBase}
-                colAxis={colAxis} blocks={blocks} revision={revision} showProtected={showProtected} />);
+                colAxis={colAxis} blocks={blocks} revision={revision} showProtected={showProtected} setup={setup} />);
         }
         // the merged blocks that reach into the pane, each drawn whole (the pane cuts what is outside it)
         for (const b of blocks) {
@@ -819,13 +838,19 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
                 width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) }} />);
         });
         // a frame over a rectangle of cells, against the sheet like everything in the pane
-        const frame = (key, cls, b) => {
+        const frame = (key, cls, b, extra) => {
             if (b.r1 > rows.to || b.r2 < rows.from || b.c1 > cols.to || b.c2 < cols.from) return;
             out.push(<div key={key} className={cls} style={{ left: colAxis.start(b.c1) - xBase, top: rowAxis.start(b.r1) - yBase,
-                width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) }} />);
+                width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1), ...(extra || {}) }} />);
         };
         if (clipMark && clipMark.sheetId === sheetId) frame('clip', 'ks-clipmark', clipMark.rect);
         if (fillPreview) frame('fill', 'ks-fillpreview', fillPreview);
+        if (setup && setup.selected !== null && setup.selected !== undefined) {
+            // in the colour of the selected rule's who, so it reads as that who's squares do
+            const color = setup.places.colorOf(setup.selected);
+            setup.places.rects(setup.selected, sheetId).forEach((b, i) => frame('rule' + i, 'ks-rule-outline', { r1: b.r1, c1: b.c1, r2: Math.min(b.r2, rows.to), c2: b.c2 },
+                color ? { borderColor: color, background: color + '12' } : null));
+        }
         if (marks && marks.length) {
             for (let i = 0; i < marks.length; i++) {
                 const m = marks[i];

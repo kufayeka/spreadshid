@@ -32,13 +32,34 @@ await withExample(async ({ js, click, mouse, wait }) => {
     await wait(200);
     const last = await js('Array.from(document.querySelectorAll(".daftar-aturan tbody tr")).pop().textContent');
     check('the rule is a new row of the table: role:kasir deny read Produk!C2:C5', last.startsWith('role:kasirdenyreadProduk!C2:C5'), last);
+    await wait(300);
 
+    // the rules editor (setup): a square per who in the corner of each cell a rule touches, the selected rule outlined
+    const squares = (r, c) => js(`(function(){ var t = document.querySelector('.ks-cell[data-r="${r}"][data-c="${c}"] .ks-whos'); return t ? t.querySelectorAll('i').length : 0; })()`);
+    check('C3 carries two squares: kasir and gudang (kasir twice is one square)', (await squares(2, 2)) === 2, await squares(2, 2));
+    check('a cell no rule touches carries none (G3)', (await squares(2, 6)) === 0);
+    check('the new rule is selected: its range is outlined', await js('!!document.querySelector(".ks-rule-outline")'));
+    check('in setup there are no live marks (no lock, no eye)', await js('!document.querySelector(".ks-sheet").className.match(/ks-marks-/)'));
     check('the owner still sees the cost price', (await shown(1, 2)) === 'Rp 64.000', await shown(1, 2));
-    await pick('.lihat-sebagai', 'user:rina');
+
+    // a click on a square in the sheet selects that who's row in the list
+    const sq = await js(`(function(){ var i = document.querySelector('.ks-cell[data-r="1"][data-c="4"] .ks-whos i:last-child'); var b = i.getBoundingClientRect(); return { x: b.left + 2, y: b.top + 2 }; })()`);
+    await click(sq.x, sq.y);
+    await wait(200);
+    const row = await js('Array.from(document.querySelectorAll(".daftar-aturan tbody tr")).findIndex(function(t){ return t.style.background; })');
+    check('a click on the gudang square of E2 selects the first gudang row (row 3)', row === 2, row);
+
+    // live: the sheet as Rina sees it
+    await pick('.lihat-sebagai', 'rina');
     await wait(300);
     check('as Rina (kasir), the cost price is hidden', (await shown(1, 2)) === '•••', await shown(1, 2));
-    check('and the selling price is not', (await shown(1, 3)) === 'Rp 72.000', await shown(1, 3));
-    await pick('.lihat-sebagai', 'user:joko');
+    const modeOf = (r, c) => js(`document.querySelector('.ks-cell[data-r="${r}"][data-c="${c}"]').dataset.mode`);
+    const sheetHas = (cls) => js(`document.querySelector('.ks-sheet').classList.contains('${cls}')`);
+    check('and marked with the eye', (await sheetHas('ks-marks-hidden')) && (await modeOf(1, 2)) === 'hidden', await modeOf(1, 2));
+    check('a cell she may only read carries the lock', (await sheetHas('ks-marks-lock')) && (await modeOf(1, 3)) === 'readonly', await modeOf(1, 3));
+    check('and the selling price is not hidden', (await shown(1, 3)) === 'Rp 72.000', await shown(1, 3));
+    check('no squares outside setup', !(await js('!!document.querySelector(".ks-whos")')));
+    await pick('.lihat-sebagai', 'joko');
     await wait(300);
     check('as Joko (gudang), the rule of the kasir does not count', (await shown(1, 2)) === 'Rp 64.000', await shown(1, 2));
 }, '../docs/examples/04-13-editor-akses.page.tsx');

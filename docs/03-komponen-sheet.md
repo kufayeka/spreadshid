@@ -28,7 +28,7 @@ Semua props boleh tidak diisi.
 | `fileName` | string | `'Spreadsheet'` | nama file (tanpa ekstensi) saat orang memilih File → Download |
 | `access` | `{ rows, who }` | tanpa batasan | baris-baris aturan akses dan orang yang membuka sheet ([bab 13](13-hak-akses.md)). Sheet hanya menerapkan; aturannya tetap milik aplikasimu |
 | `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya ([bab 14](14-komentar.md)) |
-| `showProtected` | boolean | `false` | sel yang dilindungi aturan digambar bergaris-garis (berguna saat membuat aturan) |
+| `marks` | `false \| { lock, hidden, tint, stripes }` | `{ lock: true, hidden: true }` | tanda di sel yang tidak boleh diubah orang ini: gembok di sel hanya-baca, mata di sel tersembunyi, latar abu, garis-garis. Bebas dicampur; `false` = tanpa tanda ([13.9](13-hak-akses.md#139-langkah-8-di-react)) |
 | `className` | string | | class tambahan di elemen terluar |
 | `style` | objek style | | style elemen terluar. Tinggi bisa diatur di sini; variabel tema juga (3.5) |
 | `ref` | ref React | | handle untuk kodemu (3.3) |

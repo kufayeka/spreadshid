@@ -23,6 +23,7 @@ export { findAll, replaceIn, sortRange } from './search.js';
 export { tableOf, pivot, PIVOT_FUNCTIONS } from './pivot.js';
 export { exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';
 export { resolveAccess, ACTIONS, ACTION_INFO, UI_ITEMS, validateAccess, parseWhere } from './policy.js';
+export { accessColor, accessPlaces } from './access-setup.js';
 
 /** The names of every function a formula can use, in order (for a list of them, or a check). */
 export const FUNCTION_NAMES = Object.keys(ALL_FUNCTIONS).sort();

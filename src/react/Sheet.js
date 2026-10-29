@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { createWorkbook, VERSION } from '../core/index.js';
+import { createWorkbook, VERSION, accessPlaces } from '../core/index.js';
 import { selectCell, stepActive, rectsOf } from '../core/selection.js';
 import { addressOf } from '../core/formula/address.js';
 import { parseAddressText } from './FormulaBar.js';
@@ -86,7 +86,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {string} [fileName]
  * @property {{ rows: object[]|null, who: any }} [access]
  * @property {{ id: string, name: string }} [user]
- * @property {boolean} [showProtected]
+ * @property {false|{ lock?: boolean, hidden?: boolean, tint?: boolean, stripes?: boolean }} [marks]
  * @property {string} [className]
  * @property {import('react').CSSProperties} [style]
  */
@@ -110,7 +110,8 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {{ rows: object[]|null, who: any }} [props.access]  The access rows of the workbook and the person who has it open (policy.js). It is the
  *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
  * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments.
- * @param {boolean} [props.showProtected]  Draw the protected cells striped (the rules are the workbook's: setRules).
+ * @param {false|{ lock?: boolean, hidden?: boolean, tint?: boolean, stripes?: boolean }} [props.marks]  How the cells this person may not change are
+ *   marked: a lock on a read-only cell and an eye on a hidden one by default; a tint and stripes on request; false: no marks.
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
  * @param {import('react').CSSProperties} [props.style]  Inline style of the outer element (its height above all: the grid fills it).
  * @param {import('react').Ref<SheetHandle>} [ref]  What the host's code can ask of the sheet (see SheetHandle).
@@ -179,6 +180,19 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const accessRows = props.access ? props.access.rows : null;
     const who = props.access ? props.access.who : null;
     useEffect(() => { if (props.access) wb.setAccess(accessRows, who); }, [wb, accessRows, JSON.stringify(who), !!props.access]);
+
+    // How the cells this person may not change are marked (live): a lock and an eye by default, a tint and stripes on request, any of them together;
+    // false: none. The rules editor (access.view 'setup') shows who has a rule in each cell instead, so the live marks are left out there.
+    const setupView = !!(props.access && props.access.view === 'setup');
+    const cellMarks = props.marks === false || setupView ? null : { lock: true, hidden: true, ...(props.marks || {}) };
+    const marksClass = cellMarks ? ['lock', 'hidden', 'tint', 'stripes'].filter((k) => cellMarks[k]).map((k) => ' ks-marks-' + k).join('') : '';
+    // the rules editor: where each row of the access touches the sheet (made again when the rows or the sheet's shape change), the selected row,
+    // and the host told which row a square stands for
+    const accessColors = props.access ? props.access.colors : undefined;
+    const places = useMemo(() => (setupView ? accessPlaces(wb, accessRows || [], accessColors) : null), [setupView, wb, accessRows, accessColors, revision]);
+    // kept the same object between renders (the rows of the grid are drawn again only when it changes); the host's onSelect is read when called
+    const selectedRule = setupView ? props.access.selected : null;
+    const setup = useMemo(() => (places ? { places, selected: selectedRule, onSelect: (i) => { const a = latest.current.access; if (a && a.onSelect) a.onSelect(i); } } : null), [places, selectedRule]);
     // making a pivot table (its dialog), and its editor that opens when a cell of a pivot table is selected (and closes when one outside is)
     const [pivotDialog, setPivotDialog] = useState(null);
     useEffect(() => {
@@ -326,7 +340,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     // what the access policy lets this person see (policy.js): the parts of the screen it hides are not drawn
     const ui = wb.access().ui;
     return (
-        <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
+        <div ref={root} className={'ks-sheet' + marksClass + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             {ui.menubar ? <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => { if (wb.shows('panel.settings')) setSettingsOpen(true); }} onShow={show} onError={tellError} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
@@ -368,7 +382,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     toGrid();
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
-                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
+                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!cellMarks} setup={setup} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={() => setPanel({ kind: 'comments', start: Date.now() })} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}

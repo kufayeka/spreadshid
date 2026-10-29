@@ -1,5 +1,5 @@
 // Control from code in a real Chrome (step R4): the host's rules stop a person at once (typing, double click, paste), types refuse a wrong value and say
-// it as an event, hidden cells show dots, protected cells are striped, and the host's handle (select, startEdit) and events (op, selection) work.
+// it as an event, hidden cells show dots, protected cells are marked (a lock, and stripes as this example asks), and the host's handle (select, startEdit) and events (op, selection) work.
 //   node test/grid-control.test.js     (needs Chrome)
 import { chromeAvailable, withExample } from './chrome.js';
 
@@ -18,7 +18,7 @@ await withExample(async ({ js, send, click, mouse, type, key, wait }) => {
     const cellAt = (r, c) => q(`(function(){ var h = document.querySelector('.ks-colhead[data-c="${c}"]'), v = document.querySelector('.ks-rowhead[data-r="${r}"]'); var a = h.getBoundingClientRect(), b = v.getBoundingClientRect(); return { x: Math.round(a.left + a.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
     const clickCell = async (r, c, extra) => { const p = await cellAt(r, c); await click(p.x, p.y, extra); await wait(120); };
 
-    check('protected cells are drawn striped (the rates, the approved line)', await q('!!document.querySelector(".ks-cell.ks-guarded[data-r=\\"1\\"][data-c=\\"2\\"]") && !!document.querySelector(".ks-cell.ks-guarded[data-r=\\"2\\"][data-c=\\"0\\"]")'));
+    check('protected cells are marked (the rates, the approved line): read only, with the stripes this example asks for', await q('!!document.querySelector(".ks-cell.ks-guarded[data-r=\\"1\\"][data-c=\\"2\\"]") && !!document.querySelector(".ks-cell.ks-guarded[data-r=\\"2\\"][data-c=\\"0\\"]")'));
     check('a hidden column shows dots, its header its name', (await q('document.querySelector(".ks-cell[data-r=\\"1\\"][data-c=\\"5\\"]").textContent')) === '•••' && (await q('document.querySelector(".ks-cell[data-r=\\"0\\"][data-c=\\"5\\"]").textContent')) === 'Cost');
     // what the eye sees: the dots stay in their cell, the header's text is on top of its fill, and a text that runs on does not take its fill along
     check('the dots of a hidden cell stay in their cell (they do not run on)', (await q('Math.round(document.querySelector(".ks-cell[data-r=\\"1\\"][data-c=\\"5\\"]").getBoundingClientRect().width)')) === 99);

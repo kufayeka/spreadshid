@@ -94,7 +94,7 @@ manajer       : Rp 64.000 | mode F2 null
 ```
 <!-- /hasil -->
 
-Di layar, kasir yang mengetik di kolom Harga jual mendapat pesan dari aturannya. Dengan prop `showProtected`, sel yang dilindungi digambar bergaris:
+Di layar, kasir yang mengetik di kolom Harga jual mendapat pesan dari aturannya. Sel yang dilindungi diberi gembok kecil di pojok kanan atas (bawaan, bisa diganti dengan prop `marks`, lihat [13.9](13-hak-akses.md#139-langkah-8-di-react)):
 
 ![Kolom terlindung dan pesan penolakan](img/aturan.png)
 
@@ -107,8 +107,8 @@ import { buatProdukKasir } from './10-aturan.js';
 
 export default function HalamanKasir() {
     const [wb] = useState(buatProdukKasir);
-    // showProtected: sel yang dilindungi aturan digambar bergaris, berguna saat menyusun aturan
-    return <div style={{ height: 520 }}><Sheet workbook={wb} showProtected /></div>;
+    // sel yang dilindungi aturan diberi gembok kecil di pojok (bawaan); marks={{ stripes: true }} menambah garis-garis
+    return <div style={{ height: 520 }}><Sheet workbook={wb} /></div>;
 }
 ```
 <!-- /contoh -->

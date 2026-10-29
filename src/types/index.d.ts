@@ -2,6 +2,32 @@
 import type { ForwardRefExoticComponent, RefAttributes, CSSProperties } from 'react';
 import type { Workbook, Op, Source, AccessRow, Who } from './core/index.js';
 
+/** The marks of the cells a person may not change (Sheet marks). */
+export interface CellMarks {
+    /** A lock in the top right corner of a cell that can be read, not changed. Default true. */
+    lock?: boolean;
+    /** An eye, crossed out, in the corner of a hidden cell (•••). Default true. */
+    hidden?: boolean;
+    /** A light grey background, and the text of a read-only cell a little paler. */
+    tint?: boolean;
+    /** Thin diagonal stripes. */
+    stripes?: boolean;
+}
+
+/** The access of a Sheet: the rows, the person, and the rules editor. */
+export interface SheetAccess {
+    rows: AccessRow[] | null;
+    who: Who;
+    /** 'live' (default): the sheet as this person works in it. 'setup': the rules editor, each cell showing a coloured square per who with a rule there. */
+    view?: 'live' | 'setup';
+    /** setup: the index of the selected row, outlined in the sheet in its who's colour. */
+    selected?: number | null;
+    /** setup: a square was clicked; the index of the row it stands for (the first of that who's rows in the cell). */
+    onSelect?: (index: number) => void;
+    /** setup: a colour of your own for some whos (the others get one from accessColor). */
+    colors?: Record<string, string>;
+}
+
 /** A message of the sheet (onNotice). */
 export interface SheetNotice {
     /** refused: a change was not let through (access, rules, validation, types, beforeOp); error: something went wrong; info: just so you know. */
@@ -61,9 +87,15 @@ export interface SheetProps {
     onSelectionChange?: (selection: SheetSelection) => void;
     /** The name a download gets, without its extension. */
     fileName?: string;
-    access?: { rows: AccessRow[] | null; who: Who };
+    /** The access rows and the person who opens (chapter 13). With view 'setup' the sheet is the rules editor. */
+    access?: SheetAccess;
     user?: { id: string; name: string };
-    showProtected?: boolean;
+    /**
+     * How the cells this person may not change are marked (live view). Default { lock: true, hidden: true }; the marks mix freely; false: none.
+     * @example
+     * marks={{ tint: true, lock: true }}   // a grey tint and the lock
+     */
+    marks?: false | CellMarks;
     className?: string;
     style?: CSSProperties;
 }

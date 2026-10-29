@@ -567,6 +567,79 @@ menjelaskan alasannya.
 
 Prop `access` sama dengan memanggil `wb.setAccess(rows, who)` sendiri. Pilih salah satu, jangan keduanya.
 
+### Tanda di sel: gembok dan mata
+
+Supaya orang tahu sebelum mencoba mengetik, sel yang tidak boleh diubah diberi tanda kecil di **pojok kanan atas**:
+
+| Tanda | Di sel | Artinya |
+|---|---|---|
+| gembok | sel yang terlihat isinya | hanya bisa dibaca |
+| mata dicoret | sel `•••` | isinya tersembunyi |
+| (tidak ada) | sel kosong yang tidak terlihat | tidak ada tanda, supaya tidak ada petunjuk bahwa sel itu berisi |
+| (tidak ada) | sel yang boleh diubah | sel biasa |
+
+Itu tampilan bawaannya. Prop **`marks`** mengaturnya, dan pilihannya bebas dicampur:
+
+| `marks` | Hasil |
+|---|---|
+| tidak diisi | `{ lock: true, hidden: true }`: gembok dan mata |
+| `{ tint: true }` | ditambah latar abu-abu muda dan teks sedikit pudar di sel hanya-baca |
+| `{ stripes: true }` | ditambah garis-garis tipis |
+| `{ lock: false }` | tanpa gembok (mata tetap) |
+| `false` | tanpa tanda sama sekali |
+
+<!-- contoh: 13-12-tanda.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { CellMarks } from '@kufayeka/sheet';
+import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
+
+// Tanda di sel yang tidak boleh diubah: prop marks. Aturan dan orangnya sama di keempat sheet, hanya tandanya yang berbeda.
+const ATURAN: AccessRow[] = [
+    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    ...['menubar', 'toolbar', 'formulaBar', 'tabs'].map((bagian): AccessRow => ({ who: '*', effect: 'deny', action: 'ui.' + bagian }))
+];
+const RINA = { user: 'rina', roles: ['kasir'] };
+
+const PILIHAN: Array<{ judul: string; marks: false | CellMarks | undefined }> = [
+    { judul: 'Bawaan (gembok + mata)', marks: undefined },
+    { judul: '{ tint: true }: abu-abu + gembok + mata', marks: { tint: true } },
+    { judul: '{ stripes: true, lock: false }: garis-garis + mata', marks: { stripes: true, lock: false } },
+    { judul: 'false: tanpa tanda', marks: false }
+];
+
+function Contoh({ judul, marks }: { judul: string; marks: false | CellMarks | undefined }) {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ border: '1px solid #dadce0', borderRadius: 6, overflow: 'hidden' }}>
+            <div style={{ padding: '6px 10px', fontWeight: 600 }}>{judul}</div>
+            <div style={{ height: 160 }}><Sheet workbook={wb} access={{ rows: ATURAN, who: RINA }} marks={marks} /></div>
+        </div>
+    );
+}
+
+export default function PilihanTanda() {
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 12, font: '13px system-ui' }}>
+            {PILIHAN.map((p) => <Contoh key={p.judul} judul={p.judul} marks={p.marks} />)}
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Pilihan tanda di sel](img/akses-tanda.png)
+
+Tanda ini berlaku untuk semua sel yang tidak boleh diubah, baik karena baris aturan akses maupun karena aturan dari kode aplikasimu
+(`setRules`, [bab 10](10-aturan.md)).
+
+Tanda ini hanya bantuan untuk mata. Yang benar-benar menjaga datanya tetap aturannya sendiri, yang juga diperiksa di server (langkah 9).
+
 ### Pesan penolakan: diganti, dimatikan, atau ditampilkan di luar sheet
 
 Saat sesuatu ditolak, sheet menampilkan pesan kecil di bawah grid. Teksnya diambil dari kolom `message` baris aturan, atau teks bawaan kalau
@@ -720,16 +793,171 @@ Cara menyambungkan ini ke route GET dan PUT dijelaskan di [bab 12](12-server.md)
 
 ## 13.11 Langkah 10: membuat layar pengaturan aturan
 
-Library tidak punya layar pengaturan aturan bawaan. Kamu membuatnya sendiri di aplikasimu, dengan tampilan aplikasimu. Bahannya sudah ada semua:
+Library tidak punya layar pengaturan aturan bawaan. Kamu membuatnya sendiri di aplikasimu, dengan tampilan aplikasimu. Sheet membantu dengan
+**mode pengaturan**: `access.view: 'setup'`.
 
-1. Orang memilih range di sheet. `onSelectionChange` memberi alamatnya (`Produk!C2:C5`), sekali setelah mouse dilepas.
+![Layar pengaturan aturan](img/editor-akses.png)
+
+**Yang terlihat di mode pengaturan:**
+
+- Setiap sel yang kena aturan mendapat **kotak warna kecil di pojok kanan atas, satu kotak untuk setiap who** yang punya aturan di sel itu.
+  Di gambar, C3 punya dua kotak: kasir dan gudang. Dua aturan untuk kasir di sel yang sama tetap satu kotak.
+- Arahkan kursor ke kotak untuk melihat siapa dan aturan nomor berapa saja.
+- Aturan yang **dipilih** diberi garis di sekeliling range-nya, dengan warna who-nya.
+- Gembok dan mata tidak muncul di mode ini. Apa isi aturannya terbaca di daftar aturan.
+
+**Cara menyambungkannya:**
+
+| Kamu | Sheet |
+|---|---|
+| `access.view: 'setup'` | menggambar kotak who di setiap sel yang kena aturan |
+| `access.selected: i` | memberi garis pada range baris aturan ke-`i` |
+| `access.onSelect: (i) => ...` | dipanggil saat kotak di sel diklik, dengan nomor baris aturannya |
+| `accessColor(who)` | warna yang sama dengan kotak di sheet, untuk daftar aturanmu sendiri |
+| `ref.select(range)` | memilih range di sheet saat baris di daftarmu diklik |
+| `onSelectionChange` | alamat range yang dipilih orang di sheet, sekali setelah mouse dilepas, untuk membuat aturan baru |
+
+**Alurnya:**
+
+1. Orang memilih range di sheet. Alamatnya (`Produk!C2:C5`) datang lewat `onSelectionChange`.
 2. Orang memilih siapa dan aturannya, lalu menekan Tambah. Aplikasimu menambah **satu baris** ke daftar.
-3. "Lihat sebagai" memanggil `setAccess` dengan orang lain, supaya hasilnya bisa dicoba sebelum disimpan.
-4. `validateAccess` memeriksa barisnya, lalu baris-baris itu disimpan ke tabel `sheet_access`.
+3. Klik baris di daftar: `selected` berubah, range-nya bergaris dan terpilih di sheet. Klik kotak di sheet: `onSelect` memberi tahu baris yang mana.
+4. Ganti mode ke "Lihat sebagai Rina": `view` kembali ke `'live'`, dan `who` diganti Rina. Sheet tampil persis seperti yang Rina lihat, dengan
+   gembok dan matanya, jadi aturannya bisa dicoba sebelum disimpan.
+5. `validateAccess` memeriksa barisnya, lalu baris-baris itu disimpan ke tabel `sheet_access`.
 
-Contoh lengkapnya ada di [4.13](04-api-workbook.md#413-editor-hak-akses-di-luar-sheet):
+![Dilihat sebagai Rina](img/editor-akses-live.png)
 
-![Editor aturan akses](img/editor-akses.png)
+<!-- contoh: 04-13-editor-akses.page.tsx -->
+```tsx
+import { useEffect, useRef, useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { SheetSelection, SheetHandle } from '@kufayeka/sheet';
+import { createWorkbook, validateAccess, accessColor } from '@kufayeka/sheet/core';
+import type { Workbook, AccessRow, Who } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+
+// Layar pengaturan hak akses buatan aplikasimu sendiri, di luar sheet:
+// 1. Mode "Pengaturan": setiap sel yang kena aturan diberi kotak warna kecil, satu per who
+// 2. pilih range di sheet, pilih siapa dan aturannya, Tambah: satu baris baru
+// 3. klik baris di daftar: range-nya bergaris dan terpilih di sheet. Klik kotak di sel: barisnya terpilih di daftar
+// 4. Mode "Lihat sebagai ...": sheet seperti yang dilihat orang itu (gembok di sel hanya-baca, mata di sel tersembunyi)
+// 5. baris-barisnya disimpan ke tabel database
+
+function buatStok(): Workbook {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setSheetProps({ name: 'Produk', freezeRows: 1 });
+    s.setValues('A1', [
+        ['Kode', 'Produk', 'Harga beli', 'Harga jual', 'Stok'],
+        ['SMN-01', 'Semen 50 kg', 64000, 72000, 420],
+        ['BSI-10', 'Besi 10 mm', 68000, 79500, 260],
+        ['CAT-05', 'Cat 5 kg', 118000, 145000, 64],
+        ['PSR-01', 'Pasir m3', 245000, 290000, 31]
+    ]);
+    s.setStyle('A1:E1', { bold: true, fill: '#e8f0fe' });
+    s.setColProps('C:D', { format: { type: 'money', decimals: 0 } });
+    s.setColProps('B', { width: 130 });
+    return wb;
+}
+
+// aturan awal: pemilik boleh semua, kasir dan gudang membaca tabelnya, gudang mengubah stok
+const ATURAN_AWAL: AccessRow[] = [
+    { who: 'user:yeka', effect: 'allow', action: '*' },
+    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
+    { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
+    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+];
+// mode layar: pengaturan, atau sheet seperti dilihat seseorang (akun + role-nya, seperti dari sesi login aplikasimu)
+const MODE: Record<string, { nama: string; who: Who }> = {
+    setup: { nama: 'Pengaturan', who: { user: 'yeka' } },
+    rina: { nama: 'Lihat sebagai Rina (kasir)', who: { user: 'rina', roles: ['kasir'] } },
+    joko: { nama: 'Lihat sebagai Joko (gudang)', who: { user: 'joko', roles: ['gudang'] } }
+};
+// pilihan aturan untuk satu range: effect + action, dengan kata yang dimengerti orang
+const ATURAN = {
+    edit: { effect: 'allow', action: 'edit', label: 'boleh diubah' },
+    read: { effect: 'allow', action: 'read', label: 'hanya baca' },
+    hidden: { effect: 'deny', action: 'read', label: 'tersembunyi (•••)' },
+    invisible: { effect: 'deny', action: 'see', label: 'tidak terlihat' }
+} as const;
+type Pilihan = keyof typeof ATURAN;
+
+export default function EditorAkses() {
+    const [wb] = useState(buatStok);
+    const sheet = useRef<SheetHandle>(null);
+    const [rows, setRows] = useState<AccessRow[]>(ATURAN_AWAL);
+    const [pilihan, setPilihan] = useState<SheetSelection | null>(null);   // seleksi terakhir di sheet
+    const [dipilih, setDipilih] = useState<number | null>(null);           // baris aturan yang dipilih
+    const [siapa, setSiapa] = useState('role:kasir');
+    const [aturan, setAturan] = useState<Pilihan>('read');
+    const [mode, setMode] = useState('setup');
+
+    // satu aturan baru = satu baris baru, langsung terpilih
+    function tambah() {
+        if (!pilihan) return;
+        const { effect, action } = ATURAN[aturan];
+        setRows([...rows, { who: siapa, effect, action, where: pilihan.sheet.name + '!' + pilihan.address }]);
+        setDipilih(rows.length);
+    }
+    const hapus = (i: number) => { setRows(rows.filter((_, j) => j !== i)); setDipilih(null); };
+    // memilih baris di daftar: range-nya juga terpilih di sheet
+    function pilih(i: number) {
+        setDipilih(i);
+        const where = rows[i].where;
+        if (where) sheet.current?.select(where.includes('!') ? where.slice(where.indexOf('!') + 1) : where);
+    }
+    // sheet yang dilihat sebagai orang lain: tidak ada yang dipilih
+    useEffect(() => { if (mode !== 'setup') setDipilih(null); }, [mode]);
+    const masalah = validateAccess(rows);
+
+    return (
+        <div style={{ display: 'flex', height: 520, font: '13px system-ui' }}>
+            <Sheet ref={sheet} workbook={wb} style={{ flex: 1 }} onSelectionChange={setPilihan}
+                access={{ rows, who: MODE[mode].who, view: mode === 'setup' ? 'setup' : 'live', selected: dipilih, onSelect: setDipilih }} />
+            <aside className="editor-akses" style={{ width: 380, padding: 12, borderLeft: '1px solid #dadce0', overflow: 'auto' }}>
+                <h3 style={{ margin: '0 0 8px' }}>Aturan akses</h3>
+                <p>
+                    Mode <select className="lihat-sebagai" value={mode} onChange={(e) => setMode(e.target.value)}>
+                        {Object.entries(MODE).map(([id, m]) => <option key={id} value={id}>{m.nama}</option>)}
+                    </select>
+                </p>
+                <p>Range terpilih: <b className="range-terpilih">{pilihan ? pilihan.sheet.name + '!' + pilihan.address : '-'}</b></p>
+                <p>
+                    <select className="pilih-peran" value={siapa} onChange={(e) => setSiapa(e.target.value)}>
+                        <option value="role:kasir">role:kasir</option><option value="role:gudang">role:gudang</option>
+                        <option value="user:rina">user:rina</option><option value="*">semua orang</option>
+                    </select>{' '}
+                    <select className="pilih-mode" value={aturan} onChange={(e) => setAturan(e.target.value as Pilihan)}>
+                        {(Object.keys(ATURAN) as Pilihan[]).map((k) => <option key={k} value={k}>{ATURAN[k].label}</option>)}
+                    </select>{' '}
+                    <button className="tambah-aturan" onClick={tambah} disabled={!pilihan || mode !== 'setup'}>Tambah</button>
+                </p>
+                <table className="daftar-aturan" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th /><th align="left">who</th><th align="left">effect</th><th align="left">action</th><th align="left">where</th><th /></tr></thead>
+                    <tbody>
+                        {rows.map((r, i) => (
+                            <tr key={i} onClick={() => pilih(i)} style={{ borderTop: '1px solid #eee', cursor: 'pointer', background: i === dipilih ? '#e8f0fe' : undefined }}>
+                                {/* warna yang sama dengan kotak di sheet */}
+                                <td><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: accessColor(r.who) }} /></td>
+                                <td>{r.who}</td><td>{r.effect}</td><td>{r.action}</td><td>{r.where ?? ''}</td>
+                                <td><button onClick={(e) => { e.stopPropagation(); hapus(i); }}>✕</button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <p style={{ color: masalah.length ? '#d93025' : '#188038' }}>{masalah.length ? masalah.map((m) => 'baris ' + (m.row + 1) + ': ' + m.problem).join('; ') : 'Aturan sah, siap disimpan'}</p>
+            </aside>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Kalau satu sel punya lebih dari empat who, sheet menampilkan tiga kotak dan tanda `+n`. Warna setiap who dihitung dari namanya, jadi
+`role:kasir` selalu berwarna sama di setiap layar dan komputer. Warna sendiri bisa diberikan lewat `access.colors`:
+`{ 'role:kasir': '#1a73e8' }`.
 
 ## 13.12 Referensi
 
@@ -800,3 +1028,8 @@ dropdown di layar pengaturanmu.
 | `viewFor(doc, { access, who })` | di server: isi yang boleh dikirim |
 | `checkPatch(doc, patch, { access, who })` | di server: perubahan diperiksa sebelum disimpan |
 | `<Sheet access={{ rows, who }}>` | di React: sama dengan `setAccess` |
+| `<Sheet access={{ rows, who, view: 'setup', selected, onSelect, colors }}>` | mode pengaturan: kotak who di sel, aturan terpilih bergaris (13.11) |
+| `<Sheet marks={{ lock, hidden, tint, stripes }}>` | tanda di sel yang tidak boleh diubah; `false` = tanpa tanda (13.9) |
+| `<Sheet onNotice={(n) => ...}>` | setiap pesan sheet sebelum tampil: diganti, dimatikan, atau ditampilkan sendiri (13.9) |
+| `accessColor(who, colors?)` | warna sebuah who, sama dengan kotak di sheet |
+| `accessPlaces(wb, rows)` | di mana setiap baris aturan menyentuh sheet: `at(sheet, r, c)`, `rects(i, sheet)`, `colorOf(i)` |

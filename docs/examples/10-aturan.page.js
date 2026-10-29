@@ -5,8 +5,8 @@ import { buatProdukKasir } from './10-aturan.js';
 
 export default function HalamanKasir() {
     const [wb] = useState(buatProdukKasir);
-    // showProtected: sel yang dilindungi aturan digambar bergaris, berguna saat menyusun aturan
-    return <div style={{ height: 520 }}><Sheet workbook={wb} showProtected /></div>;
+    // sel yang dilindungi aturan diberi gembok kecil di pojok (bawaan); marks={{ stripes: true }} menambah garis-garis
+    return <div style={{ height: 520 }}><Sheet workbook={wb} /></div>;
 }
 // ----- tampilkan -----
 import { createRoot } from 'react-dom/client';
