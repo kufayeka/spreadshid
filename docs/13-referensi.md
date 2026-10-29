@@ -125,6 +125,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `findAll`, `replaceIn` | cari dan ganti | [7.7](07-data.md#77-mencari-dan-mengganti) |
 | `pivot`, `tableOf`, `PIVOT_FUNCTIONS` | ringkasan per kelompok tanpa sheet, dan range sebagai daftar record | [7.6](07-data.md#76-pivot-table) |
 | `chartSeries`, `CHART_TYPES`, `CHART_DEFAULTS` | membaca range menjadi kategori dan seri seperti Excel, jenis-jenis chart, dan pengaturan awal chart baru | [12](12-dashboard.md) |
+| `CHART_FIELDS`, `SPARKLINE_FIELDS`, `CHART_NODES` | semua pengaturan chart dan sparkline seperti yang ditawarkan panel Chart: kunci, label, jenis isian, node | [12](12-dashboard.md) |
 | `populate` | data dari luar ke sheet, tetap sebagai data | [4.5](04-api-workbook.md#45-mengisi-dari-data-api) |
 | `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [8.5](08-menjaga-isi.md#85-tipe-kolom) |
 | `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [9](09-menyimpan.md) |

@@ -22,7 +22,7 @@ function buat() {
 
 export default function Halaman() {
     const [wb] = useState(buat);
-    return <div style={{ height: 420 }}><Sheet workbook={wb} /></div>;
+    return <div style={{ height: 710 }}><Sheet workbook={wb} /></div>;
 }
 // ----- tampilkan -----
 import { createRoot } from 'react-dom/client';

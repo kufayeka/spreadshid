@@ -2,7 +2,7 @@
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Komentar dan Excel](11-komentar-excel.md) · Berikutnya: [13. Performa dan referensi](13-referensi.md)
 
-Bab ini membahas **chart** (kolom, batang, garis, area, pie, donut, kombinasi dua sumbu, bullet, waterfall), **kurva S di atas time
+Bab ini membahas **chart** (kolom, batang, garis, area, pie, donut, kombinasi dua sumbu, scatter, bullet, waterfall), **kurva S di atas time
 schedule**, **sparkline dan data bar di sel**, lalu cara menyusunnya menjadi **dashboard**: form sebagai pintu input, tabel sebagai sumber
 data, dan sheet yang hanya dibaca sebagai tampilan. Setiap langkah adalah satu halaman React dengan foto hasilnya.
 
@@ -19,12 +19,13 @@ data, dan sheet yang hanya dibaca sebagai tampilan. Setiap langkah adalah satu h
 - [12.8 Waterfall: dari kontrak ke sisa tagih](#128-waterfall-dari-kontrak-ke-sisa-tagih)
 - [12.9 Kurva S di atas time schedule](#129-kurva-s-di-atas-time-schedule)
 - [12.10 Sparkline dan data bar](#1210-sparkline-dan-data-bar)
-- [12.11 Form mengisi tabel, dashboard hanya dibaca](#1211-form-mengisi-tabel-dashboard-hanya-dibaca)
+- [12.11 Seri dari range sendiri, dan scatter](#1211-seri-dari-range-sendiri-dan-scatter)
+- [12.12 Form mengisi tabel, dashboard hanya dibaca](#1212-form-mengisi-tabel-dashboard-hanya-dibaca)
 
 **Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
-- [12.12 Contoh lengkap: dashboard proyek](#1212-contoh-lengkap-dashboard-proyek)
-- [12.13 Yang sering keliru](#1213-yang-sering-keliru)
-- [12.14 Referensi](#1214-referensi)
+- [12.13 Contoh lengkap: dashboard proyek](#1213-contoh-lengkap-dashboard-proyek)
+- [12.14 Yang sering keliru](#1214-yang-sering-keliru)
+- [12.15 Referensi](#1215-referensi)
 
 ---
 
@@ -48,20 +49,23 @@ tombol "refresh".
 
 ## 12.2 Chart menempel di sel
 
-Chart di sheet ini tidak melayang bebas. Setiap chart punya dua hal:
+Chart di sheet ini tidak melayang bebas. Setiap chart berdiri di **`at`**, blok sel tempatnya (misalnya `'E2:K16'`), dan membaca datanya
+dengan salah satu dari dua cara (atau keduanya sekaligus):
 
-| | Artinya | Contoh |
+| Cara | Kapan | Bentuknya |
 |---|---|---|
-| **`at`** | blok sel tempat chart berdiri | `'E2:K16'` |
-| **`data`** | range yang dibaca chart | `'A1:C7'`, `'Progres!A1:D8'`, atau nama range |
+| **Blok** | cepat, sebagian besar kasus | `data: 'A1:C7'`: satu range, dibaca seperti Excel membaca pilihan sel (lihat di bawah) |
+| **Range per seri** | kolomnya tidak bersebelahan, atau dari sheet lain | `categories: 'A2:A8'` untuk semua seri, lalu setiap seri punya `values` (Y) dan `name` atau `nameFrom` (sel namanya) |
 
-Keduanya disimpan menurut **id baris dan kolom**, seperti named range. Akibatnya:
+Scatter memakai cara kedua: setiap seri punya `x` dan `values` sendiri ([12.11](#1211-seri-dari-range-sendiri-dan-scatter)).
+
+Semua range itu disimpan menurut **id baris dan kolom**, seperti named range. Akibatnya:
 
 - Baris disisipkan di atas chart: chart ikut turun. Kolom disisipkan di kiri data: range datanya ikut bergeser.
 - Isi sel di range data berubah: chart langsung berubah.
 - Chart ikut tersimpan di workbook (`toJSON`), dan saat diekspor ke .xlsx menjadi **chart Excel asli** di sel yang sama.
 
-**Cara chart membaca range** sama seperti Excel membaca pilihan sel:
+**Cara chart membaca blok** sama seperti Excel membaca pilihan sel:
 
 - **Seri ke bawah atau ke samping.** Kalau range lebih tinggi daripada lebarnya, tiap kolom jadi satu seri. Kalau lebih lebar, tiap baris
   jadi satu seri. Pilihan `seriesIn: 'cols'` atau `'rows'` memaksanya.
@@ -110,7 +114,7 @@ function buat() {
 
 export default function Halaman() {
     const [wb] = useState(buat);
-    return <div style={{ height: 420 }}><Sheet workbook={wb} /></div>;
+    return <div style={{ height: 710 }}><Sheet workbook={wb} /></div>;
 }
 ```
 <!-- /contoh -->
@@ -126,24 +130,47 @@ export default function Halaman() {
 
 ## 12.4 Mengatur chart dari layar
 
-**Tujuan:** mengubah chart tanpa kode. Halamannya sama dengan [12.3](#123-chart-pertama).
+**Tujuan:** mengubah apa pun tentang chart tanpa kode. Halamannya sama dengan [12.3](#123-chart-pertama).
 
-![Chart dipilih: bingkai ungu, titik pegangan, panel Chart di kanan](img/chart-editor.png)
+![Batang Semen diklik: seri itu terpilih di pohon, pengaturannya di bawah](img/chart-editor.png)
 
-**Penjelasan:**
+**Memilih dan memindah:**
 
 - **Klik chart** untuk memilihnya. Bingkai ungu dan 8 titik pegangan muncul, dan **panel Chart** terbuka di kanan.
-- **Tarik chart** untuk memindahkannya. Chart selalu pindah satu sel penuh, karena ia menempel di sel.
-- **Tarik titik pegangan** untuk memperbesar atau memperkecil chart, juga per sel.
+- **Tarik chart** untuk memindahkannya, dan **tarik titik pegangan** untuk mengubah ukurannya. Keduanya per sel penuh, karena chart menempel
+  di sel.
 - **Delete** menghapus chart yang dipilih. **Escape** melepasnya. Setiap perubahan bisa di-undo (Ctrl+Z).
-- Isi panel Chart:
-  - **Type**: Column, Bar, Line, Area, Combo, Pie, Donut, Bullet, Waterfall.
-  - **Data**: range, arah seri (Automatic, Columns, Rows), dan per seri: warna, nama, jenis (garis atau kolom), Right axis, Dashed, Hide.
-  - **Look**: Title, Subtitle, Legend, Data labels, Stacked, Gridlines, Smooth lines, Markers, Transparent, dan "Points on the middle of
-    each column" (menempel ke kolom, lihat [12.9](#129-kurva-s-di-atas-time-schedule)).
-  - **Value axis**: Min, Max, dan teks di belakang angka (misalnya `%` atau ` jt`).
-- Orang tanpa hak `chart` ([12.14](#1214-referensi)) tetap melihat chart dan nilai saat mouse diarahkan, tetapi tidak bisa memilih, memindah,
-  atau mengubahnya.
+
+**Panel Chart terdiri dari dua bagian:**
+
+1. **Pohon** di atas berisi bagian-bagian chart: *Chart* (jenis), *Data*, *Series* (satu baris per seri; titik di kanan menyembunyikan
+   atau menampilkan seri itu), *Axes*, *Title and legend*, *Labels and gridlines*, *Place and background*. Ada juga bagian yang hanya
+   muncul untuk jenis tertentu: *Slices* (pie, donut), *Center* (donut), *Limits* (bullet), *Steps* (waterfall).
+2. **Isian** di bawahnya: pengaturan bagian yang dipilih saja.
+
+**Klik langsung di chart** memilih bagiannya: klik batang memilih serinya (seperti di foto), klik judul atau legenda memilih *Title and
+legend*, klik angka sumbu memilih *Axes*, klik potongan pie memilih *Slices*.
+
+**Cara isian bekerja:**
+
+| Isian | Kapan berlaku |
+|---|---|
+| warna (6 warna cepat, **More** untuk warna lain, ↺ kembali ke bawaan) | langsung saat diklik |
+| pilihan (misalnya Left / Right) dan saklar | langsung |
+| teks dan angka | saat **Enter** atau saat pindah dari isian. Isian yang dikosongkan menghapus pengaturan itu |
+| range, dengan tombol **⊞** | ketik range, atau klik ⊞ lalu pilih sel di grid |
+
+**Tombol lain:**
+
+- **Data → Add series**: seri baru tanpa range. Isi *Values* dengan ⊞, maka seri itu langsung tergambar.
+- **⧉** di kepala panel menyalin gaya chart (jenis, warna, judul, legenda, sumbu, dan lainnya, tetapi bukan letak dan range-nya). Pilih chart
+  lain, lalu **⎘** untuk menempelkannya.
+- **Sparkline** punya panelnya sendiri, yang terbuka saat salah satu selnya dipilih ([12.10](#1210-sparkline-dan-data-bar)).
+
+**Panel menawarkan semua yang bisa ditulis di kode.** Panel dibentuk dari daftar pengaturan yang sama dengan tabel di
+[12.15](#1215-referensi), dan sebuah tes memastikan setiap pengaturan di types punya isiannya di panel.
+
+Orang tanpa hak `chart` tetap melihat chart dan nilai saat mouse diarahkan, tetapi tidak bisa memilih, memindah, atau mengubahnya.
 
 ## 12.5 Kolom dan garis, dua sumbu
 
@@ -359,7 +386,7 @@ export default function Halaman() {
 
 **Penjelasan:**
 
-- Isi time schedule dibuat oleh `buatJadwal()` (file `data/proyek.js`, lihat [12.12](#1212-contoh-lengkap-dashboard-proyek)): bobot setiap
+- Isi time schedule dibuat oleh `buatJadwal()` (file `data/proyek.js`, lihat [12.13](#1213-contoh-lengkap-dashboard-proyek)): bobot setiap
   pekerjaan dibagi rata ke minggu pelaksanaannya, lalu dijumlahkan menjadi baris "Bobot mingguan" dan "Kumulatif rencana". Semuanya rumus.
 - **`background: 'none'`** membuat chart transparan. Bar jadwal di bawahnya tetap terlihat, dan klik di dalam chart tembus ke sel. Chart
   dipilih lewat **tepinya** (mouse berubah menjadi tanda geser).
@@ -421,11 +448,76 @@ export default function Halaman() {
   angkanya dibandingkan angka terbesar di range itu (dari 0 kalau semuanya positif). Data bar bisa dipakai bersama aturan warna lain.
   Dari layar: **Format → Conditional formatting**, tab **Data bar**.
 
-## 12.11 Form mengisi tabel, dashboard hanya dibaca
+## 12.11 Seri dari range sendiri, dan scatter
+
+**Tujuan:** chart dari kolom yang tidak bersebelahan, dan scatter dengan X berupa tanggal yang jaraknya tidak rata.
+
+<!-- contoh: 12-11-seri.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { PROGRES } from './data/proyek.js';
+
+// 12.11 Seri dari range sendiri: Aktual di kolom C dan Rencana di kolom F, dengan kolom lain di antaranya. Lalu scatter: progres terhadap
+// tanggal opname yang jaraknya tidak rata, dari sheet lain.
+function buat() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID' });
+    const s = wb.sheet('Sheet1');
+    s.setSheetProps({ name: 'Progres' });
+    s.setValues('A1', [['Proyek', 'Minggu', 'Aktual', 'Catatan', 'PIC', 'Rencana'], ...PROGRES.map(([p, m, a, r]) => [p, m, a, '', '', r])]);
+    s.setColProps('A', { width: 130 });
+    s.setColProps('C', { format: { type: 'percent', decimals: 1 } });
+    s.setColProps('F', { format: { type: 'percent', decimals: 1 } });
+    s.setStyle('A1:F1', { bold: true, fill: '#eef2f7' });
+    // baru: tanpa data blok; kategori dan setiap seri menunjuk range-nya sendiri
+    s.addChart({
+        at: 'H1:L14', type: 'bullet', title: 'Aktual (C) terhadap Rencana (F)',
+        categories: 'A2:A8', series: [{ nameFrom: 'C1', values: 'C2:C8' }, { nameFrom: 'F1', values: 'F2:F8' }]
+    });
+    const opname = wb.sheet(wb.addSheet('Opname'));
+    opname.setValues('A1', [['Tanggal', 'Progres'], [46266, 0.02], [46280, 0.08], [46301, 0.21], [46309, 0.27], [46330, 0.44], [46337, 0.5]]);
+    opname.setColProps('A', { format: { type: 'date' } });
+    opname.setColProps('B', { format: { type: 'percent', decimals: 0 } });
+    // baru: scatter, X dan Y setiap seri sendiri-sendiri; X tanggal dengan jarak sebenarnya
+    s.addChart({
+        at: 'A10:F24', type: 'scatter', title: 'Progres per tanggal opname', lines: true, smooth: true, legend: 'none',
+        series: [{ name: 'Realisasi', x: 'Opname!A2:A7', values: 'Opname!B2:B7' }]
+    });
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buat);
+    return <div style={{ height: 710 }}><Sheet workbook={wb} /></div>;
+}
+```
+<!-- /contoh -->
+
+![Bullet dari kolom C dan F, scatter progres terhadap tanggal opname](img/chart-seri.png)
+
+**Penjelasan:**
+
+- Chart bullet tidak punya `data`. **`categories: 'A2:A8'`** memberi label untuk semua seri, dan setiap seri menunjuk range-nya sendiri:
+  Aktual di kolom C, Rencana di kolom F. Kolom Catatan dan PIC di antaranya tidak mengganggu, dan tidak perlu menyembunyikan seri.
+- **`nameFrom: 'C1'`** mengambil nama seri dari sel. Kalau judul kolomnya diubah, nama di chart ikut berubah. `name: 'Aktual'` menulis
+  namanya langsung.
+- Range bisa dari **sheet lain**: `'Opname!A2:A7'`.
+- **Scatter**: setiap seri punya **`x`** dan **`values`** sendiri. Titik diletakkan menurut nilai X yang sebenarnya, jadi opname tanggal
+  1 dan 22 Oktober berjarak tiga minggu, bukan satu langkah. Karena sel X berformat tanggal, sumbunya menulis tanggal.
+- `lines: true` menyambung titik-titiknya dengan garis. Seri dengan `type: 'points'` tetap berupa titik saja.
+- Kedua cara bisa digabung: blok `data` dibaca lebih dulu, lalu seri yang punya `values` sendiri ditambahkan sesudahnya. Di panel: **Data →
+  Add series**.
+- Di file Excel, setiap seri ditulis dengan range-nya sendiri (scatter menjadi scatter Excel), dan chart Excel yang datanya terpisah-pisah
+  sekarang ikut masuk.
+
+## 12.12 Form mengisi tabel, dashboard hanya dibaca
 
 **Tujuan:** alur lengkap dari [12.1](#121-form-tabel-dashboard). Pilih proyek, isi progres, simpan, dan chart di dashboard langsung berubah.
 
-<!-- contoh: 12-11-form.page.tsx -->
+<!-- contoh: 12-12-form.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -433,7 +525,7 @@ import { createWorkbook, type AccessRow } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { PROGRES } from './data/proyek.js';
 
-// 12.11 Form sebagai pintu input, tabel sebagai sumber data, dashboard read-only: orang lapangan mengisi progres lewat form biasa,
+// 12.12 Form sebagai pintu input, tabel sebagai sumber data, dashboard read-only: orang lapangan mengisi progres lewat form biasa,
 // angkanya masuk ke tabel Progres, dan chart di sheet Dashboard langsung ikut berubah. Dashboard tidak bisa diedit siapa pun.
 function buat() {
     const wb = createWorkbook();
@@ -497,12 +589,12 @@ export default function Halaman() {
 
 # Bagian C. Contoh lengkap, yang sering keliru, dan referensi
 
-## 12.12 Contoh lengkap: dashboard proyek
+## 12.13 Contoh lengkap: dashboard proyek
 
 Satu workbook dengan sheet Jadwal (kurva S), tiga sheet tabel (Progres, Termin, PEKTAM), dan sheet Dashboard yang hanya berisi rumus,
 chart, sparkline, dan data bar.
 
-<!-- contoh: 12-12-dashboard.page.tsx -->
+<!-- contoh: 12-13-dashboard.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -676,7 +768,7 @@ export function buatDashboard() {
 - **Status berwarna** di kolom G adalah rumus `IF` biasa, ditambah tiga aturan conditional formatting `textIs`.
 - **Chart membaca sheet lain** lewat `data: 'Progres!A1:D8'`. Sheet Dashboard sendiri tidak menyimpan angka mentah.
 
-## 12.13 Yang sering keliru
+## 12.14 Yang sering keliru
 
 | Gejala | Penyebab | Perbaikan |
 |---|---|---|
@@ -688,58 +780,114 @@ export function buatDashboard() {
 | Kurva S tidak lurus dengan kolom minggu | `align` masih `'fit'` | `align: 'cells'`, dan `at` tepat di kolom minggu |
 | Sel di bawah kurva S tidak bisa diklik | chart masih berlatar putih | `background: 'none'` |
 | Orang bisa menggeser chart di dashboard | baris akses memberi `chart` atau `*` | dashboard cukup `read` saja |
-| Chart dari file Excel tidak masuk | seri chart itu membaca range di sheet berbeda, atau tidak bersambung | jadikan datanya satu blok di satu sheet (peringatannya ada di `warnings`) |
+| Ada kolom yang tidak diinginkan ikut jadi seri | blok `data` mencakup kolom di antaranya | pakai range per seri ([12.11](#1211-seri-dari-range-sendiri-dan-scatter)), atau sembunyikan seri itu |
+| Titik scatter berjarak sama padahal tanggalnya tidak | chart masih jenis line (X sebagai kategori) | `type: 'scatter'` dengan `x` per seri |
+| Seri baru dari "Add series" tidak tergambar | belum punya range `values` | isi *Values* dengan ⊞ |
 
-## 12.14 Referensi
+## 12.15 Referensi
 
-### Pengaturan chart (`addChart`, `setChart`)
+### Semua pengaturan
 
-| Kunci | Nilai | Bawaan | Artinya |
-|---|---|---|---|
-| `at` | range | (wajib) | blok sel tempat chart berdiri |
-| `data` | range, `Sheet!range`, nama range | (wajib) | yang dibaca chart |
-| `type` | `column` `bar` `line` `area` `combo` `pie` `donut` `bullet` `waterfall` | `column` | jenis chart |
-| `seriesIn` | `auto` `cols` `rows` | `auto` | seri ke bawah (kolom) atau ke samping (baris) |
-| `categories` | `true` `false` | dari isinya | kolom pertama sebagai kategori |
-| `title`, `subtitle` | teks | kosong | judul dan keterangan di atas chart |
-| `legend` | `top` `right` `bottom` `none` | `top` | letak legenda |
-| `labels` | `true` `false` | `false` | angka di setiap batang, titik, atau potongan |
-| `stacked` | `true` `false` | `false` | kolom atau batang ditumpuk |
-| `grid` | `true` `false` | `true` | garis bantu sumbu nilai |
-| `smooth`, `markers` | `true` `false` | `false`, `true` | garis melengkung, titik di setiap nilai |
-| `background` | `white` `none` | `white` | `none`: transparan, di atas sel, klik tembus |
-| `align` | `fit` `cells` | `fit` | `cells`: kategori ke-i di tengah kolom ke-i dari `at` |
-| `xAxis`, `yAxis` | `true` `false` | `true` | tulisan kategori dan sumbu nilai |
-| `y`, `y2` | `{ min, max, prefix, suffix, decimals, percent }` | dari format sel | sumbu kiri dan kanan |
-| `colors` | daftar warna | palet Carbon | warna seri, atau potongan pie/donut |
-| `series` | daftar pengaturan per seri | | lihat tabel berikut |
-| `warn`, `bad` | angka | `1`, `5` | bullet: batas kuning dan merah |
-| `totals` | daftar indeks kategori (dari 0) | `[0]` | waterfall: kategori yang menjadi total |
-| `upColor`, `downColor`, `totalColor` | warna | hijau, merah, ungu | waterfall |
-| `centerText`, `centerLabel` | teks | total, nama seri | donut: tulisan di tengah |
+Tabel ini dicetak dari daftar yang juga membentuk panel Chart, jadi selalu lengkap: setiap baris adalah satu isian di panel (node pohon →
+isian) sekaligus satu kunci di kode. Kunci `series.x` berarti kunci `x` di salah satu isi daftar `series`, dan `y.min` berarti `min` di
+dalam `y`.
 
-### Pengaturan per seri (`series[i]`)
+<!-- hasil: 12-pengaturan.js -->
+```text
+**Chart** (`addChart`, `setChart`; di panel: node pohon → isian)
 
-| Kunci | Artinya |
-|---|---|
-| `name` | nama seri (menggantikan judul kolomnya) |
-| `color` | warnanya |
-| `type` | `line`, `column`, atau `area` (di combo, line, dan column) |
-| `axis` | `right`: sumbu sendiri di kanan |
-| `dash` | garis putus-putus |
-| `hidden` | tidak digambar (tetap terbaca) |
-| `labels`, `smooth`, `markers`, `width` | seperti pengaturan chart, untuk seri ini saja |
-| `endLabel` | teks di ujung garis diikuti angka terakhirnya: `true` untuk nama seri, atau teks sendiri |
+| Node | Isian | Kunci | Jenis isian | Untuk chart | Keterangan |
+|---|---|---|---|---|---|
+| Chart | Type | `type` | kartu jenis | semua |  |
+| Data | Block | `data` | range (⊞ dari grid) | semua | One block read as Excel reads a selection; leave it empty for series of their own ranges |
+| Data | Series in | `seriesIn` | pilihan: Auto, Columns, Rows | semua |  |
+| Data | Categories | `categories` | range (⊞ dari grid) | column, bar, line, area, combo, bullet, waterfall, pie, donut | A range of labels every series shares (or the first column of the block) |
+| Series → (satu seri) | Name | `series.name` | teks | semua |  |
+| Series → (satu seri) | Name from cell | `series.nameFrom` | range (⊞ dari grid) | semua |  |
+| Series → (satu seri) | Values (y) | `series.values` | range (⊞ dari grid) | semua | Its own range (a series past the block's) |
+| Series → (satu seri) | X values | `series.x` | range (⊞ dari grid) | scatter |  |
+| Series → (satu seri) | Color | `series.color` | warna | semua |  |
+| Series → (satu seri) | Draw as | `series.type` | pilihan: Default, Column, Line, Area | column, line, area, combo |  |
+| Series → (satu seri) | Draw as | `series.type` | pilihan: Default, Line, Points | scatter |  |
+| Series → (satu seri) | Axis | `series.axis` | pilihan: Left, Right | column, line, area, combo |  |
+| Series → (satu seri) | Dashed | `series.dash` | saklar | line, area, combo, scatter |  |
+| Series → (satu seri) | Line width | `series.width` | angka (px) | line, area, combo, scatter |  |
+| Series → (satu seri) | Smooth | `series.smooth` | saklar | line, area, combo, scatter |  |
+| Series → (satu seri) | Markers | `series.markers` | saklar | line, area, combo |  |
+| Series → (satu seri) | Point size | `series.size` | angka (px) | scatter |  |
+| Series → (satu seri) | Data labels | `series.labels` | saklar | semua |  |
+| Series → (satu seri) | End label | `series.endLabel` | teks | line, area, combo, scatter | Text before the last value, at the end of the line |
+| Series → (satu seri) | Hidden | `series.hidden` | saklar | semua |  |
+| Axes → Value axis (left) | Min | `y.min` | angka | column, bar, line, area, combo, scatter, bullet, waterfall |  |
+| Axes → Value axis (left) | Max | `y.max` | angka | column, bar, line, area, combo, scatter, bullet, waterfall |  |
+| Axes → Value axis (left) | Before | `y.prefix` | teks | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut |  |
+| Axes → Value axis (left) | After | `y.suffix` | teks | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut |  |
+| Axes → Value axis (left) | Decimals | `y.decimals` | angka | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut |  |
+| Axes → Value axis (left) | Percent | `y.percent` | saklar | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut | Write 0.5 as 50% (on its own when the cells are percents) |
+| Axes → Right axis | Min | `y2.min` | angka | column, bar, line, area, combo, scatter, bullet, waterfall |  |
+| Axes → Right axis | Max | `y2.max` | angka | column, bar, line, area, combo, scatter, bullet, waterfall |  |
+| Axes → Right axis | Before | `y2.prefix` | teks | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut |  |
+| Axes → Right axis | After | `y2.suffix` | teks | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut |  |
+| Axes → Right axis | Decimals | `y2.decimals` | angka | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut |  |
+| Axes → Right axis | Percent | `y2.percent` | saklar | column, bar, line, area, combo, scatter, bullet, waterfall, pie, donut | Write 0.5 as 50% (on its own when the cells are percents) |
+| Axes → X axis | Min | `x.min` | angka | scatter |  |
+| Axes → X axis | Max | `x.max` | angka | scatter |  |
+| Axes → X axis | Before | `x.prefix` | teks | scatter |  |
+| Axes → X axis | After | `x.suffix` | teks | scatter |  |
+| Axes → X axis | Decimals | `x.decimals` | angka | scatter |  |
+| Axes → X axis | Percent | `x.percent` | saklar | scatter |  |
+| Axes → Show | Show the value axis | `yAxis` | saklar | semua |  |
+| Axes → Show | Show the categories (x) | `xAxis` | saklar | semua |  |
+| Title and legend | Title | `title` | teks | semua |  |
+| Title and legend | Subtitle | `subtitle` | teks | semua |  |
+| Title and legend | Legend | `legend` | pilihan: Top, Right, Bottom, Off | semua |  |
+| Labels and gridlines | Data labels | `labels` | saklar | semua |  |
+| Labels and gridlines | Gridlines | `grid` | saklar | column, bar, line, area, combo, scatter, bullet, waterfall |  |
+| Labels and gridlines | Stacked | `stacked` | saklar | column, bar, area, combo |  |
+| Labels and gridlines | Smooth lines | `smooth` | saklar | line, area, combo, scatter |  |
+| Labels and gridlines | Markers | `markers` | saklar | line, area, combo |  |
+| Labels and gridlines | Lines through the points | `lines` | saklar | scatter |  |
+| Place and background | Cells | `at` | range (⊞ dari grid) | semua | The block of cells the chart stands on |
+| Place and background | Background | `background` | pilihan: White, Transparent | semua | Transparent: over the cells, a click goes through; pick it by its edge |
+| Place and background | Points | `align` | pilihan: Fit, On the columns | column, line, area, combo | On the columns: category i in the middle of column i of its cells (an S-curve over a schedule) |
+| Slices | Colors | `colors` | warna per potongan | pie, donut | One per slice, in the order of the categories |
+| Center | Center text | `centerText` | teks | donut |  |
+| Center | Under it | `centerLabel` | teks | donut |  |
+| Limits | Amber when below by | `warn` | angka | bullet |  |
+| Limits | Red when below by | `bad` | angka | bullet |  |
+| Steps | Totals (category numbers) | `totals` | nomor kategori | waterfall | From 1; the last one is a total when its cell is empty |
+| Steps | Up | `upColor` | warna | waterfall |  |
+| Steps | Down | `downColor` | warna | waterfall |  |
+| Steps | Total | `totalColor` | warna | waterfall |  |
+
+**Sparkline** (`addSparkline`, `setSparkline`; panelnya terbuka saat sel sparkline dipilih)
+
+| Node | Isian | Kunci | Jenis isian | Untuk | Keterangan |
+|---|---|---|---|---|---|
+| Sparklines | Type | `type` | pilihan: Line, Column, Win/loss | semua |  |
+| Sparklines | Color | `color` | warna | semua |  |
+| Sparklines | Negative | `negColor` | warna | semua |  |
+| Sparklines | Dots | `markers` | pilihan: Last, All, None | semua |  |
+| Sparklines | Min | `min` | angka | semua |  |
+| Sparklines | Max | `max` | angka | semua |  |
+| Sparklines | Cells | `at` | range (⊞ dari grid) | semua |  |
+| Sparklines | Data | `data` | range (⊞ dari grid) | semua |  |
+```
+<!-- /hasil -->
+
+Bawaannya: `type: 'column'`, `seriesIn: 'auto'`, `legend: 'top'`, `grid: true`, `markers: true`, `background: 'white'`, `align: 'fit'`, sumbu
+menurut format sel datanya, warna dari palet Carbon, bullet `warn: 1` dan `bad: 5`, waterfall `totals: [0]`.
 
 ### Fungsi
 
 | Fungsi | Artinya |
 |---|---|
-| `addChart(spec)` | chart baru. Mengembalikan id |
+| `addChart(spec)` | chart baru (`at`, lalu `data` atau seri dengan `values` sendiri). Mengembalikan id |
 | `setChart(id, patch)` | ubah sebagian pengaturan (`at` dan `data` sebagai teks range) |
 | `removeChart(id)` | hapus chart |
-| `charts()` | semua chart sheet: pengaturannya, `at` dan `atText`, `dataText`, `dataAt` |
-| `chartData(id)` | yang digambar sekarang: `{ categories, series: [{ name, values, format, ... }], seriesIn, layout }` |
+| `charts()` | semua chart sheet: pengaturannya (range sebagai teks), `at` dan `atText`, `dataText`, `dataAt` |
+| `chartData(id)` | yang digambar sekarang: `{ categories, series: [{ name, values, x?, format, ... }], seriesIn, layout, fromBlock }` |
+| `CHART_FIELDS`, `SPARKLINE_FIELDS`, `CHART_NODES` | daftar semua pengaturan seperti yang ditawarkan panel (dari `@kufayeka/sheet/core`) |
 | `addSparkline({ at, data, type, color, negColor, markers, min, max })` | sparkline di sel `at`. Mengembalikan id grup |
 | `setSparkline(id, patch)`, `removeSparkline(id)`, `sparklines()` | ubah, hapus, dan daftar grup sparkline (dengan angka setiap selnya) |
 | `addConditional(range, { kind: 'bar', color })` | data bar ([bab 6](06-format.md)) |
@@ -771,7 +919,7 @@ perubahan bisa di-undo.
 
 | | Ke .xlsx | Dari .xlsx |
 |---|---|---|
-| column, bar, line, area, pie, donut, combo dua sumbu | chart Excel asli di sel yang sama. Setiap seri menunjuk selnya sendiri | ya, kalau semua seri membaca satu blok di satu sheet |
+| column, bar, line, area, pie, donut, combo dua sumbu, scatter | chart Excel asli di sel yang sama. Setiap seri menunjuk selnya sendiri | ya: sebagai blok kalau bagian-bagiannya membentuk satu blok, kalau tidak sebagai range per seri |
 | chart transparan | chart tanpa isi latar | ya (`background: 'none'`) |
 | `align: 'cells'` | posisinya tetap, tetapi Excel tidak menempelkan titik ke tengah kolom | tidak |
 | bullet, waterfall | sebagai batang dan kolom biasa (Excel tidak punya jenis ini di format chart klasik) | sebagai bar dan column |

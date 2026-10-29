@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PALETTE } from './draw.js';
-import { CHART_FIELDS, SPARKLINE_FIELDS, NODES, isFor, fieldsOf, valueAt, patchFor } from './props.js';
+import { CHART_FIELDS, SPARKLINE_FIELDS, NODES, isFor, fieldsOf, valueAt, patchFor } from '../../core/chart-fields.js';
 
 // the kinds of chart, as the editor offers them, each with a small picture of itself (a path in a 24 x 24 box; `line` paths are stroked)
 const TYPES = [
@@ -148,7 +148,9 @@ export function ChartPanel({ workbook: wb, sheetId, id, node = 'chart', onNode, 
                     // a series of the block takes its values from the block: its range is shown, not changed here
                     const extra = k === 'values' && !own ? { readOnly: true, note: 'from the block (Data)' } : k === 'color' ? { fallback: (chart.colors && chart.colors[pos]) || PALETTE[pos % PALETTE.length] } : null;
                     if ((k === 'values' || k === 'x') && !own && type !== 'scatter') return k === 'values' ? <FieldRow key={f.key + f.for} field={f} value={chart.dataText || ''} extra={extra} onApply={() => {}} /> : null;
-                    return <FieldRow key={f.key + (f.for || '')} field={f} value={spec[k]} extra={extra} onPick={onPick} onApply={(v) => setSeries(pos, { [k]: v })} />;
+                    // the name the series has now (from the block's header or its cell) shows in an empty Name field
+                    const shown = k === 'name' ? { ...f, placeholder: s.name } : f;
+                    return <FieldRow key={f.key + (f.for || '')} field={shown} value={spec[k]} extra={extra} onPick={onPick} onApply={(v) => setSeries(pos, { [k]: v })} />;
                 })}
                 <div className="ks-ins-actions">
                     {own ? <button type="button" className="ks-button" onClick={() => { const list = (chart.series || []).filter((_, i) => i !== listPlaceOf(pos)); set({ series: list }); onNode('data'); }}>Remove series</button>

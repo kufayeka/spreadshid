@@ -1,4 +1,4 @@
-// Every setting of a chart and of a sparkline group, in one list: where it stands in the chart editor (the node of its tree), how it is edited (the
+// Every setting of a chart and of a sparkline group, in one list (exported from the core: CHART_FIELDS, SPARKLINE_FIELDS, CHART_NODES): where it stands in the chart editor (the node of its tree), how it is edited (the
 // kind of its field), and when it shows (the kinds of chart it is for). The editor is drawn from this list, the reference of the docs is printed
 // from it, and a test checks that every key of the types (ChartSpec, ChartSeriesSpec, SparklineSpec) is in it, so the editor can never offer less
 // than the code can do. Pure: no React.

@@ -16,6 +16,7 @@ export { ERR, isError } from './formula/xlvalue.js';
 export { formatValue, localeInfo, FORMAT_PRESETS, dateToSerial, serialToDate } from './format.js';
 export { displayOf } from './display.js';
 export { chartSeries, CHART_TYPES, CHART_DEFAULTS } from './chart.js';
+export { CHART_FIELDS, SPARKLINE_FIELDS, NODES as CHART_NODES } from './chart-fields.js';
 export { populate } from './populate.js';
 export { fromApiMakerType, fieldType, checkValue } from './types.js';
 export { mergePatch, checkPatch, viewFor } from './server.js';

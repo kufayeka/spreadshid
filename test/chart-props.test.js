@@ -1,10 +1,10 @@
 // The chart editor offers everything the code can do: every key of ChartSpec, ChartSeriesSpec, ChartAxis and SparklineSpec (as the types declare them)
-// has its field in the editor's list (src/react/chart/props.js), from which the editor and the docs' reference are made. A key added to the types and
+// has its field in the editor's list (src/core/chart-fields.js), from which the editor and the docs' reference are made. A key added to the types and
 // not to the editor fails here.
 //   node test/chart-props.test.js
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { CHART_FIELDS, SPARKLINE_FIELDS, NODES, fieldsOf, valueAt, patchFor } from '../src/react/chart/props.js';
+import { CHART_FIELDS, SPARKLINE_FIELDS, NODES, fieldsOf, valueAt, patchFor } from '../src/core/chart-fields.js';
 import { CHART_TYPES } from '../src/core/index.js';
 
 let passed = 0;

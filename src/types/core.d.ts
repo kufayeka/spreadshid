@@ -564,6 +564,14 @@ export const PIVOT_FUNCTIONS: Record<PivotFunction, (values: unknown[]) => CellR
 export function chartSeries(block: Array<Array<{ value: unknown; text: string; format?: object | null }>>, spec?: ChartSpec): ChartModel;
 export const CHART_TYPES: ChartType[];
 export const CHART_DEFAULTS: Readonly<ChartSpec>;
+/** One setting as the chart editor offers it: its key ('y.min', 'series.color'), its label, the kind of its field, the node of the editor's tree it is in,
+ * and the kinds of chart it is for (all when left out). */
+export interface ChartField { key: string; label: string; kind: 'text' | 'number' | 'range' | 'color' | 'toggle' | 'segment' | 'type' | 'colors' | 'totals'; node: string; for?: ChartType[]; options?: Array<[string, string]>; unit?: string; help?: string; group?: string; placeholder?: string; default?: unknown }
+/** Every setting of a chart (and of a sparkline group), as the chart editor offers them: the editor is made from these lists. */
+export const CHART_FIELDS: ChartField[];
+export const SPARKLINE_FIELDS: ChartField[];
+/** The nodes of the chart editor's tree, in their order. */
+export const CHART_NODES: Array<{ id: string; label: string; for?: ChartType[] }>;
 
 export function exportXlsx(wb: Workbook): Uint8Array;
 export function importXlsx(bytes: Uint8Array, options?: WorkbookOptions & { settings?: Settings }): Promise<{ workbook: Workbook; warnings: string[]; active: string }>;
