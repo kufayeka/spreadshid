@@ -209,6 +209,20 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const [picking, setPicking] = useState(null); // { apply, from }
     const pickRange = (apply) => { setPicking({ apply, from: sheetId }); tell({ kind: 'info', reason: 'Select the cells for the field in the grid' }); };
     useEffect(() => { setChartSelState(null); setPanel((p) => (p && p.kind === 'chart' ? null : p)); }, [sheetId]);
+    // Insert > Sparkline: one sparkline per row of the selection (one per column when the selection is one row), in the cells just right of it
+    // (below it for a row); its editor opens on its first cell
+    function insertSparkline() {
+        if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: refusalOf('chart', wb.access().message) }); return; }
+        const d = rectsOf(sel)[rectsOf(sel).length - 1];
+        const oneRow = d.r1 === d.r2 && d.c2 > d.c1;
+        const at = oneRow ? { r1: d.r2 + 1, c1: d.c1, r2: d.r2 + 1, c2: d.c2 } : { r1: d.r1, c1: d.c2 + 1, r2: d.r2, c2: d.c2 + 1 };
+        try {
+            wb.addSparkline(sheetId, { at: rectText(at), data: rectText(d) }, { source: 'user' });
+            setSel({ ranges: [{ anchor: { r: at.r1, c: at.c1 }, focus: { r: at.r1, c: at.c1 } }], active: { r: at.r1, c: at.c1 } });
+        } catch (err) {
+            tellError(err.message[0].toUpperCase() + err.message.slice(1));
+        }
+    }
     // Insert > Chart: a column chart of the selection (or of the filled block around the active cell), on the cells to the right of it, selected
     function insertChart() {
         if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: refusalOf('chart', wb.access().message) }); return; }
@@ -431,6 +445,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onComment={writeComment}
                 onChart={insertChart}
+                onSparkline={insertSparkline}
                 onPivot={() => {
                     // the data to start with: the selection, or the block of filled cells around the active cell
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];

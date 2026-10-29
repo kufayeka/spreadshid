@@ -259,7 +259,7 @@ export const UI_ITEMS = [
         ['menu.view:freezeRows', 'View > Freeze rows'], ['menu.view:freezeCols', 'View > Freeze columns'], ['menu.view:group', 'View > Group'], ['menu.view:comments', 'View > Comments'],
         ['menu.view:zoom', 'View > Zoom'], ['menu.insert:rowsAbove', 'Insert > Rows'], ['menu.insert:colsLeft', 'Insert > Columns'], ['menu.insert:sheet', 'Insert > Sheet'],
         ['menu.insert:checkbox', 'Insert > Checkbox'], ['menu.insert:dropdown', 'Insert > Dropdown'], ['menu.insert:fn', 'Insert > Function'], ['menu.insert:link', 'Insert > Link'],
-        ['menu.insert:comment', 'Insert > Comment'], ['menu.insert:pivot', 'Insert > Pivot table'], ['menu.insert:chart', 'Insert > Chart'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
+        ['menu.insert:comment', 'Insert > Comment'], ['menu.insert:pivot', 'Insert > Pivot table'], ['menu.insert:chart', 'Insert > Chart'], ['menu.insert:sparkline', 'Insert > Sparkline'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
         ['menu.data:sortRange', 'Data > Sort range'], ['menu.data:filter', 'Data > Filter'], ['menu.data:validation', 'Data > Data validation'], ['menu.data:names', 'Data > Named ranges']
     ].map(([id, label]) => ({ id, label, group: 'Menu items' })),
     [['panel.comments', 'Comments panel'], ['panel.pivot', 'Pivot table editor'], ['panel.chart', 'Chart editor'], ['panel.conditional', 'Conditional formatting panel'], ['panel.names', 'Named ranges panel'], ['panel.validation', 'Data validation dialog'],

@@ -105,6 +105,17 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     check('a cell of sparklines opens their editor', await q(`!!document.querySelector('[aria-label="Sparkline editor"]')`));
     await press(`Array.from(${row('type')}.querySelectorAll('button')).find(function(b){ return b.textContent === 'Column'; })`);
     check('and its fields change them', (await q(`${W}.sparklines(${S})[0].type`)) === 'column');
+
+    // Insert > Sparkline: one per row of the selection, in the column on its right, its editor open
+    await q(`window.__sheet.current.select('C41:D44')`);
+    await wait(200);
+    await q(`(function(){ var b = Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'Insert'; }); b.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); b.click(); })()`);
+    await wait(250);
+    await q(`(function(){ var it = Array.from(document.querySelectorAll('.ks-menu-item')).find(function(x){ return x.textContent.trim().indexOf('Sparkline') === 0; }); it.click(); })()`);
+    await wait(400);
+    const made = await q(`${W}.sparklines(${S}).map(function(g){ return g.atText + ' <- ' + g.dataText; }).join(' | ')`);
+    check('Insert > Sparkline: a sparkline per row, in the column right of the selection', made.includes('E41:E44 <- C41:D44'), made);
+    check('and its editor opens on it', await q(`!!document.querySelector('[aria-label="Sparkline editor"]')`));
 }, 'control.js');
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL OK');

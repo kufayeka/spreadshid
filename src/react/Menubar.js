@@ -24,6 +24,7 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {() => void} props.onComment  Opens the comments to write one on the active cell.
  * @param {() => void} props.onComments  Shows or hides the panel of comments.
  * @param {() => void} props.onChart  Insert > Chart: a chart of the selection.
+ * @param {() => void} props.onSparkline  Insert > Sparkline: a sparkline per row of the selection, in the column on its right.
  * @param {() => void} props.onPivot  Opens the dialog that makes a pivot table.
  * @param {(text: string) => void} props.onStartEdit @param {(id: string) => void} props.onShow  A sheet was added: show it.
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
@@ -38,7 +39,7 @@ function actionOfMenu(value) {
         file: { import: 'import', download: 'download', settings: 'settings' },
         edit: { cut: 'copy', copy: 'copy', paste: 'paste', pasteValues: 'paste', pasteStyles: 'paste', clear: 'edit', deleteRows: 'rows.delete', deleteCols: 'cols.delete' },
         view: { comments: 'comment.read', freezeRows: 'view.freeze', freezeCols: 'view.freeze', gridlines: 'view.gridlines', foldRows: 'rows.group', foldCols: 'cols.group' },
-        insert: { pivot: 'pivot', chart: 'chart', comment: 'comment.create', rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
+        insert: { pivot: 'pivot', chart: 'chart', sparkline: 'chart', comment: 'comment.create', rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
         data: { sortSheet: 'sort', sortRange: 'sort', filter: 'filter', validation: 'validation', names: 'names' }
     };
     if (area === 'view' && (what === 'group' || what === 'ungroup')) return extra === 'cols' ? 'cols.group' : 'rows.group';
@@ -114,7 +115,8 @@ export function Menubar(props) {
             { value: 'insert:link', label: 'Link', hint: 'Ctrl+K' },
             { value: 'insert:comment', label: 'Comment', hint: 'Ctrl+Alt+M' },
             { value: 'insert:pivot', label: 'Pivot table' },
-            { value: 'insert:chart', label: 'Chart' }
+            { value: 'insert:chart', label: 'Chart' },
+            { value: 'insert:sparkline', label: 'Sparkline' }
         ],
         Format: [
             { label: 'Number', children: [
@@ -256,6 +258,7 @@ export function Menubar(props) {
                 else if (what === 'comment') props.onComment();
                 else if (what === 'pivot') props.onPivot();
                 else if (what === 'chart') props.onChart();
+                else if (what === 'sparkline') props.onSparkline();
                 // a checkbox in every cell of the selection (an empty one shows unticked): one change
                 else if (what === 'checkbox') run(() => wb.setValidation(s, b, { kind: 'checkbox' }, how));
                 else if (what === 'dropdown') props.onValidation('list');

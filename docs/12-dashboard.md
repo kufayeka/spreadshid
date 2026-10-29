@@ -447,6 +447,9 @@ export default function Halaman() {
 - **Data bar** adalah aturan conditional formatting ([bab 6](06-format.md)) dengan `kind: 'bar'`: bar di belakang teks sel, sepanjang
   angkanya dibandingkan angka terbesar di range itu (dari 0 kalau semuanya positif). Data bar bisa dipakai bersama aturan warna lain.
   Dari layar: **Format → Conditional formatting**, tab **Data bar**.
+- **Sparkline dari layar:** pilih range datanya (misalnya D2:K8), lalu **Insert → Sparkline**. Sparkline dibuat di kolom tepat di kanan
+  pilihan, satu sel per baris (atau di baris tepat di bawahnya kalau pilihannya satu baris), dan panel **Sparklines** terbuka untuk mengatur
+  jenis, warna, titik, min/max, dan range-nya. Klik sel sparkline kapan saja untuk membuka panel itu lagi.
 
 ## 12.11 Seri dari range sendiri, dan scatter
 
@@ -902,6 +905,7 @@ perubahan bisa di-undo.
 | Aksi | Hasil |
 |---|---|
 | Insert → Chart | chart kolom dari pilihan (atau blok terisi di sekitar sel aktif), di sebelah kanannya |
+| Insert → Sparkline | sparkline per baris pilihan, di kolom tepat di kanannya. Panelnya terbuka |
 | klik chart (chart transparan: klik tepinya) | pilih. Panel Chart terbuka |
 | tarik chart, tarik titik pegangan | pindah, ubah ukuran, per sel |
 | Delete, Escape | hapus chart yang dipilih, lepas pilihan |
