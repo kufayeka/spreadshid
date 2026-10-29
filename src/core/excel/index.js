@@ -125,7 +125,7 @@ export function exportXlsx(wb) {
             autoFilter: toExcelFilter(wb, s),
             conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean),
             validations: (props.validations || []).map((rule) => ({ rule, rect: ruleRect(wb, s, rule) })).filter((x) => x.rect),
-            // the open and the resolved threads, each as one note on its cell
+            // every thread, as one note on its cell
             notes: wb.comments(s).filter((t) => t.at && t.items.length).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) }))
         };
     });

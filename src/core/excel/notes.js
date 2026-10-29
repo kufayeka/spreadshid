@@ -11,7 +11,7 @@
 // reject: false is errorStyle="information" (Excel keeps the value and only tells); help is the input message, message the error message.
 //
 // Comments: written as Excel's notes (comments1.xml and the VML drawing that shows them), which Excel, Google Sheets and LibreOffice all read. A
-// thread becomes one note, a line per comment ("Dewi: Kapan datang?"); a resolved thread starts with "[resolved]". Read back the same way.
+// thread becomes one note, a line per comment ("Dewi: Kapan datang?"). Read back the same way.
 
 import { colName } from '../formula/address.js';
 import { newId } from '../ids.js';
@@ -102,9 +102,9 @@ export function readValidations(node, kid, kids, addressOf) {
 
 // ---- comments out -----------------------------------------------------------------------------------------------------------------------------
 
-/** The text of a thread as one note: a line per comment, "[resolved]" first when it is closed. */
+/** The text of a thread as one note: a line per comment. */
 export function noteText(thread) {
-    return (thread.resolved ? '[resolved]\n' : '') + thread.items.map((i) => (i.by && i.by.name ? i.by.name + ': ' : '') + i.text).join('\n');
+    return thread.items.map((i) => (i.by && i.by.name ? i.by.name + ': ' : '') + i.text).join('\n');
 }
 
 /**
@@ -131,7 +131,7 @@ export function notesParts(notes, n) {
 // ---- comments in ------------------------------------------------------------------------------------------------------------------------------
 
 /**
- * A comments<n>.xml as threads to put on a sheet: [{ r, c, resolved, items: [{ name, text }] }]. Each line "Name: text" is a comment by Name (the
+ * A comments<n>.xml as threads to put on a sheet: [{ r, c, items: [{ name, text }] }]. Each line "Name: text" is a comment by Name (the
  * shape this file writes, and the one Excel's own notes have: "Author:" on the first line); a line without a name continues the comment before it.
  */
 export function readNotes(root, kid, kids, addressOf) {
@@ -142,8 +142,6 @@ export function readNotes(root, kid, kids, addressOf) {
         if (!at) continue;
         const text = textOf(kid(cm, 'text'), kids);
         let lines = text.replace(/\r/g, '').split('\n');
-        const resolved = lines[0] === '[resolved]';
-        if (resolved) lines = lines.slice(1);
         const items = [];
         const fallback = authors[Number(cm.attrs.authorId)] || '';
         for (const line of lines) {
@@ -152,7 +150,7 @@ export function readNotes(root, kid, kids, addressOf) {
             else if (items.length) items[items.length - 1].text += '\n' + line;
             else items.push({ name: fallback, text: line });
         }
-        if (items.length) out.push({ r: at.r, c: at.c, resolved, items });
+        if (items.length) out.push({ r: at.r, c: at.c, items });
     }
     return out;
 }
@@ -169,7 +167,7 @@ function textOf(node, kids) {
 export function threadsFor(wb, s, notes) {
     const at = new Date().toISOString();
     return notes.map((n) => ({
-        id: newId(), row: wb.rowId(s, n.r), col: wb.colId(s, n.c), resolved: n.resolved,
+        id: newId(), row: wb.rowId(s, n.r), col: wb.colId(s, n.c),
         items: n.items.map((i) => ({ id: newId(), by: { id: null, name: i.name }, text: i.text, at }))
     })).filter((t) => t.row && t.col);
 }

@@ -37,7 +37,7 @@ bulat, sel yang tidak boleh diubah, dan aturan bisnis yang membaca sel lain. Set
 Mulailah dari atas. Kalau validasi data sudah cukup, tidak perlu yang lain. `beforeOp` adalah pintu terakhir untuk yang tidak bisa ditulis dengan
 tiga cara lainnya.
 
-Untuk mengatur **siapa** boleh mengubah apa (kasir, gudang, pemilik), pakai hak akses ([bab 8](10-hak-akses.md)). Aturan sel di 8.6 adalah
+Untuk mengatur **siapa** boleh mengubah apa (kasir, gudang, pemilik), pakai hak akses ([bab 10](10-hak-akses.md)). Aturan sel di 8.6 adalah
 bagian per sel dari hak akses itu, tanpa membedakan orang.
 
 ## 8.2 Kapan diperiksa
@@ -192,7 +192,7 @@ Orang mengetik di kolom yang dilindungi:
 - `when` membuat aturan hanya berlaku di baris yang rumusnya `TRUE`: di sini baris yang statusnya Dihentikan. Rumusnya ditulis untuk baris
   pertama range, lalu bergeser ke setiap baris.
 - Sel yang dilindungi diberi gembok kecil di pojok (bawaan). Tandanya bisa diganti dengan prop `marks` ([10.25](10-hak-akses.md#1025-variasi-tanda)).
-- Aturan sel sama untuk semua orang. Untuk aturan yang berbeda per orang atau per role, pakai hak akses ([bab 8](10-hak-akses.md)).
+- Aturan sel sama untuk semua orang. Untuk aturan yang berbeda per orang atau per role, pakai hak akses ([bab 10](10-hak-akses.md)).
 
 ## 8.7 Aturan yang membaca sel lain: `beforeOp`
 

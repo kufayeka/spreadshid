@@ -14,8 +14,8 @@ function when(at, locale) {
 
 /**
  * The comments of a sheet, in a panel on the right of the grid (View > Comments, Insert > Comment, Ctrl+Alt+M): a box to comment on the selected cell,
- * then every thread in the order of its cells (open ones, or resolved ones), each with its cell's address (a click goes there), its comments (who,
- * when, what; Edit and Delete), a reply box and Resolve / Reopen. What the access policy does not let the person do (comment.*) is not offered.
+ * then every thread in the order of its cells, each with its cell's address (a click goes there), its comments as a chat (the person's own on the
+ * right, the others' on the left; Edit and Delete) and a reply box. What the access policy does not let the person do (comment.*) is not offered.
  *
  * @param {object} props
  * @param {any} props.workbook @param {string} props.sheetId
@@ -28,7 +28,6 @@ function when(at, locale) {
  */
 export function CommentsPanel({ workbook: wb, sheetId: s, active, revision, start, onGo, onError, onClose }) {
     void revision;
-    const [show, setShow] = useState('open');
     const [text, setText] = useState('');
     const [replies, setReplies] = useState({});
     const [editing, setEditing] = useState(null); // { thread, item, text }
@@ -37,8 +36,10 @@ export function CommentsPanel({ workbook: wb, sheetId: s, active, revision, star
     const can = (a) => wb.can(a);
     const how = { source: 'user' };
     const locale = wb.settings().locale;
+    // the person who has the sheet open: their own comments are drawn as their own side of a chat
+    const me = wb.user().id;
     const run = (fn) => { try { fn(); return true; } catch (err) { onError(err.message[0].toUpperCase() + err.message.slice(1)); return false; } };
-    const threads = wb.comments(s).filter((t) => t.at && (show === 'open' ? !t.resolved : t.resolved))
+    const threads = wb.comments(s).filter((t) => t.at)
         .sort((a, b) => a.at.r - b.at.r || a.at.c - b.at.c);
     const here = wb.commentAt(s, active.r, active.c);
     const address = rectText({ r1: active.r, c1: active.c, r2: active.r, c2: active.c });
@@ -65,11 +66,7 @@ export function CommentsPanel({ workbook: wb, sheetId: s, active, revision, star
                     </div>
                 </div>
             ) : null}
-            <div className="ks-tabs-choice" role="tablist">
-                <button type="button" role="tab" aria-selected={show === 'open'} className={show === 'open' ? 'ks-on' : ''} onClick={() => setShow('open')}>Open</button>
-                <button type="button" role="tab" aria-selected={show === 'resolved'} className={show === 'resolved' ? 'ks-on' : ''} onClick={() => setShow('resolved')}>Resolved</button>
-            </div>
-            {threads.length ? null : <p className="ks-panel-help">{show === 'open' ? 'No open comments on this sheet.' : 'No resolved comments.'}</p>}
+            {threads.length ? null : <p className="ks-panel-help">No comments on this sheet yet.</p>}
             <ol className="ks-thread-list">
                 {threads.map((t) => {
                     const mine = t.at.r === active.r && t.at.c === active.c;
@@ -79,13 +76,15 @@ export function CommentsPanel({ workbook: wb, sheetId: s, active, revision, star
                         <li key={t.id} className={'ks-thread' + (mine ? ' ks-current' : '')} data-thread={t.id}>
                             <div className="ks-thread-head">
                                 <button type="button" className="ks-thread-cell" onClick={() => onGo(t.at.r, t.at.c)}>{rectText({ r1: t.at.r, c1: t.at.c, r2: t.at.r, c2: t.at.c })}</button>
-                                {can('comment.resolve') ? <button type="button" className="ks-tool" aria-label={t.resolved ? 'Reopen' : 'Resolve'} title={t.resolved ? 'Reopen' : 'Resolve'}
-                                    onClick={() => run(() => wb.resolveComment(s, t.id, !t.resolved, how))}>{t.resolved ? '↺' : '✓'}</button> : null}
                             </div>
                             <ol className="ks-comment-list">
-                                {t.items.map((item) => (
-                                    <li key={item.id} className="ks-comment">
-                                        <div className="ks-comment-by"><b>{item.by && item.by.name}</b><span>{when(item.at, locale)}{item.edited ? ' (edited)' : ''}</span>
+                                {t.items.map((item) => {
+                                    // as in a chat: what the person who has the sheet open wrote sits on the right, without their name; what others wrote
+                                    // sits on the left, under the writer's name
+                                    const own = me !== null && !!item.by && item.by.id === me;
+                                    return (
+                                    <li key={item.id} className={'ks-comment ' + (own ? 'ks-own-msg' : 'ks-other-msg')}>
+                                        <div className="ks-comment-by">{own ? null : <b>{item.by && item.by.name}</b>}<span>{when(item.at, locale)}{item.edited ? ' (edited)' : ''}</span>
                                             <span className="ks-comment-tools">
                                                 {can('comment.edit') || can('comment.moderate') ? <button type="button" aria-label="Edit comment" title="Edit" onClick={() => setEditing({ thread: t.id, item: item.id, text: item.text })}>✎</button> : null}
                                                 {can('comment.delete') || can('comment.moderate') ? <button type="button" aria-label="Delete comment" title="Delete" onClick={() => run(() => wb.deleteComment(s, t.id, item.id, how))}><Icon name="trash" /></button> : null}
@@ -102,7 +101,8 @@ export function CommentsPanel({ workbook: wb, sheetId: s, active, revision, star
                                             </div>
                                         ) : <p className="ks-comment-text">{item.text}</p>}
                                     </li>
-                                ))}
+                                    );
+                                })}
                             </ol>
                             {can('comment.reply') && !mine ? (
                                 <div className="ks-comment-new">

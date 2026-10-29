@@ -182,7 +182,10 @@ export const SHOTS = [
         let p = await at(`Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'View'; })`); await click(p.x, p.y); await wait(300);
         p = await at(`Array.from(document.querySelectorAll('.ks-menu-item')).find(function(x){ return x.textContent.indexOf('Comments') >= 0; })`);
         await mouse('mouseMoved', p.x - 20, p.y); await mouse('mouseMoved', p.x, p.y); await wait(200); await click(p.x, p.y); await wait(600);
-    }, clip: { x: 0, y: 0, width: 1366, height: 480 } },
+        // G9, where Dewi (who has the sheet open) and Joko talk: its thread shown in full
+        const g9 = await cellAt(js, 8, 6); await click(g9.x, g9.y); await wait(300);
+        await js("(function(){ var t = document.querySelector('.ks-thread.ks-current'); if (t) t.scrollIntoView({ block: 'start' }); return 0; })()"); await wait(300);
+    }, clip: { x: 0, y: 0, width: 1366, height: 740 } },
     { name: 'langkah5', page: '11-langkah5.page.js', act: async ({ js, click, type, key, wait }) => {
         for (let i = 0; i < 30 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(200);
         const p = await cellAt(js, 1, 7); await click(p.x, p.y); await wait(100); await type('99'); await key('Enter', 'Enter', 13); await wait(300);

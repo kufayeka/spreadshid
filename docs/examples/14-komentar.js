@@ -24,7 +24,7 @@ export function buatDiskusi() {
 
 const { doc, thread } = buatDiskusi();
 const dewi = createWorkbook(doc, { user: { id: 'user:dewi', name: 'Dewi' } });
-const tampil = (x) => `${wantedAt(x)} ${x.resolved ? '(selesai)' : '(terbuka)'}: ` + x.items.map((i) => i.by.name + ' ' + i.at.slice(11, 16) + ' "' + i.text + '"').join(' / ');
+const tampil = (x) => `${wantedAt(x)}: ` + x.items.map((i) => i.by.name + ' ' + i.at.slice(11, 16) + ' "' + i.text + '"').join(' / ');
 const wantedAt = (x) => (x.at ? dewi.address(x.at.r, x.at.c) : '(sel terhapus)');
 for (const x of dewi.comments('Produk')) console.log(tampil(x));
 console.log('G9 punya komentar:', dewi.hasComment('Produk', 'G9'), '| G2:', dewi.hasComment('Produk', 'G2'));
@@ -32,10 +32,6 @@ console.log('G9 punya komentar:', dewi.hasComment('Produk', 'G9'), '| G2:', dewi
 // diskusi mengikuti selnya: baris disisipkan di atas, komentar ikut turun
 dewi.insertRows('Produk', '2');
 console.log('setelah sisip   :', dewi.comments('Produk').map(wantedAt).join(', '));
-
-// menutup diskusi. Jawaban baru membukanya lagi
-dewi.resolveComment('Produk', thread, true);
-console.log('ditutup         :', dewi.hasComment('Produk', 'G10'), '(tanda di sel hilang, diskusinya tetap ada)');
 
 // hanya penulis yang boleh mengubah atau menghapus komentarnya. Dari kode, yang tidak boleh melempar error (di layar tombolnya tidak ada)
 const punyaJoko = dewi.comments('Produk')[0].items[2];

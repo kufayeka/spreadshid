@@ -146,7 +146,7 @@ export interface PivotResult {
 }
 
 export interface CommentItem { id: string; by: { id: string | null; name: string }; text: string; at: string; edited?: string }
-export interface CommentThread { id: string; row: string; col: string; resolved: boolean; items: CommentItem[]; at: { r: number; c: number } | null }
+export interface CommentThread { id: string; row: string; col: string; items: CommentItem[]; at: { r: number; c: number } | null }
 
 export interface NamedRange { id: string; name: string; sheetId: string; range: Rect | null; ref: string | null }
 
@@ -349,7 +349,6 @@ export interface SheetFns {
     replyComment(thread: string, text: string, how?: How): string;
     editComment(thread: string, item: string, text: string, how?: How): Op[] | null;
     deleteComment(thread: string, item: string, how?: How): Op[] | null;
-    resolveComment(thread: string, resolved: boolean, how?: How): Op[] | null;
     comments(): CommentThread[];
     commentAt(at: CellAt, c?: number): CommentThread | null;
     hasComment(at: CellAt, c?: number): boolean;
@@ -401,6 +400,8 @@ export interface Workbook extends WithSheet<Omit<SheetFns, 'setValues'>> {
     unsaved(): boolean;
     // the person and the rules
     setUser(user: { id: string; name: string } | string | null): void;
+    /** The person the workbook is open for (createWorkbook's user, or setUser), as their comments are signed. */
+    user(): { id: string | null; name: string };
     setRules(rules: Rule[]): void;
     setAccess(rows: AccessRow[] | null, who?: Who): void;
     access(): AccessInfo;

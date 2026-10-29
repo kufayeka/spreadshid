@@ -39,7 +39,7 @@ export function buatDiskusi() {
 
 const { doc, thread } = buatDiskusi();
 const dewi = createWorkbook(doc, { user: { id: 'user:dewi', name: 'Dewi' } });
-const tampil = (x) => `${wantedAt(x)} ${x.resolved ? '(selesai)' : '(terbuka)'}: ` + x.items.map((i) => i.by.name + ' ' + i.at.slice(11, 16) + ' "' + i.text + '"').join(' / ');
+const tampil = (x) => `${wantedAt(x)}: ` + x.items.map((i) => i.by.name + ' ' + i.at.slice(11, 16) + ' "' + i.text + '"').join(' / ');
 const wantedAt = (x) => (x.at ? dewi.address(x.at.r, x.at.c) : '(sel terhapus)');
 for (const x of dewi.comments('Produk')) console.log(tampil(x));
 console.log('G9 punya komentar:', dewi.hasComment('Produk', 'G9'), '| G2:', dewi.hasComment('Produk', 'G2'));
@@ -47,10 +47,6 @@ console.log('G9 punya komentar:', dewi.hasComment('Produk', 'G9'), '| G2:', dewi
 // diskusi mengikuti selnya: baris disisipkan di atas, komentar ikut turun
 dewi.insertRows('Produk', '2');
 console.log('setelah sisip   :', dewi.comments('Produk').map(wantedAt).join(', '));
-
-// menutup diskusi. Jawaban baru membukanya lagi
-dewi.resolveComment('Produk', thread, true);
-console.log('ditutup         :', dewi.hasComment('Produk', 'G10'), '(tanda di sel hilang, diskusinya tetap ada)');
 
 // hanya penulis yang boleh mengubah atau menghapus komentarnya. Dari kode, yang tidak boleh melempar error (di layar tombolnya tidak ada)
 const punyaJoko = dewi.comments('Produk')[0].items[2];
@@ -64,11 +60,10 @@ console.log('dikirim ke tamu :', createWorkbook(viewFor(dewi.toJSON(), { access,
 
 <!-- hasil: 14-komentar.js -->
 ```text
-G9 (terbuka): Dewi 09:15 "Keramik 40x40 habis. Kapan datang lagi?" / Dewi 09:15 "Sekalian cek harga beli dari pemasok baru ya." / Joko 10:02 "PO sudah dikirim, barang datang Kamis. Harga naik 3%."
-G7 (terbuka): Joko 10:02 "Sisa 12 pail, di bawah minimum."
+G9: Dewi 09:15 "Keramik 40x40 habis. Kapan datang lagi?" / Dewi 09:15 "Sekalian cek harga beli dari pemasok baru ya." / Joko 10:02 "PO sudah dikirim, barang datang Kamis. Harga naik 3%."
+G7: Joko 10:02 "Sisa 12 pail, di bawah minimum."
 G9 punya komentar: true | G2: false
 setelah sisip   : G10, G8
-ditutup         : false (tanda di sel hilang, diskusinya tetap ada)
 ubah milik Joko : only the one who wrote a comment can change it
 dikirim ke tamu : 0 diskusi
 ```
@@ -90,7 +85,7 @@ import { buatDiskusi } from './14-komentar.js';
 // Dewi membuka workbook yang sudah berisi diskusi. Komentar ada di panel samping (View > Comments), sel berkomentar diberi tanda di pojoknya.
 export default function DiskusiStok() {
     const [wb] = useState(() => createWorkbook(buatDiskusi().doc));
-    return <div style={{ height: 480 }}><Sheet workbook={wb} user={{ id: 'user:dewi', name: 'Dewi' }} /></div>;
+    return <div style={{ height: 720 }}><Sheet workbook={wb} user={{ id: 'user:dewi', name: 'Dewi' }} /></div>;
 }
 ```
 <!-- /contoh -->
@@ -101,12 +96,12 @@ export default function DiskusiStok() {
   (opsi `now`, bawaannya jam komputer).
 - **Diskusi mengikuti selnya.** Baris disisipkan atau di-sort, diskusinya ikut. Kalau baris atau kolomnya dihapus, diskusinya tetap ada dengan `at: null`,
   dan kembali ke selnya kalau penghapusan itu di-undo.
-- **Ditutup, bukan dihapus.** `resolveComment(..., true)` menutup diskusi: tanda di sel hilang, isinya tetap bisa dibaca di tab Resolved. Balasan baru
-  membukanya lagi.
+- **Seperti chat.** Satu sel punya satu diskusi. Komentar Anda sendiri ada di kanan tanpa nama, komentar orang lain di kiri dengan namanya. Tidak ada
+  status buka atau tutup: diskusi selesai kalau komentarnya dihapus.
 - **Hanya penulisnya** yang boleh mengubah atau menghapus komentar. Pengecualiannya orang dengan hak `comment.moderate` kalau ada aturan akses. Dari kode,
   percobaan yang tidak boleh melempar error, sedangkan di layar tombolnya tidak ditampilkan. Menghapus komentar pertama sebuah diskusi menghapus seluruh
   diskusinya.
-- **Hak akses** ([bab 8](10-hak-akses.md)): `comment.read`, `comment.create`, `comment.reply`, `comment.resolve`, `comment.edit`, `comment.delete`,
+- **Hak akses** ([bab 10](10-hak-akses.md)): `comment.read`, `comment.create`, `comment.reply`, `comment.edit`, `comment.delete`,
   `comment.moderate`. Tanpa aturan akses, semua orang boleh membaca dan menulis. Dengan aturan akses, orang tanpa `comment.read` tidak melihat panelnya, dan `viewFor`
   tidak mengirim komentar kepadanya.
 
@@ -116,8 +111,7 @@ export default function DiskusiStok() {
 | `replyComment(thread, teks)` | balas sebuah diskusi. Mengembalikan id balasan |
 | `editComment(thread, item, teks)` | ubah teks komentar sendiri. Komentarnya diberi `edited` |
 | `deleteComment(thread, item)` | hapus komentar sendiri |
-| `resolveComment(thread, true/false)` | tutup atau buka lagi |
-| `comments()` | semua diskusi sheet: `[{ id, resolved, items: [{ id, by: { id, name }, text, at, edited? }], at: { r, c } }]` |
+| `comments()` | semua diskusi sheet: `[{ id, items: [{ id, by: { id, name }, text, at, edited? }], at: { r, c } }]` |
 | `commentAt(sel)` | diskusi terbuka di sel itu, atau `null` |
 | `hasComment(sel)` | apakah sel itu punya diskusi terbuka (cepat, untuk menggambar tanda) |
 
@@ -225,7 +219,7 @@ URL.revokeObjectURL(a.href);
 | grup baris dan kolom | ya | ya |
 | pivot table | sebagai nilai | sebagai nilai |
 | validasi data | ya: daftar, daftar dari range, checkbox (sebagai daftar TRUE/FALSE), angka, tanggal, panjang teks, teks memuat. Email dan URL tidak, karena Excel tidak punya jenis itu | ya. Jenis lain (rumus bebas) disebut di `warnings` |
-| komentar | ya, sebagai *note* Excel: satu note per diskusi, satu baris per komentar (`Dewi: …`), diskusi selesai diawali `[resolved]` | ya, dibaca balik menjadi diskusi dengan penulis per baris |
+| komentar | ya, sebagai *note* Excel: satu note per diskusi, satu baris per komentar (`Dewi: …`) | ya, dibaca balik menjadi diskusi dengan penulis per baris |
 | gambar dan grafik | tidak ada di library ini | dilewati, disebut di `warnings` |
 | locale | tidak disimpan oleh Excel | beri lewat `settings` |
 | aturan, tipe kolom, policy | tidak ikut: itu milik aplikasimu | |

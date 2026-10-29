@@ -169,7 +169,7 @@ Handle juga punya `id` dan `name`.
 | validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | pivot | `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt` | [7.6](07-data.md#76-pivot-table) |
 | aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [8](08-menjaga-isi.md) |
-| komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `resolveComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
+| komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
 
 ## 12.8 Daftar lain
 
@@ -214,7 +214,7 @@ const onSelect = (sel: SheetSelection) => setRange(sel.address);    // "C2:C5"
 | `Style`, `Format`, `Borders` | gaya dan format (4.5, [bab 6](06-format.md)) |
 | `Op`, `Source`, `WorkbookEvents`, `WorkbookOptions` | op, `source`, isi data setiap event, opsi `createWorkbook` |
 | `WorkbookDoc`, `Patch` | yang disimpan (`toJSON()`) dan yang berubah (`pendingPatch()`) |
-| `AccessRow`, `Who`, `AccessInfo`, `AccessUi` | hak akses ([bab 8](10-hak-akses.md)) |
+| `AccessRow`, `Who`, `AccessInfo`, `AccessUi` | hak akses ([bab 10](10-hak-akses.md)) |
 | `ValidationSpec`, `ConditionalSpec`, `PivotSpec`, `TypesSpec` | aturan validasi, conditional formatting, pivot, tipe kolom |
 
 Tipe ini ditulis tangan dan diuji: `test/types.test.js` mengompilasi kode host contoh dengan `strict`, termasuk kesalahan yang **harus** ditolak

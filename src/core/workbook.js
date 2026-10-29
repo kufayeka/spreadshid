@@ -891,8 +891,8 @@ export function createWorkbook(doc, options) {
     /** True when the filter of a sheet hides row r. */
     const filteredOut = (s, r) => { const sheet = sheetOf(sheetIdOf(s)); return filteredOf(sheet).has(sheet.rowOrder[r]); };
 
-    // ---- comments, as in Google Sheets: a thread on a cell (a comment and its replies), kept in the sheet's props by the ids of its cell -------------
-    //   comments: [{ id, row, col, resolved, items: [{ id, by: { id, name }, text, at }] }]
+    // ---- comments: a discussion on a cell (a comment and its replies), kept in the sheet's props by the ids of its cell -------------------------
+    //   comments: [{ id, row, col, items: [{ id, by: { id, name }, text, at }] }]
 
     const threadsOf = (s) => sheetOf(s).props.comments || [];
     // the comments a person may not read are not there for them (the server does not send them either: viewFor)
@@ -901,16 +901,16 @@ export function createWorkbook(doc, options) {
     const author = () => { const u = opt.user; return u && typeof u === 'object' ? { id: u.id === undefined ? null : u.id, name: u.name || String(u.id || '') } : u ? { id: String(u), name: String(u) } : { id: null, name: 'Anonymous' }; };
     const putThreads = (s, list, how) => setSheetProps(s, { comments: list.length ? list : null }, how);
 
-    /** Comments on a cell: a new thread, or a reply when the cell has an open one (one change). Returns { thread, item } ids. */
+    /** Comments on a cell: a new thread, or a reply when the cell has one already (one change). Returns { thread, item } ids. */
     function addComment(s, r, c, text, how) {
         s = sheetIdOf(s);
         const words = String(text || '').trim();
         if (!words) throw new Error('a comment needs some text');
         const item = { id: newId(), by: author(), text: words, at: clockNow().toISOString() };
         const all = threadsOf(s);
-        const open = all.find((x) => !x.resolved && x.row === api.rowId(s, r) && x.col === api.colId(s, c));
-        if (open) { putThreads(s, all.map((x) => (x === open ? { ...x, items: x.items.concat([item]) } : x)), how); return { thread: open.id, item: item.id }; }
-        const thread = { id: newId(), row: api.rowId(s, r), col: api.colId(s, c), resolved: false, items: [item] };
+        const there = all.find((x) => x.row === api.rowId(s, r) && x.col === api.colId(s, c));
+        if (there) { putThreads(s, all.map((x) => (x === there ? { ...x, items: x.items.concat([item]) } : x)), how); return { thread: there.id, item: item.id }; }
+        const thread = { id: newId(), row: api.rowId(s, r), col: api.colId(s, c), items: [item] };
         putThreads(s, all.concat([thread]), how);
         return { thread: thread.id, item: item.id };
     }
@@ -923,8 +923,7 @@ export function createWorkbook(doc, options) {
         const item = { id: newId(), by: author(), text: words, at: clockNow().toISOString() };
         const all = threadsOf(s);
         if (!all.some((x) => x.id === threadId)) throw new Error('there is no comment ' + threadId);
-        // a reply opens a resolved thread again, as in Google Sheets
-        putThreads(s, all.map((x) => (x.id === threadId ? { ...x, resolved: false, items: x.items.concat([item]) } : x)), how);
+        putThreads(s, all.map((x) => (x.id === threadId ? { ...x, items: x.items.concat([item]) } : x)), how);
         return item.id;
     }
 
@@ -958,30 +957,24 @@ export function createWorkbook(doc, options) {
         return putThreads(s, all.map((x) => (x.id === threadId ? { ...x, items: x.items.filter((i) => i.id !== itemId) } : x)), how);
     }
 
-    /** Resolves a thread (it stays, closed; a reply opens it again), or opens it. One change. */
-    function resolveComment(s, threadId, resolved, how) {
-        s = sheetIdOf(s);
-        return putThreads(s, threadsOf(s).map((x) => (x.id === threadId ? { ...x, resolved: resolved !== false } : x)), how);
-    }
-
-    // the open threads of a sheet by "row:col", made again when the sheet's props change
-    function openThreads(s) {
+    // the threads of a sheet by "row:col", made again when the sheet's props change
+    function cellThreads(s) {
         const sheet = sheetOf(s);
         if (!sheet.threadsByCell || sheet.threadsFor !== sheet.props.comments) {
             sheet.threadsFor = sheet.props.comments;
             sheet.threadsByCell = new Map();
-            for (const x of sheet.props.comments || []) if (!x.resolved) sheet.threadsByCell.set(x.row + ':' + x.col, x);
+            for (const x of sheet.props.comments || []) sheet.threadsByCell.set(x.row + ':' + x.col, x);
         }
         return sheet.threadsByCell;
     }
 
-    /** The open thread of a cell, or null. */
-    /** True when a cell has an open thread (quick: for drawing its mark). */
-    const hasComment = (s, r, c) => { if (!readable()) return false; s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); return !!rid && !!cid && openThreads(s).has(rid + ':' + cid); };
+    /** True when a cell has a thread (quick: for drawing its mark). */
+    const hasComment = (s, r, c) => { if (!readable()) return false; s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); return !!rid && !!cid && cellThreads(s).has(rid + ':' + cid); };
 
-    const commentAt = (s, r, c) => { if (!readable()) return null; s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); const x = rid && cid ? openThreads(s).get(rid + ':' + cid) : null; return x ? clone(x) : null; };
+    /** The thread of a cell, or null. */
+    const commentAt = (s, r, c) => { if (!readable()) return null; s = sheetIdOf(s); const rid = api.rowId(s, r), cid = api.colId(s, c); const x = rid && cid ? cellThreads(s).get(rid + ':' + cid) : null; return x ? clone(x) : null; };
 
-    /** Every thread of a sheet (open and resolved), with where its cell stands now ({ r, c }, or null when its row or column was deleted). */
+    /** Every thread of a sheet, with where its cell stands now ({ r, c }, or null when its row or column was deleted). */
     const comments = (s) => { if (!readable()) return []; s = sheetIdOf(s); return threadsOf(s).map((x) => { const r = api.rowIndex(s, x.row), c = api.colIndex(s, x.col); return { ...clone(x), at: r >= 0 && c >= 0 ? { r, c } : null }; }); };
 
     // ---- pivot tables (pivot.js): a summary of a range written into the sheet, worked out again when its data changes -------------------------------
@@ -1973,9 +1966,11 @@ export function createWorkbook(doc, options) {
         filterValues: (s, c) => { const f = sheetOf(sheetIdOf(s)).props.filter; return f ? valuesOfFilter(api, sheetIdOf(s), f, c) : []; },
         dataRegion: (s, r, c) => regionAround(api, sheetIdOf(s), r, c),
         // comments
-        addComment, replyComment, editComment, deleteComment, resolveComment, commentAt, comments, hasComment,
+        addComment, replyComment, editComment, deleteComment, commentAt, comments, hasComment,
         /** The person who writes from now on ({ id, name }): their name goes on their comments, and only they change them. */
         setUser: (user) => { opt.user = user; },
+        // the person the workbook is open for, as their comments are signed: { id, name } (id null when none was given)
+        user: () => author(),
         // pivot tables
         addPivot, setPivot, removePivot, pivots, pivotAt,
         // named ranges

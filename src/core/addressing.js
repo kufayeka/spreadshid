@@ -155,5 +155,5 @@ const SHEET_FNS = [...CELL_FNS, ...Object.keys(RANGE_FNS), 'setRowProps', 'setCo
     'rowProps', 'colProps', 'rowId', 'colId', 'rowIndex', 'colIndex', 'size', 'sheetProps', 'setSheetProps', 'merges', 'lastFilled', 'forEachFilledRow', 'setBlock',
     'rowAxis', 'colAxis', 'setTypes', 'groupRows', 'ungroupRows', 'groupCols', 'ungroupCols', 'foldRowGroup', 'foldColGroup', 'showRowLevel', 'showColLevel',
     'rowGroups', 'colGroups', 'removeFilter', 'setFilterColumn', 'filterOf', 'filterValues', 'dataRegion', 'conditionals', 'removeConditional', 'moveConditional',
-    'replyComment', 'editComment', 'deleteComment', 'resolveComment', 'comments', 'hideSheet', 'removeSheet', 'duplicateSheet', 'moveSheet', 'sheetShown',
+    'replyComment', 'editComment', 'deleteComment', 'comments', 'hideSheet', 'removeSheet', 'duplicateSheet', 'moveSheet', 'sheetShown',
     'addPivot', 'setPivot', 'removePivot', 'pivots'];

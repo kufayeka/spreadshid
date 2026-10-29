@@ -31,7 +31,7 @@ export const ACTIONS = [
     'view.freeze', 'view.gridlines', 'view.area', 'view.sheet',
     'sort', 'filter', 'validation', 'names', 'settings', 'pivot',
     'copy', 'paste', 'download', 'import',
-    'comment.read', 'comment.create', 'comment.reply', 'comment.resolve', 'comment.edit', 'comment.delete', 'comment.moderate',
+    'comment.read', 'comment.create', 'comment.reply', 'comment.edit', 'comment.delete', 'comment.moderate',
     'access'
 ];
 
@@ -161,9 +161,8 @@ const OP_ACTION = { insertRows: 'rows.insert', deleteRows: 'rows.delete', insert
 const changedKeys = (a, b) => { const out = new Set(); for (const k of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) if (JSON.stringify((a || {})[k]) !== JSON.stringify((b || {})[k])) out.add(k); return out; };
 
 /**
- * What a change to the comments of a sheet asks for: a new thread is comment.create, a new item in a thread comment.reply, a thread resolved or opened
- * comment.resolve; a comment changed or taken away is comment.edit / comment.delete when it is the person's own (`me`, their id), comment.moderate when
- * it is someone else's.
+ * What a change to the comments of a sheet asks for: a new thread is comment.create, a new item in a thread comment.reply; a comment changed or taken
+ * away is comment.edit / comment.delete when it is the person's own (`me`, their id), comment.moderate when it is someone else's.
  */
 export function commentActions(before, after, me) {
     const out = new Set();
@@ -172,7 +171,6 @@ export function commentActions(before, after, me) {
     for (const [id, t] of now) {
         const old = was.get(id);
         if (!old) { out.add('comment.create'); continue; }
-        if (!!old.resolved !== !!t.resolved) out.add('comment.resolve');
         const oldItems = new Map(old.items.map((i) => [i.id, i]));
         for (const item of t.items) {
             const o = oldItems.get(item.id);
@@ -215,7 +213,7 @@ export function actionsOfOp(op, me) {
 // what a person is told, by the action that was refused
 const SAY = { edit: 'change cells', sort: 'sort', filter: 'change the filter', names: 'change named ranges', validation: 'change data validation', settings: 'change the settings',
     copy: 'copy from this sheet', paste: 'paste here', 'comment.read': 'see the comments', 'comment.create': 'comment', 'comment.reply': 'reply to comments',
-    'comment.resolve': 'resolve comments', 'comment.edit': 'change comments', 'comment.delete': 'delete comments', 'comment.moderate': 'change the comments of others', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
+    'comment.edit': 'change comments', 'comment.delete': 'delete comments', 'comment.moderate': 'change the comments of others', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
 /** A sentence for an action a person may not do ("You cannot change cells here"). */
 export function refusalOf(action, message) {
     if (message) return message;
@@ -240,8 +238,7 @@ export const ACTION_INFO = [
     ['view.area', 'Only this part of a sheet shows', 'View'], ['view.sheet', 'Only these sheets show', 'View'], ['view.freeze', 'Freeze rows and columns', 'View'], ['view.gridlines', 'Show or hide gridlines', 'View'],
     ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['pivot', 'Pivot tables', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
     ['copy', 'Copy out', 'Clipboard and files'], ['paste', 'Paste', 'Clipboard and files'], ['download', 'Download', 'Clipboard and files'], ['import', 'Import', 'Clipboard and files'],
-    ['comment.read', 'See comments', 'Comments'], ['comment.create', 'Start a comment', 'Comments'], ['comment.reply', 'Reply', 'Comments'], ['comment.resolve', 'Resolve and reopen', 'Comments'],
-    ['comment.edit', 'Edit own comments', 'Comments'], ['comment.delete', 'Delete own comments', 'Comments'], ['comment.moderate', 'Edit and delete anyone\'s comments', 'Comments'],
+    ['comment.read', 'See comments', 'Comments'], ['comment.create', 'Start a comment', 'Comments'], ['comment.reply', 'Reply', 'Comments'], ['comment.edit', 'Edit own comments', 'Comments'], ['comment.delete', 'Delete own comments', 'Comments'], ['comment.moderate', 'Edit and delete anyone\'s comments', 'Comments'],
     ['access', 'Change the access policy', 'Access']
 ].map(([id, label, group]) => ({ id, label, group }));
 

@@ -1,6 +1,6 @@
 // Comments in a real Chrome (step R6): Ctrl+Alt+M opens the comments panel on the right with its box focused for the selected cell, Ctrl+Enter sends,
-// the cell gets its mark, a reply as another person, a second thread, a thread's address goes to its cell, Resolve moves it to Resolved and Reopen
-// back; the access rows decide what is offered (reply only: no new thread, no Resolve; no comment.read: no panel, no marks). The rules underneath
+// the cell gets its mark, a reply as another person, a second thread, a thread's address goes to its cell, a thread drawn as a chat (own comments on
+// the right, the others' on the left); the access rows decide what is offered (reply only: no new thread; no comment.read: no panel, no marks). The rules underneath
 // are in comments.test.js.
 //   node test/grid-comments.test.js     (needs Chrome)
 import { chromeAvailable, withExample } from './chrome.js';
@@ -53,19 +53,17 @@ await withExample(async ({ js, click, type, key, wait }) => {
     await press(`Array.from(document.querySelectorAll('.ks-thread-cell')).find(function(x){ return x.textContent === 'A2'; })`);
     check('a thread\'s address goes to its cell', (await q('window.__sheet.current.getSelection().active.address')) === 'A2');
 
-    await press('document.querySelector(\'.ks-thread.ks-current [aria-label="Resolve"]\')');
-    check('Resolve: A2 leaves the open list and its mark goes', (await cells()) === 'D4' && !(await marked(1, 0)), await cells());
-    await press(`Array.from(document.querySelectorAll('.ks-comments [role="tab"]')).find(function(x){ return x.textContent === 'Resolved'; })`);
-    check('it is under Resolved', (await cells()) === 'A2', await cells());
-    await press(inPanel('Reopen'));
-    check('Reopen: open again, its mark back', (await q(`${W}.commentAt(${S}, 1, 0) !== null`)) && (await marked(1, 0)));
-    await press(`Array.from(document.querySelectorAll('.ks-comments [role="tab"]')).find(function(x){ return x.textContent === 'Open'; })`);
+    // a thread reads as a chat: the comments of the one who has the sheet open on the right (no name), the others' on the left (under their name)
+    const sides = await q(`JSON.stringify(Array.from(document.querySelectorAll('.ks-comment')).map(function(e){ return e.classList.contains('ks-own-msg') ? 'right' : 'left'; }))`);
+    check('own comments on the right, the others on the left', sides.includes('right') && sides.includes('left'), sides);
+    check('an own comment shows no name, another one its writer', await q(`!document.querySelector('.ks-own-msg .ks-comment-by b') && !!document.querySelector('.ks-other-msg .ks-comment-by b')`));
+    check('no Open / Resolved tabs and no Resolve button', !(await q(`!!document.querySelector('.ks-comments [role="tab"], .ks-comments [aria-label="Resolve"]')`)));
 
     // the access rows decide what is offered
     await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'read' }, { who: '*', effect: 'allow', action: 'comment.read' }, { who: '*', effect: 'allow', action: 'comment.reply' }], 'x')`);
     await wait(250);
     await clickCell(5, 5);
-    check('reply only: no box for a cell without a thread, no Resolve', !(await q('!!document.querySelector(\'.ks-comments textarea[aria-label="Comment on F6"]\')')) && !(await q('!!document.querySelector(\'.ks-comments [aria-label="Resolve"]\')')));
+    check('reply only: no box for a cell without a thread', !(await q('!!document.querySelector(\'.ks-comments textarea[aria-label="Comment on F6"]\')')));
     check('but a reply box under each thread', (await q('document.querySelectorAll(".ks-thread .ks-comment-new textarea").length')) === 2);
     await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'edit' }], 'y')`);
     await wait(250);

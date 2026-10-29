@@ -1696,7 +1696,7 @@ Tanda `$` boleh dipakai (`$G$2`). `where` yang tidak bisa dibaca **tidak mengena
 | View | `view.area`, `view.sheet`, `view.freeze`, `view.gridlines` |
 | Data | `sort`, `filter`, `pivot`, `validation`, `names`, `settings` |
 | Clipboard and files | `copy`, `paste`, `download`, `import` |
-| Comments | `comment.read`, `comment.create`, `comment.reply`, `comment.resolve`, `comment.edit`, `comment.delete`, `comment.moderate` |
+| Comments | `comment.read`, `comment.create`, `comment.reply`, `comment.edit`, `comment.delete`, `comment.moderate` |
 | Access | `access` |
 | Layar | `ui.menubar`, `ui.toolbar`, `ui.formulaBar`, `ui.headers`, `ui.gridlines`, `ui.tabs`, `ui.disallowed` |
 | Layar: Toolbar | `ui.tool.undo`, `ui.tool.redo`, `ui.tool.paint`, `ui.tool.zoom`, `ui.tool.currency`, `ui.tool.percent`, `ui.tool.decimals`, `ui.tool.formats`, `ui.tool.font`, `ui.tool.size`, `ui.tool.bold`, `ui.tool.italic`, `ui.tool.strike`, `ui.tool.underline`, `ui.tool.color`, `ui.tool.fill`, `ui.tool.borders`, `ui.tool.merge`, `ui.tool.align`, `ui.tool.valign`, `ui.tool.wrap`, `ui.tool.rotate`, `ui.tool.link`, `ui.tool.functions`, `ui.tool.clear` |

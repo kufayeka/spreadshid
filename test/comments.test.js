@@ -1,5 +1,5 @@
-// Comments without a screen (step R6): a thread on a cell, replies, its writer's name and time, edited and taken away by its writer only, resolved and
-// opened again by a reply, following its cell when a row is inserted above, undone, saved; a person who may comment but not edit comments.
+// Comments without a screen (step R6): a thread on a cell, replies, its writer's name and time, edited and taken away by its writer only,
+// following its cell when a row is inserted above, undone, saved; a person who may comment but not edit comments.
 //   node test/comments.test.js
 import assert from 'node:assert';
 import { createWorkbook, viewFor, mergePatch, checkPatch } from '../src/core/index.js';
@@ -26,24 +26,21 @@ const user = { source: 'user' };
     wb.setUser({ id: 'u1', name: 'Rina' });
     wb.editComment(s, thread, item, 'Volume dari opname minggu 3?', user);
     assert.ok(wb.commentAt(s, 1, 1).items[0].edited, 'edited by its writer, and marked so');
-    wb.resolveComment(s, thread, true, user);
-    assert.strictEqual(wb.commentAt(s, 1, 1), null, 'resolved: the cell shows none');
-    assert.strictEqual(wb.comments(s)[0].resolved, true, 'but it is kept');
-    wb.replyComment(s, thread, 'Dibuka lagi', user);
-    assert.strictEqual(wb.commentAt(s, 1, 1).items.length, 3, 'a reply opens it again');
+    wb.replyComment(s, thread, 'Terima kasih', user);
+    assert.strictEqual(wb.commentAt(s, 1, 1).items.length, 3, 'a third comment in the discussion');
 
     wb.insertRows(s, 0, 2);
     assert.ok(wb.commentAt(s, 3, 1), 'it follows its cell');
     assert.deepStrictEqual(wb.comments(s)[0].at, { r: 3, c: 1 });
     wb.undo();
     wb.undo();
-    assert.deepStrictEqual([wb.comments(s)[0].items.length, wb.comments(s)[0].resolved], [2, true], 'undone: the reply goes, and with it the thread is resolved again');
+    assert.strictEqual(wb.comments(s)[0].items.length, 2, 'undone: the last reply goes');
 
     const again = createWorkbook(wb.toJSON());
     assert.strictEqual(again.comments(again.sheetIds()[0])[0].items[1].text, 'Ya, sudah dicek', 'saved with the sheet');
     wb.deleteComment(s, thread, item, user);
     assert.deepStrictEqual(wb.comments(s), [], 'its first comment taken away: the thread goes');
-    ok('a thread: replies, who and when, edited and taken away by its writer, resolved and opened again, follows its cell, undone, saved');
+    ok('a thread: replies, who and when, edited and taken away by its writer, follows its cell, undone, saved');
 }
 
 {
@@ -67,7 +64,7 @@ const user = { source: 'user' };
 }
 
 {
-    // comments by CRUD: who may see, start, reply, resolve, change their own, change anyone's
+    // comments by CRUD: who may see, start, reply, change their own, change anyone's
     const access = [
         ...['comment.read', 'comment.create', 'comment.edit', 'comment.delete'].map((action) => ({ who: 'user:a', effect: 'allow', action })),
         ...['comment.read', 'comment.reply'].map((action) => ({ who: 'user:r', effect: 'allow', action })),
@@ -87,8 +84,6 @@ const user = { source: 'user' };
     assert.deepStrictEqual([wb.commentAt(s, 1, 1), said.pop()], [null, 'You cannot comment here'], 'a replier cannot start a thread');
     const reply = wb.replyComment(s, thread, 'Balas', user);
     assert.strictEqual(wb.commentAt(s, 0, 0).items.length, 2, 'but replies');
-    wb.resolveComment(s, thread, true, user);
-    assert.deepStrictEqual([!!wb.commentAt(s, 0, 0), said.pop()], [true, 'You cannot resolve comments here'], 'and may not resolve');
     as('a');
     assert.throws(() => wb.editComment(s, thread, reply, 'ubah', user), /only the one who wrote/, 'an author changes only their own');
     wb.editComment(s, thread, item, 'Mulai (ubah)', user);
@@ -108,7 +103,7 @@ const user = { source: 'user' };
     const kept = mergePatch(stored, theirs.pendingPatch(), { access, who: 'x' });
     assert.strictEqual(kept.sheets[0].props.comments.length, 1, 'their save does not take away the comments they were not sent');
     assert.ok(!checkPatch(stored, theirs.pendingPatch(), { access, who: 'x' }).problems.some((p) => /comment/.test(p.reason)), 'nor is it read as deleting them');
-    ok('comments by CRUD: start, reply, resolve, own edit, moderate, read; the server leaves out what may not be read');
+    ok('comments by CRUD: start, reply, own edit, moderate, read; the server leaves out what may not be read');
 }
 
 // a comment is dated by the workbook's clock (opt.now), as NOW() is
