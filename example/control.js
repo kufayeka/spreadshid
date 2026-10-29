@@ -28,7 +28,9 @@ const library = { LineStatus: { name: 'LineStatus', enum: ['Draft', 'Approved', 
 wb.setTypes(s, { headerRow: 1, fields: fromApiMakerType({ name: 'BoqLine', fields: { Qty: { type: 'int' }, Rate: { type: 'decimal', scale: 2 }, Status: { type: 'LineStatus' } } }, library).fields });
 
 window.__workbook = wb;
-window.__events = { op: [], reject: [], cellError: [], selection: [] };
+window.__events = { op: [], reject: [], cellError: [], selection: [], notice: [] };
+// what the host answers onNotice with, set by a test: undefined keeps the sheet's own text, null shows nothing, a text shows that instead
+window.__noticeAnswer = undefined;
 window.__sheet = createRef();
 window.__populate = (spec, value) => populate(wb, s, spec, value);
 createRoot(document.getElementById('root')).render(
@@ -36,5 +38,6 @@ createRoot(document.getElementById('root')).render(
         onOp={(e) => window.__events.op.push(e)}
         onReject={(e) => window.__events.reject.push(e.reason)}
         onCellError={(e) => window.__events.cellError.push(e)}
+        onNotice={(n) => { window.__events.notice.push({ kind: n.kind, reason: n.reason, address: n.address, action: n.action }); return window.__noticeAnswer; }}
         onSelectionChange={(sel) => window.__events.selection.push(sel.active)} />
 );

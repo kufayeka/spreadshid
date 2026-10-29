@@ -45,7 +45,7 @@ export function CommentsPanel({ workbook: wb, sheetId: s, active, revision, star
 
     function send() {
         if (!text.trim()) return;
-        if (!can(here ? 'comment.reply' : 'comment.create')) { onError(refusalOf(here ? 'comment.reply' : 'comment.create', wb.access().message)); return; }
+        if (!can(here ? 'comment.reply' : 'comment.create')) { onError(refusalOf(here ? 'comment.reply' : 'comment.create', wb.access().message), { kind: 'refused', action: here ? 'comment.reply' : 'comment.create' }); return; }
         if (run(() => wb.addComment(s, active.r, active.c, text, how))) setText('');
     }
     const keys = (fn) => (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fn(); } };

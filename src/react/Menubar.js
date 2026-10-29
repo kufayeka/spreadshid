@@ -203,7 +203,7 @@ export function Menubar(props) {
             const result = csv ? importCsvInto(wb, await file.text(), file.name.replace(/\.[^.]*$/, ''), how) : await importXlsxInto(wb, new Uint8Array(await file.arrayBuffer()), how);
             if (result.sheetIds.length) props.onShow(result.sheetIds[0]);
             const n = result.sheetIds.length;
-            props.onError('Imported ' + n + (n === 1 ? ' sheet' : ' sheets') + (result.warnings.length ? '. ' + result.warnings.join('. ') : ''));
+            props.onError('Imported ' + n + (n === 1 ? ' sheet' : ' sheets') + (result.warnings.length ? '. ' + result.warnings.join('. ') : ''), { kind: 'info' });
         } catch (err) { props.onError('The file could not be imported: ' + err.message); }
     }
 

@@ -31,6 +31,20 @@ await withExample(async ({ js, send, click, mouse, type, key, wait }) => {
     check('typing on a read-only rate: no editor, and the rule\'s message at once', !(await q('document.querySelector(".ks-input").classList.contains("ks-editing")')) && (await notice()) === 'The rates are set by the estimator', await notice());
     check('the rate is unchanged', (await value(1, 2)) === 500);
 
+    // the host hears of the refusal with where and what (onNotice), and decides what shows: its own text, or nothing
+    const heard = await q('window.__events.notice[window.__events.notice.length - 1]');
+    check('onNotice tells the host: refused, C2, edit, and the message of the rule', heard && heard.kind === 'refused' && heard.address === 'C2' && heard.action === 'edit' && heard.reason === 'The rates are set by the estimator', heard);
+    await key('Escape', 'Escape', 27);
+    await q('window.__noticeAnswer = "Tarif diatur estimator"');
+    await clickCell(1, 2); await type('9'); await wait(150);
+    check('a text from onNotice shows instead of the text of the sheet', (await notice()) === 'Tarif diatur estimator', await notice());
+    await key('Escape', 'Escape', 27);
+    await q('window.__noticeAnswer = null');
+    const before = await q('window.__events.notice.length');
+    await clickCell(1, 2); await type('9'); await wait(150);
+    check('null from onNotice: the sheet shows nothing new (not its own text), the host still hears of it', (await notice()) !== 'The rates are set by the estimator' && (await q('window.__events.notice.length')) === before + 1, [await notice(), await q('window.__events.notice.length') - before]);
+    await q('window.__noticeAnswer = undefined');
+
     const beam = await cellAt(2, 1);
     await mouse('mouseMoved', beam.x, beam.y); await mouse('mousePressed', beam.x, beam.y); await mouse('mouseReleased', beam.x, beam.y);
     await mouse('mousePressed', beam.x, beam.y, { clickCount: 2 }); await mouse('mouseReleased', beam.x, beam.y, { clickCount: 2 });

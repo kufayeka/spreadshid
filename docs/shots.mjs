@@ -58,6 +58,9 @@ export const SHOTS = [
     { name: 'akses-kasir', page: '13-08-kasir.page.tsx', act: async ({ js, click, wait }) => {
         const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(200); await click(p.x, p.y); await wait(100);
     }, clip: { x: 0, y: 0, width: 1100, height: 400 } },
+    { name: 'akses-pesan', page: '13-11-pesan.page.tsx', act: async ({ js, click, type, wait }) => {
+        const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(200); await type('x'); await wait(300);
+    }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
     { name: 'komentar', page: '14-komentar.page.js', act: async ({ js, click, mouse, wait }) => {
         const at = (expr) => js(`(function(){ var e = ${expr}; var b = e.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
         let p = await at(`Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'View'; })`); await click(p.x, p.y); await wait(300);

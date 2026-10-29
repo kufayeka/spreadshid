@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createWorkbook, VERSION } from '../core/index.js';
 import { selectCell, stepActive, rectsOf } from '../core/selection.js';
+import { addressOf } from '../core/formula/address.js';
 import { parseAddressText } from './FormulaBar.js';
 import { findAll, replaceIn } from '../core/search.js';
 import { Grid } from './Grid.js';
@@ -79,6 +80,7 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {(sheetId: string) => void} [onSheetChange]
  * @property {(event: { ops: object[], source: string }) => void} [onOp]
  * @property {(event: { reason: string, op: object, source: string }) => void} [onReject]
+ * @property {(notice: { kind: string, reason: string, address?: string, action?: string, source?: string, op?: object }) => string|null|undefined|void} [onNotice]
  * @property {(event: { address: string, field?: string, value: any, expected: string }) => void} [onCellError]
  * @property {(sel: SheetSelection) => void} [onSelectionChange]
  * @property {string} [fileName]
@@ -100,6 +102,8 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {(event: { ops: object[], source: string }) => void} [props.onOp]  Every change applied (by a person, by code, by undo), as ops: what the host
  *   saves, sends to others, or keeps as history.
  * @param {(event: { reason: string, op: object, source: string }) => void} [props.onReject]  A change was refused (by the rules, the types, or beforeOp).
+ * @param {(notice: object) => string|null|undefined|void} [props.onNotice]  Every message of the sheet before it shows (refused, error, info): a text
+ *   shows that instead, null shows nothing (the host shows it its own way), nothing keeps the sheet's own text.
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
  * @param {(sel: SheetSelection) => void} [props.onSelectionChange]  The selection changed (see SheetSelection).
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
@@ -199,10 +203,19 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const [notice, setNotice] = useState(null);
     const latest = useRef(props);
     latest.current = props;
+    // Every message the sheet has for the person goes through here: a change refused (by the access rows, the host's rules, a validation, a type,
+    // beforeOp), an error, or a plain information. The host hears of it first (onNotice) and decides what shows: its own text, nothing (null),
+    // or, when it says nothing, the sheet's own text. A host that shows messages its own way returns null and puts them where it likes.
+    const tell = (n) => {
+        const own = latest.current.onNotice ? latest.current.onNotice(n) : undefined;
+        if (own === null || own === false) return;
+        setNotice(typeof own === 'string' ? own : n.reason);
+    };
+    const tellError = (reason, more) => tell({ kind: 'error', reason, ...(more || {}) });
     useEffect(() => {
         const offs = [
             wb.on('op', (e) => { if (latest.current.onOp) latest.current.onOp(e); }),
-            wb.on('reject', (e) => { setNotice(e.reason); if (latest.current.onReject) latest.current.onReject(e); }),
+            wb.on('reject', (e) => { tell({ kind: 'refused', reason: e.reason, source: e.source, op: e.op }); if (latest.current.onReject) latest.current.onReject(e); }),
             wb.on('cellError', (e) => { if (latest.current.onCellError) latest.current.onCellError(e); })
         ];
         return () => offs.forEach((off) => off());
@@ -293,10 +306,10 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
         const at = wb.nameRange(text);
         if (at) { goToRange(at.sheetId, at.range); return; }
         const why = wb.nameProblem(text);
-        if (why) { setNotice(why[0].toUpperCase() + why.slice(1)); toGrid(); return; }
+        if (why) { tellError(why[0].toUpperCase() + why.slice(1)); toGrid(); return; }
         const b = rectsOf(sel)[rectsOf(sel).length - 1];
         wb.addName(text.trim(), sheetId, b, { source: 'user' });
-        setNotice('Named range ' + text.trim() + ' is ' + rectText(b));
+        tell({ kind: 'info', reason: 'Named range ' + text.trim() + ' is ' + rectText(b) });
         toGrid();
     }
 
@@ -315,7 +328,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     return (
         <div ref={root} className={'ks-sheet' + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
             {ui.menubar ? <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
-                onLink={() => setLinking(true)} onSettings={() => { if (wb.shows('panel.settings')) setSettingsOpen(true); }} onShow={show} onError={setNotice} fileName={props.fileName}
+                onLink={() => setLinking(true)} onSettings={() => { if (wb.shows('panel.settings')) setSettingsOpen(true); }} onShow={show} onError={tellError} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onComment={() => setPanel({ kind: 'comments', start: Date.now() })}
@@ -341,7 +354,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
             {ui.formulaBar ? <FormulaBar address={nameOfSelection() || rectText(rectsOf(sel)[rectsOf(sel).length - 1])} onGoName={goToName} content={wb.input(sheetId, sel.active.r, sel.active.c)} editing={editing}
                 onStartEdit={(text) => {
                     const m = wb.modeAt(sheetId, sel.active.r, sel.active.c);
-                    if (m) { setNotice(m.message || 'This cell is protected: it cannot be changed here'); toGrid(); return; }
+                    if (m) { tell({ kind: 'refused', reason: m.message || 'This cell is protected: it cannot be changed here', address: addressOf(sel.active.r, sel.active.c), action: 'edit' }); toGrid(); return; }
                     setEditing({ r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' });
                 }}
                 onText={(text) => setEditing((e) => (e ? { ...e, text } : { r: sel.active.r, c: sel.active.c, text, mode: 'edit', from: 'bar' }))}
@@ -356,7 +369,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!props.showProtected} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={setNotice} onFilterMenu={setFilterMenu} ui={ui} onComment={() => setPanel({ kind: 'comments', start: Date.now() })} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={() => setPanel({ kind: 'comments', start: Date.now() })} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}
@@ -368,13 +381,13 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 {panel && panel.kind === 'conditional' && wb.shows('panel.conditional') ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
                     key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'comments' && wb.can('comment.read') && wb.shows('panel.comments') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision} start={panel.start}
-                    onGo={(r, c) => goToRange(sheetId, { r1: r, c1: c, r2: r, c2: c })} onError={setNotice} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                    onGo={(r, c) => goToRange(sheetId, { r1: r, c1: c, r2: r, c2: c })} onError={tellError} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'pivot' && wb.shows('panel.pivot') ? <PivotPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
-                    key={panel.id} onError={setNotice} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                    key={panel.id} onError={tellError} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'names' && wb.shows('panel.names') ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
                     onGo={(id, range) => goToRange(id, range)} onClose={() => { setPanel(null); toGrid(); }} /> : null}
             </div>
-            {ui.tabs ? <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={setNotice} /> : null}
+            {ui.tabs ? <Tabs workbook={wb} active={sheetId} onShow={show} container={root} onError={tellError} /> : null}
             {pivotDialog ? (
                 <PivotDialog container={root} range={pivotDialog.range} onClose={() => { setPivotDialog(null); toGrid(); }}
                     onCreate={(source, where) => {
@@ -401,7 +414,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     }} />
             ) : null}
             {filterMenu && wb.filterOf(sheetId) && wb.shows('panel.filter') ? (
-                <FilterMenu workbook={wb} sheetId={sheetId} c={filterMenu.c} at={filterMenu} container={root} onError={setNotice}
+                <FilterMenu workbook={wb} sheetId={sheetId} c={filterMenu.c} at={filterMenu} container={root} onError={tellError}
                     onClose={() => { setFilterMenu(null); toGrid(); }}
                     onSort={(dir) => {
                         // the rows under the filter's header, sorted by the column (one change)

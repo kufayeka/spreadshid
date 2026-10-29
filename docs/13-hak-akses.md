@@ -567,6 +567,83 @@ menjelaskan alasannya.
 
 Prop `access` sama dengan memanggil `wb.setAccess(rows, who)` sendiri. Pilih salah satu, jangan keduanya.
 
+### Pesan penolakan: diganti, dimatikan, atau ditampilkan di luar sheet
+
+Saat sesuatu ditolak, sheet menampilkan pesan kecil di bawah grid. Teksnya diambil dari kolom `message` baris aturan, atau teks bawaan kalau
+kosong. Semua pesan sheet lewat satu prop, **`onNotice`**, sebelum tampil. Prop ini sekaligus event-nya:
+
+| `onNotice` mengembalikan | Yang terjadi |
+|---|---|
+| tidak ada (`undefined`) | pesan bawaan sheet tampil |
+| teks | teks itu yang tampil, menggantikan pesan bawaan |
+| `null` | sheet tidak menampilkan apa pun; aplikasimu menampilkannya sendiri |
+
+Isi `SheetNotice` yang diterima:
+
+| Kolom | Isi |
+|---|---|
+| `kind` | `refused` (ditolak), `error` (gagal), `info` (pemberitahuan) |
+| `reason` | teks bawaan sheet, atau `message` dari baris aturan |
+| `address` | sel yang dicoba, misalnya `B4` (kalau ada) |
+| `action` | aksi yang ditolak: `edit`, `copy`, `paste`, `comment.reply`, ... (kalau diketahui) |
+| `source`, `op` | untuk penolakan dari workbook: siapa yang mengubah dan op-nya |
+
+Untuk mematikan semua pesan bawaan: `onNotice={() => null}`. Contoh di bawah menampilkan penolakan di bar merah di atas sheet, dengan kata-kata
+sendiri untuk setiap aksi:
+
+<!-- contoh: 13-11-pesan.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { SheetNotice } from '@kufayeka/sheet';
+import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
+
+// Pesan penolakan ditampilkan di luar sheet, dengan kata-kata aplikasimu sendiri. Pesan bawaan sheet dimatikan.
+const ATURAN: AccessRow[] = [
+    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'role:kasir', effect: 'deny', action: 'copy' }
+];
+
+// teks sendiri untuk setiap aksi yang ditolak
+const KATA: Record<string, string> = {
+    edit: 'Kolom ini hanya bisa dibaca. Yang boleh kamu ubah hanya Stok.',
+    copy: 'Data stok tidak boleh disalin keluar.'
+};
+
+export default function PesanSendiri() {
+    const [wb] = useState(buatStok);
+    const [pesan, setPesan] = useState<string | null>(null);
+
+    // onNotice dipanggil untuk setiap pesan sheet: refused (ditolak), error, info
+    function padaPesan(n: SheetNotice) {
+        if (n.kind === 'refused') {
+            setPesan((n.address ? n.address + ': ' : '') + (KATA[n.action ?? ''] ?? n.reason));
+            return null;           // null: sheet tidak menampilkan pesannya sendiri
+        }
+        return undefined;          // error dan info: biarkan sheet yang menampilkan
+    }
+
+    return (
+        <div style={{ height: 420, display: 'flex', flexDirection: 'column', font: '13px system-ui' }}>
+            <div className="pesan-sendiri" style={{ padding: '8px 12px', background: pesan ? '#fce8e6' : '#f1f3f4', color: pesan ? '#c5221f' : '#5f6368' }}>
+                {pesan ?? 'Klik sel lalu ketik. Hanya kolom Stok yang bisa diubah.'}
+            </div>
+            <Sheet workbook={wb} style={{ flex: 1 }} onNotice={padaPesan}
+                access={{ rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Pesan penolakan di luar sheet](img/akses-pesan.png)
+
+Di luar React (misalnya di server, atau di kode yang memakai workbook langsung), penolakan dari workbook didengar dengan `wb.on('reject', fn)`
+([4.9](04-api-workbook.md)).
+
 ## 13.10 Langkah 9: di server dan database
 
 Di database, aturan disimpan di tabel tersendiri, satu baris per aturan:

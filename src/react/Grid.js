@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { colName } from '../core/formula/address.js';
+import { colName, addressOf } from '../core/formula/address.js';
 import { cycleReference } from '../core/formula/formula.js';
 import { Icon } from './icons.js';
 import { Gutter, gutterSize } from './Outline.js';
@@ -252,7 +252,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // a protected cell is not edited: the person is told why at once (not after typing a whole text that is then refused)
     function guard(r, c) {
         const m = wb.modeAt(sheetId, r, c);
-        if (m && onError) onError(m.message || 'This cell is protected: it cannot be changed here');
+        if (m && onError) onError(m.message || 'This cell is protected: it cannot be changed here', { kind: 'refused', address: addressOf(r, c), action: 'edit' });
         return !!m;
     }
 
@@ -374,7 +374,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (rects.length !== 1) { e.preventDefault(); return; } // as in Google Sheets: a copy is one rectangle
         e.preventDefault();
         // the access policy may keep the sheet's content in it (no copy out)
-        if (!wb.can('copy')) { if (onError) onError(refusalOf('copy', wb.access().message)); return; }
+        if (!wb.can('copy')) { if (onError) onError(refusalOf('copy', wb.access().message), { kind: 'refused', action: 'copy' }); return; }
         const clip = copyBlock(wb, sheetId, rects[0], cut);
         e.clipboardData.setData('text/plain', clipText(clip));
         rememberCopy(clip);
@@ -385,7 +385,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     function onPaste(e) {
         if (editing) return; // the editor pastes into its text
         e.preventDefault();
-        if (!wb.can('paste')) { if (onError) onError(refusalOf('paste', wb.access().message)); return; }
+        if (!wb.can('paste')) { if (onError) onError(refusalOf('paste', wb.access().message), { kind: 'refused', action: 'paste' }); return; }
         const only = valuesOnly.current ? 'values' : 'all';
         valuesOnly.current = false;
         const target = rects[rects.length - 1];
