@@ -1,6 +1,6 @@
 # 17. Performa
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [16. Panduan layar](16-layar.md) · Berikutnya: [18. Referensi](18-referensi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [15. Excel dan CSV](15-excel.md) · Berikutnya: [18. Referensi](18-referensi.md)
 
 Sheet ini dibuat untuk data sungguhan: setahun transaksi, RAB proyek besar, ribuan baris dari database. Tiga hal yang membuatnya tetap cepat:
 
@@ -88,4 +88,4 @@ test-nya menjaga batas atasnya.
 - **Membuka workbook besar sekali, lalu memakainya terus.** `createWorkbook(doc)` untuk 100.000 baris butuh beberapa detik. Jangan membuatnya ulang
   saat props lain berubah ([11.6](11-react.md#116-workbook-bukan-state-react)).
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [16. Panduan layar](16-layar.md) · Berikutnya: [18. Referensi](18-referensi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [15. Excel dan CSV](15-excel.md) · Berikutnya: [18. Referensi](18-referensi.md)

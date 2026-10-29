@@ -88,8 +88,8 @@ Handle juga punya `id` dan `name`.
 
 | Daftar | Di mana |
 |---|---|
-| props, event, dan handle `ref` `<Sheet>` | [3.1](03-komponen-sheet.md#31-props), [3.2](03-komponen-sheet.md#32-event), [3.3](03-komponen-sheet.md#33-handle-ref) |
-| tombol keyboard | [3.4](03-komponen-sheet.md#34-keyboard) |
+| props, event, dan handle `ref` `<Sheet>` | [3.12](03-komponen-sheet.md#312-referensi) |
+| tombol keyboard | [3.12](03-komponen-sheet.md#312-referensi) |
 | opsi `createWorkbook` dan event workbook | [2.14](02-konsep.md#214-referensi) |
 | jenis op | [4.8](04-api-workbook.md#48-jenis-op) |
 | kunci gaya, props baris, kolom, dan sheet | [4.3](04-api-workbook.md#43-gaya-dan-merge), [4.4](04-api-workbook.md#44-baris-dan-kolom), [4.5](04-api-workbook.md#45-sheet) |
@@ -100,6 +100,6 @@ Handle juga punya `id` dan `name`.
 | spesifikasi pivot | [8.2](08-pivot.md#82-spesifikasi) |
 | semua isi `action` aturan akses | [13.35](13-hak-akses.md#1335-referensi) |
 | yang ikut dan tidak ke Excel | [15](15-excel.md) |
-| menu dan toolbar | [16](16-layar.md) |
+| menu dan toolbar | [3.12](03-komponen-sheet.md#312-referensi) |
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [17. Performa](17-performa.md)

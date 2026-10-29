@@ -1,6 +1,6 @@
 # 15. Excel dan CSV
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [14. Komentar](14-komentar.md) · Berikutnya: [16. Panduan layar](16-layar.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [14. Komentar](14-komentar.md) · Berikutnya: [17. Performa](17-performa.md)
 
 File `.xlsx` ditulis dan dibaca oleh library sendiri, tanpa paket tambahan, di browser maupun di server. Di layar, File → Download → Microsoft Excel
 mengunduh workbook, dan File → Import membuka `.xlsx` atau `.csv`.
@@ -116,4 +116,4 @@ Tampilkan `warnings` kepada orang yang mengimpor, supaya ia tahu apa yang tidak 
 **CSV** hanya membawa teks. `exportCsv` menulis yang tampil di sel (`Rp 64.000`, `420 zak`), dan isi sel yang tersembunyi untuk orang itu ditulis
 kosong. Untuk Excel berbahasa Indonesia, yang memakai koma sebagai tanda desimal, pakai `{ delimiter: ';' }`.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [14. Komentar](14-komentar.md) · Berikutnya: [16. Panduan layar](16-layar.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [14. Komentar](14-komentar.md) · Berikutnya: [17. Performa](17-performa.md)

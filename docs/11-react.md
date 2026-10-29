@@ -501,7 +501,7 @@ Yang dipakai di sini:
 - **`useWorkbook` di setiap komponen yang membaca workbook.** `Ringkasan` membaca dua sel dan dua status undo, `Detail` membaca satu baris. Masing-masing
   hanya digambar ulang kalau yang dibacanya berubah.
 - **`ref` ke `<Sheet>`** untuk perintah dari luar: `sheetRef.current.select('N1')` memilih sel dan menggulir ke sana. Daftar lengkapnya ada di
-  [3.3](03-komponen-sheet.md#33-handle-ref).
+  [3.6](03-komponen-sheet.md#36-memberi-perintah-lewat-ref).
 - **`onSelectionChange`** memberi seleksi dalam nomor. Yang disimpan di state adalah **id baris** (`wb.rowId(...)`), bukan nomornya, jadi panel detail
   tetap menunjuk transaksi yang sama walaupun sheet di-sort atau disisipi baris.
 - **Form React menulis ke sheet** dengan `{ source: 'user' }`, jadi validasi dan aturan sheet ([bab 7](07-data.md#74-validasi-data),

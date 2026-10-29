@@ -31,6 +31,13 @@ const press = (...selectors) => async ({ js, click, wait }) => {
         await click(p.x, p.y); await wait(250);
     }
 };
+// a value typed into a cell and kept (Enter), as a person does
+const enter = (r, c, text) => async (p) => { await typeAt(r, c, text)(p); await p.key('Enter', 'Enter', 13); await p.wait(250); };
+// a range dragged with the mouse, from one cell to another
+const dragFrom = (r1, c1, r2, c2) => async ({ js, mouse, wait }) => {
+    const a = await cellAt(js, r1, c1), b = await cellAt(js, r2, c2);
+    await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(300);
+};
 // a picture of chapter 13: the page's top 1000 x 330 (menus, toolbar, formula bar and the first rows)
 const akses = (name, page, act) => ({ name, page, act, clip: { x: 0, y: 0, width: 1000, height: 330 } });
 
@@ -58,11 +65,14 @@ export const SHOTS = [
     proyek('proyek-harian', 'Harian 27-10'),
     proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
     proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
-    { name: 'handle-select', page: '03-handle.page.js', act: async ({ js, wait }) => { await js('document.querySelector("#pilih").click()'); await wait(400); }, clip: { x: 0, y: 0, width: 1000, height: 380 } },
-    { name: 'events', page: '03-events.page.js', act: async ({ js, click, type, key, wait }) => {
-        const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(150); await type('15'); await key('Enter', 'Enter', 13); await wait(300);
-        const q = await cellAt(js, 1, 1); await click(q.x, q.y); await wait(150); await type('Besi'); await key('Enter', 'Enter', 13); await wait(400);
-    }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
+    // chapter 3: the sheet on the screen
+    { name: 'layar-perubahan', page: '03-04-perubahan.page.tsx', act: async (p) => { await enter(1, 3, '400')(p); await enter(2, 3, '250')(p); }, clip: { x: 0, y: 0, width: 1366, height: 300 } },
+    { name: 'layar-seleksi', page: '03-05-seleksi.page.tsx', act: dragFrom(1, 4, 3, 4), clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'layar-perintah', page: '03-06-perintah.page.tsx', act: press('.pilih-stok'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'layar-sheet-aktif', page: '03-07-sheet-aktif.page.tsx', act: press('.ke-Catatan'), clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    { name: 'layar-sederhana', page: '03-08-bagian-layar.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 220 } },
+    { name: 'layar-tema', page: '03-09-tema.page.tsx', act: dragFrom(1, 2, 3, 2), clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'layar-dua-sheet', page: '03-10-dua-sheet.page.tsx', act: enter(1, 3, '400'), clip: { x: 0, y: 0, width: 1366, height: 330 } },
     // chapter 2: plain React around a workbook, a sheet only at the end
     { name: 'konsep-baca', page: '02-05-baca.page.tsx', clip: { x: 0, y: 0, width: 520, height: 70 } },
     { name: 'konsep-ubah', page: '02-06-ubah.page.tsx', act: press('.ubah'), clip: { x: 0, y: 0, width: 520, height: 110 } },
@@ -81,7 +91,6 @@ export const SHOTS = [
         await js("localStorage.removeItem('stok-toko'); 0");
         const p = await cellAt(js, 1, 3); await click(p.x, p.y); await wait(150); await type('400'); await key('Enter', 'Enter', 13); await wait(400);
     }, clip: { x: 0, y: 0, width: 1000, height: 340 } },
-    { name: 'tema', page: '03-tema.page.js', clip: { x: 0, y: 0, width: 1000, height: 360 } },
     { name: 'kondisional', page: '06-kondisional.page.js', clip: { x: 0, y: 110, width: 1000, height: 330 } },
     { name: 'pivot', page: '08-pivot.page.js', act: async ({ js, click, wait }) => {
         const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(600);

@@ -52,7 +52,7 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 
 1. [Mulai dalam 5 menit](docs/01-mulai-cepat.md): pasang, sheet pertama, isi dari kode, dirapikan, disimpan, Next.js
 2. [Konsep dasar](docs/02-konsep.md): workbook, sheet, alamat sel, id baris dan kolom, perubahan (op), undo, menyimpan
-3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): semua props, event, handle (`ref`), keyboard, tema
+3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): event, seleksi, perintah lewat `ref`, sheet yang tampil, layar sederhana, warna, menu, toolbar, keyboard
 - [Galeri: satu proyek konstruksi](docs/galeri.md)
 4. [API workbook](docs/04-api-workbook.md): mengisi dan membaca sel, gaya, baris dan kolom, sheet, undo, op
 5. [Rumus](docs/05-rumus.md): referensi, laporan dengan rumus, named range, SUBTOTAL, error, 124 fungsi, termasuk TERBILANG
@@ -66,7 +66,6 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 13. [Hak akses](docs/13-hak-akses.md)
 14. [Komentar](docs/14-komentar.md)
 15. [Excel dan CSV](docs/15-excel.md)
-16. [Panduan layar](docs/16-layar.md): menu, toolbar, panel
 17. [Performa](docs/17-performa.md)
 18. [Referensi](docs/18-referensi.md): semua nama, satu baris masing-masing
 

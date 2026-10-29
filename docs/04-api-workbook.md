@@ -631,7 +631,7 @@ useEffect(() => {
 ```
 
 Fungsi yang diberikan ke `useWorkbook` dijalankan setiap kali ada perubahan, jadi buat seringan mungkin: membaca beberapa sel, bukan `toJSON()` atau
-loop seluruh sheet. Prop `onOp`, `onReject`, dan `onCellError` di `<Sheet>` adalah event yang sama ([3.2](03-komponen-sheet.md#32-event)).
+loop seluruh sheet. Prop `onOp`, `onReject`, dan `onCellError` di `<Sheet>` adalah event yang sama ([3.4](03-komponen-sheet.md#34-mendengar-perubahan)).
 
 ## 4.10 `beforeOp`: memeriksa setiap perubahan
 
@@ -974,7 +974,7 @@ const onSelect = (sel: SheetSelection) => setRange(sel.address);    // "C2:C5"
 | `Workbook` | hasil `createWorkbook()`: semua fungsi bab ini |
 | `SheetApi` | hasil `wb.sheet('Produk')` |
 | `SheetSelection` | isi `onSelectionChange` dan `ref.getSelection()` (4.13) |
-| `SheetHandle` | yang bisa diminta lewat `ref` ([3.3](03-komponen-sheet.md#33-handle-ref)) |
+| `SheetHandle` | yang bisa diminta lewat `ref` ([3.6](03-komponen-sheet.md#36-memberi-perintah-lewat-ref)) |
 | `SheetProps` | props `<Sheet>` |
 | `CellValue`, `CellResult`, `CellError` | isi sel, hasil `value()`, dan error rumus |
 | `Style`, `Format`, `Borders` | gaya dan format (4.5, [bab 6](06-format.md)) |
