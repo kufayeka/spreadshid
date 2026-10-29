@@ -349,6 +349,8 @@ export interface SheetFns {
     replyComment(thread: string, text: string, how?: How): string;
     editComment(thread: string, item: string, text: string, how?: How): Op[] | null;
     deleteComment(thread: string, item: string, how?: How): Op[] | null;
+    /** True when the person may edit (or delete) that comment: its writer, or a moderator, and the access rows allow it. */
+    mayChangeComment(thread: string, item: string, action: 'edit' | 'delete'): boolean;
     comments(): CommentThread[];
     commentAt(at: CellAt, c?: number): CommentThread | null;
     hasComment(at: CellAt, c?: number): boolean;

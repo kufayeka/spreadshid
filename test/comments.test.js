@@ -87,7 +87,10 @@ const user = { source: 'user' };
     as('a');
     assert.throws(() => wb.editComment(s, thread, reply, 'ubah', user), /only the one who wrote/, 'an author changes only their own');
     wb.editComment(s, thread, item, 'Mulai (ubah)', user);
+    assert.deepStrictEqual([wb.mayChangeComment(s, thread, item, 'edit'), wb.mayChangeComment(s, thread, reply, 'edit'), wb.mayChangeComment(s, thread, 'nope', 'edit')], [true, false, false],
+        'mayChangeComment: one\'s own yes, another\'s or a missing one no (what the card offers)');
     as('m');
+    assert.deepStrictEqual([wb.mayChangeComment(s, thread, reply, 'edit'), wb.mayChangeComment(s, thread, reply, 'delete')], [true, true], 'a moderator may change anyone\'s');
     wb.editComment(s, thread, reply, 'Dirapikan moderator', user);
     assert.strictEqual(wb.commentAt(s, 0, 0).items[1].text, 'Dirapikan moderator', 'a moderator changes anyone\'s');
     as('x');

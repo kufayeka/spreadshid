@@ -90,6 +90,8 @@ export interface SheetProps {
     /** The access rows and the person who opens (chapter 13). With view 'setup' the sheet is the rules editor. */
     access?: SheetAccess;
     user?: { id: string; name: string };
+    /** How the card of a cell's comments opens: 'hover' (default) shows it while the mouse is on a marked cell, a click keeps it; 'click': on a click only. */
+    comments?: { open?: 'hover' | 'click' };
     /**
      * How the cells this person may not change are marked (live view). Default { lock: true, hidden: true }; the marks mix freely; false: none.
      * @example

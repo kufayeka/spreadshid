@@ -936,6 +936,20 @@ export function createWorkbook(doc, options) {
         return item;
     }
 
+    /**
+     * True when the person may edit (or delete) a comment: they wrote it, or the access rows let them moderate; and with access rows, the rows
+     * allow comment.edit (comment.delete). The card asks this before it offers Edit and Delete, so it offers only what will not be refused.
+     */
+    function mayChangeComment(s, threadId, itemId, action) {
+        try {
+            s = sheetIdOf(s);
+            ownItem(threadsOf(s).find((x) => x.id === threadId), itemId);
+        } catch (err) {
+            return false;
+        }
+        return !hasPolicy || access.can(action === 'delete' ? 'comment.delete' : 'comment.edit') || access.can('comment.moderate');
+    }
+
     /** Changes the text of a comment (its writer only). One change. */
     function editComment(s, threadId, itemId, text, how) {
         s = sheetIdOf(s);
@@ -1966,7 +1980,7 @@ export function createWorkbook(doc, options) {
         filterValues: (s, c) => { const f = sheetOf(sheetIdOf(s)).props.filter; return f ? valuesOfFilter(api, sheetIdOf(s), f, c) : []; },
         dataRegion: (s, r, c) => regionAround(api, sheetIdOf(s), r, c),
         // comments
-        addComment, replyComment, editComment, deleteComment, commentAt, comments, hasComment,
+        addComment, replyComment, editComment, deleteComment, mayChangeComment, commentAt, comments, hasComment,
         /** The person who writes from now on ({ id, name }): their name goes on their comments, and only they change them. */
         setUser: (user) => { opt.user = user; },
         // the person the workbook is open for, as their comments are signed: { id, name } (id null when none was given)

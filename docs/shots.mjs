@@ -177,15 +177,28 @@ export const SHOTS = [
         await js(`(function(){ var e = document.querySelector('.lihat-sebagai'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'rina'); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
         await wait(400);
     }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
-    { name: 'komentar', page: '14-komentar.page.js', act: async ({ js, click, mouse, wait }) => {
+    // chapter 11: comments, as in Excel (a card beside the cell)
+    { name: 'komentar-tulis', page: '11-03-tulis.page.tsx', act: async ({ js, click, type, key, wait }) => {
+        const p = await cellAt(js, 2, 4); await click(p.x, p.y); await wait(200);
+        await key('m', 'KeyM', 77, 3); await wait(400); await type('Harga ini sudah termasuk PPN?'); await wait(300);
+    }, clip: { x: 0, y: 0, width: 1100, height: 300 } },
+    { name: 'komentar-kartu', page: '11-04-diskusi.page.tsx', act: async ({ js, click, wait }) => {
+        const p = await cellAt(js, 8, 6); await click(p.x, p.y); await wait(500);
+    }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
+    { name: 'komentar-hover', page: '11-05-buka.page.tsx', act: async ({ js, mouse, wait }) => {
+        const p = await cellAt(js, 6, 6); await mouse('mouseMoved', p.x, p.y); await wait(500);
+    }, clip: { x: 0, y: 0, width: 1366, height: 570 } },
+    { name: 'komentar-daftar', page: '11-06-daftar.page.tsx', act: async ({ js, click, mouse, wait }) => {
         const at = (expr) => js(`(function(){ var e = ${expr}; var b = e.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
         let p = await at(`Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'View'; })`); await click(p.x, p.y); await wait(300);
         p = await at(`Array.from(document.querySelectorAll('.ks-menu-item')).find(function(x){ return x.textContent.indexOf('Comments') >= 0; })`);
-        await mouse('mouseMoved', p.x - 20, p.y); await mouse('mouseMoved', p.x, p.y); await wait(200); await click(p.x, p.y); await wait(600);
-        // G9, where Dewi (who has the sheet open) and Joko talk: its thread shown in full
-        const g9 = await cellAt(js, 8, 6); await click(g9.x, g9.y); await wait(300);
-        await js("(function(){ var t = document.querySelector('.ks-thread.ks-current'); if (t) t.scrollIntoView({ block: 'start' }); return 0; })()"); await wait(300);
-    }, clip: { x: 0, y: 0, width: 1366, height: 740 } },
+        await mouse('mouseMoved', p.x - 20, p.y); await mouse('mouseMoved', p.x, p.y); await wait(200); await click(p.x, p.y); await wait(500);
+        // the first discussion in the list clicked: its cell selected, its card open
+        p = await at(`document.querySelector('.ks-comments .ks-thread')`); await click(p.x, p.y); await wait(500);
+    }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
+    { name: 'komentar-akses', page: '11-07-akses.page.tsx', act: async ({ js, click, wait }) => {
+        const p = await cellAt(js, 8, 6); await click(p.x, p.y); await wait(500);
+    }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
     { name: 'langkah5', page: '11-langkah5.page.js', act: async ({ js, click, type, key, wait }) => {
         for (let i = 0; i < 30 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(200);
         const p = await cellAt(js, 1, 7); await click(p.x, p.y); await wait(100); await type('99'); await key('Enter', 'Enter', 13); await wait(300);

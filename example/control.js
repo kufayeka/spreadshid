@@ -33,11 +33,16 @@ window.__events = { op: [], reject: [], cellError: [], selection: [], notice: []
 window.__noticeAnswer = undefined;
 window.__sheet = createRef();
 window.__populate = (spec, value) => populate(wb, s, spec, value);
-createRoot(document.getElementById('root')).render(
-    <Sheet ref={window.__sheet} workbook={wb} marks={{ stripes: true }} style={{ height: '100%' }}
+// a test can give the sheet more props (window.__setProps({ comments: { open: 'click' } })): it is drawn again with them
+const root = createRoot(document.getElementById('root'));
+let more = {};
+const draw = () => root.render(
+    <Sheet ref={window.__sheet} workbook={wb} marks={{ stripes: true }} style={{ height: '100%' }} {...more}
         onOp={(e) => window.__events.op.push(e)}
         onReject={(e) => window.__events.reject.push(e.reason)}
         onCellError={(e) => window.__events.cellError.push(e)}
         onNotice={(n) => { window.__events.notice.push({ kind: n.kind, reason: n.reason, address: n.address, action: n.action }); return window.__noticeAnswer; }}
         onSelectionChange={(sel) => window.__events.selection.push(sel.active)} />
 );
+window.__setProps = (props) => { more = props || {}; draw(); };
+draw();

@@ -16,11 +16,13 @@ import { ValidationDialog } from './ValidationDialog.js';
 import { ConditionalPanel } from './ConditionalPanel.js';
 import { NamesPanel } from './NamesPanel.js';
 import { CommentsPanel } from './CommentsPanel.js';
+import { CommentCard } from './CommentCard.js';
 import { PivotPanel, PivotDialog } from './PivotPanel.js';
 import { FilterMenu } from './FilterMenu.js';
 import { sortRange } from '../core/search.js';
 import { parseRangeText } from '../core/validation.js';
 import { copyBlock, pasteClip } from '../core/transfer.js';
+import { refusalOf } from '../core/policy.js';
 import { useAutoHeights } from './autoHeights.js';
 
 /**
@@ -110,6 +112,8 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {{ rows: object[]|null, who: any }} [props.access]  The access rows of the workbook and the person who has it open (policy.js). It is the
  *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
  * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments.
+ * @param {{ open?: 'hover' | 'click' }} [props.comments]  How the card of a cell's comments opens: 'hover' (the default) shows it while the mouse
+ *   is on a marked cell and keeps it open on a click; 'click' shows it on a click only.
  * @param {false|{ lock?: boolean, hidden?: boolean, tint?: boolean, stripes?: boolean }} [props.marks]  How the cells this person may not change are
  *   marked: a lock on a read-only cell and an eye on a hidden one by default; a tint and stripes on request; false: no marks.
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
@@ -160,6 +164,9 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const onSelectEnd = (picked) => {
         dragging.current = false;
         if (props.onSelectionChange) props.onSelectionChange(selectionOf(wb, sheetId, picked));
+        // a click on a cell with a discussion opens its card (it stays until another cell is picked, Escape or its close button)
+        const a = picked.active;
+        if (wb.hasComment(sheetId, a.r, a.c)) { setHoverAt(null); setCard({ s: sheetId, r: a.r, c: a.c, start: 0 }); }
         if (!paint) return;
         const rects = rectsOf(picked);
         pasteClip(wb, sheetId, rects[rects.length - 1], paint, 'styles');
@@ -174,6 +181,41 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const [validating, setValidating] = useState(null);
     // the panel on the right of the grid (conditional formatting, named ranges), and the selection it opened on (where a new rule or name goes)
     const [panel, setPanel] = useState(null); // { kind: 'conditional' | 'names', range }
+    // The card of a cell's comments, as in Excel. `card` is the one opened by a click, Ctrl+Alt+M or the comments panel: it stays open until
+    // another cell is picked. `hoverAt` is the one the mouse shows while it is on a marked cell (comments.open 'hover'); it goes 300 ms after
+    // the mouse leaves the cell and the card, so the mouse can travel from one to the other. Typing in a hover card keeps it open (pinned).
+    const [card, setCard] = useState(null); // { s, r, c, start }
+    const [hoverAt, setHoverAt] = useState(null); // { s, r, c }
+    const [bodyEl, setBodyEl] = useState(null);
+    const drafts = useRef(new Map());
+    const leaving = useRef(0);
+    const hoverOpens = !(props.comments && props.comments.open === 'click');
+    const stay = () => { clearTimeout(leaving.current); leaving.current = 0; };
+    const leave = () => { clearTimeout(leaving.current); leaving.current = setTimeout(() => { leaving.current = 0; setHoverAt(null); }, 300); };
+    useEffect(() => () => clearTimeout(leaving.current), []);
+    // another cell picked (by the keyboard too): the card of the cell left behind closes
+    useEffect(() => { setCard((k) => (k && (k.s !== sheetId || k.r !== sel.active.r || k.c !== sel.active.c) ? null : k)); }, [sheetId, sel.active.r, sel.active.c]);
+    useEffect(() => { setHoverAt(null); }, [sheetId]);
+    // Ctrl+Alt+M, Insert > Comment: the card of the active cell, its box focused (a new discussion, or a reply to the one there)
+    function writeComment() {
+        const { r, c } = sel.active;
+        const action = wb.hasComment(sheetId, r, c) ? 'comment.reply' : 'comment.create';
+        if (!wb.can('comment.read') || !wb.can(action)) { tell({ kind: 'refused', action, reason: refusalOf(action, wb.access().message) }); return; }
+        setHoverAt(null);
+        setCard({ s: sheetId, r, c, start: Date.now() });
+    }
+    const shownCard = (hoverAt && hoverAt.s === sheetId ? hoverAt : null) || (card && card.s === sheetId ? card : null);
+    // the mouse over the grid: a marked cell shows its card (hover), anything else lets it go
+    function onBodyOver(e) {
+        if (!hoverOpens || !e.target.closest) return;
+        if (e.target.closest('.ks-comment-card')) return;
+        const el = e.target.closest('.ks-cell.ks-noted');
+        if (!el) { if (hoverAt) leave(); return; }
+        stay();
+        const r = Number(el.getAttribute('data-r')), c = Number(el.getAttribute('data-c'));
+        if (card && card.s === sheetId && card.r === r && card.c === c) { if (hoverAt) setHoverAt(null); return; }
+        if (!hoverAt || hoverAt.r !== r || hoverAt.c !== c || hoverAt.s !== sheetId) setHoverAt({ s: sheetId, r, c });
+    }
     // the person who writes (their name on their comments)
     useEffect(() => { if (props.user) wb.setUser(props.user); }, [wb, props.user && props.user.id, props.user && props.user.name]);
     // the host's access policy for the person who has the sheet open, applied to the workbook whenever the host gives another
@@ -345,7 +387,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 onLink={() => setLinking(true)} onSettings={() => { if (wb.shows('panel.settings')) setSettingsOpen(true); }} onShow={show} onError={tellError} fileName={props.fileName}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
-                onComment={() => setPanel({ kind: 'comments', start: Date.now() })}
+                onComment={writeComment}
                 onPivot={() => {
                     // the data to start with: the selection, or the block of filled cells around the active cell
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
@@ -354,7 +396,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     const name = wb.sheetProps(sheetId).name;
                     setPivotDialog({ range: (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'") + '!' + rectText(at) });
                 }}
-                onComments={() => setPanel(panel && panel.kind === 'comments' ? null : { kind: 'comments', start: 0 })}
+                onComments={() => setPanel(panel && panel.kind === 'comments' ? null : { kind: 'comments' })}
                 onValidation={(kind) => {
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
                     const own = wb.validationAt(sheetId, sel.active.r, sel.active.c);
@@ -381,9 +423,9 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     setRevealTick((t) => t + 1);
                     toGrid();
                 }} /> : null}
-            <div className={'ks-body' + (panel ? ' ks-with-panel' : '')}>
+            <div className={'ks-body' + (panel ? ' ks-with-panel' : '')} ref={setBodyEl} onMouseOver={onBodyOver} onMouseLeave={() => { if (hoverAt) leave(); }}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!cellMarks} setup={setup} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={() => setPanel({ kind: 'comments', start: Date.now() })} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={writeComment} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}
@@ -394,8 +436,12 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
                 {panel && panel.kind === 'conditional' && wb.shows('panel.conditional') ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
                     key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
-                {panel && panel.kind === 'comments' && wb.can('comment.read') && wb.shows('panel.comments') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision} start={panel.start}
-                    onGo={(r, c) => goToRange(sheetId, { r1: r, c1: c, r2: r, c2: c })} onError={tellError} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'comments' && wb.can('comment.read') && wb.shows('panel.comments') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision}
+                    onOpen={(id, r, c) => { goToRange(id, { r1: r, c1: c, r2: r, c2: c }); setHoverAt(null); setCard({ s: id, r, c, start: 0 }); }} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                {shownCard && wb.can('comment.read') ? <CommentCard workbook={wb} sheetId={sheetId} at={shownCard} revision={revision} frame={bodyEl} drafts={drafts.current}
+                    start={shownCard === card ? card.start : 0} onError={tellError} onEnter={stay} onLeave={() => { if (hoverAt) leave(); }}
+                    onPin={() => { if (shownCard === hoverAt) { stay(); setHoverAt(null); setCard({ s: sheetId, r: hoverAt.r, c: hoverAt.c, start: 0 }); } }}
+                    onClose={() => { stay(); setHoverAt(null); setCard(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'pivot' && wb.shows('panel.pivot') ? <PivotPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
                     key={panel.id} onError={tellError} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'names' && wb.shows('panel.names') ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}

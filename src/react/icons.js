@@ -25,6 +25,7 @@ const PATHS = {
     sigma: 'M18 4H6v2l6.5 6L6 18v2h12v-3h-7l5-5-5-5h7z',
     drop: 'M7 10l5 5 5-5z',
     add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+    send: 'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z',
     trash: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
     up: 'M7 14l5-5 5 5z',
     filterList: 'M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z',

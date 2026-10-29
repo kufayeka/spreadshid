@@ -334,34 +334,56 @@
 .ks-outline-toggle { border: 1px solid #80868b; border-radius: 2px; background: var(--ks-bg); }
 .ks-outline-toggle:hover, .ks-outline-level:hover { background: #e8eaed; }
 .ks-outline-level { border: 0; border-radius: 2px; background: none; color: #5f6368; }
-/* comments: a mark in the corner of a cell with an open thread, and the panel of the sheet's comments */
-.ks-cell.ks-noted::after { content: ''; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent #f9ab00 transparent transparent; z-index: 1; }
-.ks-comment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-/* A thread reads as a chat: the comments of the person who has the sheet open on the right, in the accent's tint, without their name;
-   the others on the left, in grey, under the writer's name. The time sits over each bubble. */
-.ks-comment { display: flex; flex-direction: column; max-width: 85%; }
-.ks-own-msg { align-self: flex-end; align-items: flex-end; }
-.ks-other-msg { align-self: flex-start; align-items: flex-start; }
-.ks-comment-by { display: flex; align-items: baseline; gap: 6px; font-size: 12px; padding: 0 4px; }
-.ks-own-msg .ks-comment-by { flex-direction: row-reverse; }
-.ks-comment-by span { color: #80868b; font-size: 11px; }
-.ks-comment-tools { display: none; gap: 2px; }
-.ks-comment:hover .ks-comment-tools { display: inline-flex; }
-.ks-comment-tools button { border: 0; background: none; cursor: pointer; padding: 0 2px; color: #5f6368; font: inherit; }
-.ks-comment-tools .ks-icon { width: 14px; height: 14px; }
-.ks-comment-text { margin: 2px 0 0; padding: 6px 10px; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
-.ks-other-msg .ks-comment-text { background: #f1f3f4; color: #202124; border-radius: 12px 12px 12px 3px; }
-.ks-own-msg .ks-comment-text { background: color-mix(in srgb, var(--ks-accent) 14%, #ffffff); color: #202124; border-radius: 12px 12px 3px 12px; }
-.ks-comment-edit { align-self: stretch; }
-.ks-comment-new, .ks-comment-edit { display: flex; flex-direction: column; gap: 6px; }
-.ks-comments textarea { font: inherit; min-height: 52px; resize: vertical; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; outline: none; }
-.ks-comments textarea:focus { border-color: var(--ks-accent); }
+/* comments, as in Excel: a purple mark in the corner of a cell with a discussion, a card beside the cell, and the list of every discussion */
+.ks-cell.ks-noted::after { content: ''; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--ks-comment, #7b3fe4) transparent transparent; z-index: 1; }
+.ks-avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+/* the card of one cell: the comments one under the other, the newest at the bottom, and the box to reply under them */
+.ks-comment-card { position: absolute; z-index: 25; width: 300px; max-height: min(440px, calc(100% - 8px)); display: flex; flex-direction: column; background: #fff;
+    border: 1px solid #dadce0; border-radius: 6px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); font-size: 13px; color: #202124; }
+.ks-card-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 0 12px; }
+.ks-card-cell { font-size: 11px; color: #5f6368; }
+.ks-card-close { border: 0; background: none; cursor: pointer; color: #5f6368; font: inherit; padding: 2px 6px; border-radius: 4px; }
+.ks-card-close:hover { background: #f1f3f4; }
+.ks-card-list { list-style: none; margin: 0; padding: 0 0 4px; overflow: auto; min-height: 0; }
+.ks-card-item { display: flex; gap: 9px; padding: 8px 12px 4px; }
+.ks-card-body { flex: 1; min-width: 0; }
+.ks-card-by { position: relative; display: flex; align-items: baseline; gap: 6px; }
+.ks-card-by b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ks-card-by span { color: #70757a; font-size: 11px; white-space: nowrap; }
+.ks-card-more { margin-left: auto; border: 0; background: none; cursor: pointer; color: #70757a; font: inherit; font-size: 15px; line-height: 1; padding: 0 4px; border-radius: 4px; visibility: hidden; }
+.ks-card-item:hover .ks-card-more, .ks-card-more[aria-expanded="true"], .ks-card-more:focus-visible { visibility: visible; }
+.ks-card-more:hover { background: #f1f3f4; }
+.ks-card-menu { position: absolute; right: 0; top: 20px; z-index: 2; min-width: 150px; padding: 4px 0; background: #fff; border-radius: 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); display: flex; flex-direction: column; }
+.ks-card-menu button { border: 0; background: none; text-align: left; padding: 6px 14px; font: inherit; cursor: pointer; }
+.ks-card-menu button:hover { background: #f1f3f4; }
+.ks-card-text { margin: 3px 0 0; white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+.ks-card-edit { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.ks-card-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.ks-card-reply { display: flex; align-items: flex-end; gap: 4px; margin: 6px 12px 12px; padding: 4px 4px 4px 8px; border: 1px solid #c8c8c8; border-radius: 4px; }
+.ks-card-reply:focus-within { border-color: var(--ks-comment, #7b3fe4); }
+.ks-comment-card textarea { flex: 1; min-width: 0; font: inherit; border: 0; outline: none; resize: none; padding: 4px 0; field-sizing: content; max-height: 120px; }
+.ks-card-edit textarea { border: 1px solid #dadce0; border-radius: 4px; padding: 4px 6px; }
+.ks-card-edit textarea:focus { border-color: var(--ks-comment, #7b3fe4); }
+.ks-card-send { flex: none; border: 0; background: none; cursor: pointer; color: var(--ks-comment, #7b3fe4); padding: 4px; border-radius: 4px; display: inline-flex; }
+.ks-card-send:disabled { color: #bdc1c6; cursor: default; }
+.ks-card-send:not(:disabled):hover { background: #f3edfd; }
+.ks-card-send .ks-icon { width: 18px; height: 18px; }
+/* the list of every discussion (View > Comments): who started it on which cell, the first comment, how many replies */
 .ks-comments { width: 320px; }
-.ks-thread-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.ks-thread { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 8px; }
-.ks-thread.ks-current { border-color: var(--ks-accent); box-shadow: 0 0 0 1px var(--ks-accent); }
-.ks-thread-head { display: flex; align-items: center; justify-content: space-between; }
-.ks-thread-cell { font: inherit; font-size: 12px; padding: 1px 8px; border: 1px solid #dadce0; border-radius: 10px; background: #f1f3f4; color: #3c4043; cursor: pointer; }
+.ks-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ks-chip { font: inherit; font-size: 12px; padding: 2px 10px; border: 1px solid #c8c8c8; border-radius: 12px; background: #fff; cursor: pointer; color: #3c4043; }
+.ks-chip.ks-on { background: #ede4fc; border-color: var(--ks-comment, #7b3fe4); color: #5b2bb5; }
+.ks-thread-list { list-style: none; margin: 0 -16px; padding: 0; display: flex; flex-direction: column; border-top: 1px solid #eee; }
+.ks-thread { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; border: 0; border-bottom: 1px solid #eee; border-left: 3px solid transparent;
+    background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.ks-thread:hover { background: #f8f9fa; }
+.ks-thread.ks-current { background: #f6f1fe; border-left-color: var(--ks-comment, #7b3fe4); }
+.ks-thread-top { display: flex; gap: 9px; align-items: center; }
+.ks-thread-who { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.ks-thread-who small { color: #70757a; font-size: 11px; }
+.ks-thread-cell { color: var(--ks-comment, #7b3fe4); font-weight: 700; }
+.ks-thread-text { margin-left: 37px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ks-thread-more { margin-left: 37px; color: #70757a; font-size: 12px; }
 /* the pivot table editor and its dialog */
 .ks-pivot { width: 320px; }
 .ks-pivot-section { display: flex; flex-direction: column; gap: 6px; }
