@@ -20,6 +20,7 @@ import { makeConditional, conditionalStyleOf } from './conditional.js';
 import { outlineOf, MAX_LEVEL } from './outline.js';
 import { addressable, cellOf, rangeOf } from './addressing.js';
 import { tableOf, pivot } from './pivot.js';
+import { chartSeries, splitRangeText, CHART_TYPES, CHART_DEFAULTS } from './chart.js';
 import { resolveAccess, actionsOfOp, refusalOf } from './policy.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
@@ -1002,6 +1003,106 @@ export function createWorkbook(doc, options) {
     const anyPivots = () => sheetOrder.some((s) => (sheets.get(s).props.pivots || []).length);
     const pivotWritten = new Map(); // id -> the key of what was written for it (its definition), and where: { key, s, rect }
     let pivotWriting = false;
+
+
+    // ---- charts: kept in the sheet's props (charts: [...]), each standing on a block of cells and reading a range, both by the ids of their rows and
+    // columns, so a chart moves and grows with its cells as a named range does. The drawing is the React side's (src/react/chart).
+    const chartsOf = (s) => sheetOf(s).props.charts || [];
+    const putCharts = (s, list, how) => setSheetProps(s, { charts: list.length ? list : null }, how);
+    const idsOfRect = (s, b) => ({ r1: api.rowId(s, b.r1), c1: api.colId(s, b.c1), r2: api.rowId(s, b.r2), c2: api.colId(s, b.c2) });
+    // a block kept by ids, where it stands now: { r1, c1, r2, c2 }, or null when a row or a column of its corners was deleted
+    function rectOfIds(s, x) {
+        if (!x || !sheets.has(s)) return null;
+        const r1 = api.rowIndex(s, x.r1), r2 = api.rowIndex(s, x.r2), c1 = api.colIndex(s, x.c1), c2 = api.colIndex(s, x.c2);
+        if (r1 < 0 || r2 < 0 || c1 < 0 || c2 < 0) return null;
+        return { r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) };
+    }
+    // "A1:D7", "Data!A1:D7" or a named range, read for a chart of sheet s: { s, rect }; an error says what is wrong
+    function chartRange(s, text, what) {
+        const named = nameRange(text);
+        if (named) return { s: named.sheetId, rect: named.range };
+        const parts = splitRangeText(text);
+        if (!parts) throw new Error('the ' + what + ' of a chart must be a range such as A1:D7, not "' + text + '"');
+        const src = parts.sheet ? grid.sheetIdByName(parts.sheet) : s;
+        if (!src) throw new Error('there is no sheet "' + parts.sheet + '"');
+        return { s: src, rect: rangeOf(parts.a + ':' + parts.b) };
+    }
+    // a chart's own settings from what the host gives: the ranges as ids, the rest as given (unknown keys are kept, for the host's own use)
+    function chartOwn(s, spec, base) {
+        const out = { ...base };
+        for (const [k, v] of Object.entries(spec || {})) {
+            if (k === 'id') continue;
+            if (k === 'at') { const at = chartRange(s, v, 'place'); if (at.s !== s) throw new Error('a chart stands on its own sheet'); out.at = idsOfRect(s, at.rect); }
+            else if (k === 'data') { const d = chartRange(s, v, 'data'); out.data = { s: d.s, ...idsOfRect(d.s, d.rect) }; }
+            else if (v === undefined) delete out[k];
+            else out[k] = clone(v);
+        }
+        if (out.type !== undefined && !CHART_TYPES.includes(out.type)) throw new Error('a chart is one of ' + CHART_TYPES.join(', ') + ', not "' + out.type + '"');
+        return out;
+    }
+
+    /**
+     * A new chart on the sheet: `at` is the block of cells it covers ("F3:L18"), `data` the range it reads ("A1:D7", "Data!A1:D7" or a named
+     * range); the rest is how it looks (type, title, legend, series ...). Returns its id. One change.
+     */
+    function addChart(s, spec, how) {
+        s = sheetIdOf(s);
+        if (!spec || !spec.at || !spec.data) throw new Error('a chart needs `at` (the cells it covers) and `data` (the range it reads)');
+        const chart = { id: newId(), ...chartOwn(s, spec, { ...CHART_DEFAULTS }) };
+        putCharts(s, chartsOf(s).concat([chart]), how);
+        return chart.id;
+    }
+    /** Changes a chart: only what is given (at and data as range text again). One change. */
+    function setChart(s, id, patch, how) {
+        s = sheetIdOf(s);
+        const all = chartsOf(s);
+        const old = all.find((x) => x.id === id);
+        if (!old) throw new Error('there is no chart "' + id + '"');
+        const next = { id, ...chartOwn(s, patch, old) };
+        return putCharts(s, all.map((x) => (x.id === id ? next : x)), how);
+    }
+    /** Takes a chart away. One change. */
+    function removeChart(s, id, how) {
+        s = sheetIdOf(s);
+        const all = chartsOf(s);
+        if (!all.some((x) => x.id === id)) return null;
+        return putCharts(s, all.filter((x) => x.id !== id), how);
+    }
+    /**
+     * The charts of a sheet as they stand now: each with `at` (the cells it covers, as indexes, null when its cells were deleted), `atText` ("F3:L18"),
+     * `dataText` ("Data!A1:D7") and the rest of its settings.
+     */
+    function charts(s) {
+        s = sheetIdOf(s);
+        return chartsOf(s).map((x) => {
+            const at = rectOfIds(s, x.at);
+            const d = x.data && rectOfIds(x.data.s, x.data);
+            const sheetName = x.data && x.data.s !== s && sheets.has(x.data.s) ? quoteSheet(api.sheetProps(x.data.s).name) + '!' : '';
+            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? sheetName + rectText(d) : null };
+        });
+    }
+    /**
+     * What a chart draws: its categories and series, read from its data range now ({ categories: [], series: [] } when the range was deleted).
+     * Each series carries its own settings from the chart's `series` list (name, type, axis, colour ...).
+     */
+    function chartData(s, id) {
+        s = sheetIdOf(s);
+        const x = chartsOf(s).find((c) => c.id === id);
+        if (!x) throw new Error('there is no chart "' + id + '"');
+        const d = x.data && rectOfIds(x.data.s, x.data);
+        if (!d) return { categories: [], series: [], seriesIn: 'cols' };
+        const block = [];
+        for (let r = d.r1; r <= d.r2; r++) {
+            const row = [];
+            for (let c = d.c1; c <= d.c2; c++) row.push({ value: api.value(x.data.s, r, c), text: api.display(x.data.s, r, c).text, format: api.cellFormat(x.data.s, r, c) });
+            block.push(row);
+        }
+        const out = chartSeries(block, x);
+        out.series = out.series.map((one) => ({ ...((x.series && x.series[one.index]) || {}), ...one }));
+        return out;
+    }
+    const quoteSheet = (name) => (/^[A-Za-z_][\w.]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'");
+    const rectText = (b) => colName(b.c1) + (b.r1 + 1) + (b.r1 === b.r2 && b.c1 === b.c2 ? '' : ':' + colName(b.c2) + (b.r2 + 1));
 
     // where a pivot's data is: a named range, or a range "Sheet!A1:F500" / "A1:F500" (in the pivot's own sheet)
     function pivotSource(s, p) {
@@ -1989,6 +2090,7 @@ export function createWorkbook(doc, options) {
         user: () => author(),
         // pivot tables
         addPivot, setPivot, removePivot, pivots, pivotAt,
+        addChart, setChart, removeChart, charts, chartData,
         // named ranges
         addName, setName, removeName, names, nameRange, nameProblem,
         // conditional formatting

@@ -29,7 +29,7 @@ export const ACTIONS = [
     'cols.insert', 'cols.delete', 'cols.resize', 'cols.hide', 'cols.group',
     'sheets.add', 'sheets.delete', 'sheets.rename', 'sheets.move', 'sheets.hide',
     'view.freeze', 'view.gridlines', 'view.area', 'view.sheet',
-    'sort', 'filter', 'validation', 'names', 'settings', 'pivot',
+    'sort', 'filter', 'validation', 'names', 'settings', 'pivot', 'chart',
     'copy', 'paste', 'download', 'import',
     'comment.read', 'comment.create', 'comment.reply', 'comment.edit', 'comment.delete', 'comment.moderate',
     'access'
@@ -153,7 +153,7 @@ const STYLE_ACTION = { bold: 'format.bold', italic: 'format.italic', underline: 
 const ROW_ACTION = { height: 'rows.resize', hidden: 'rows.hide', level: 'rows.group', fold: 'rows.group' };
 const COL_ACTION = { width: 'cols.resize', hidden: 'cols.hide', level: 'cols.group', fold: 'cols.group', format: 'format.number' };
 const SHEET_ACTION = { name: 'sheets.rename', hidden: 'sheets.hide', freezeRows: 'view.freeze', freezeCols: 'view.freeze', hideGridlines: 'view.gridlines', filter: 'filter',
-    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize', pivots: 'pivot' };
+    conditionals: 'format.conditional', validations: 'validation', merges: 'format.merge', colWidth: 'cols.resize', rowHeight: 'rows.resize', pivots: 'pivot', charts: 'chart' };
 const OP_ACTION = { insertRows: 'rows.insert', deleteRows: 'rows.delete', insertCols: 'cols.insert', deleteCols: 'cols.delete', moveRows: 'sort', moveCols: 'cols.insert',
     addSheet: 'sheets.add', removeSheet: 'sheets.delete', moveSheet: 'sheets.move' };
 
@@ -213,7 +213,7 @@ export function actionsOfOp(op, me) {
 // what a person is told, by the action that was refused
 const SAY = { edit: 'change cells', sort: 'sort', filter: 'change the filter', names: 'change named ranges', validation: 'change data validation', settings: 'change the settings',
     copy: 'copy from this sheet', paste: 'paste here', 'comment.read': 'see the comments', 'comment.create': 'comment', 'comment.reply': 'reply to comments',
-    'comment.edit': 'change comments', 'comment.delete': 'delete comments', 'comment.moderate': 'change the comments of others', download: 'download this workbook', import: 'import files here', access: 'change who may do what' };
+    'comment.edit': 'change comments', 'comment.delete': 'delete comments', 'comment.moderate': 'change the comments of others', download: 'download this workbook', import: 'import files here', access: 'change who may do what', chart: 'change charts' };
 /** A sentence for an action a person may not do ("You cannot change cells here"). */
 export function refusalOf(action, message) {
     if (message) return message;
@@ -236,7 +236,7 @@ export const ACTION_INFO = [
     ['cols.insert', 'Insert columns', 'Columns'], ['cols.delete', 'Delete columns', 'Columns'], ['cols.resize', 'Resize columns', 'Columns'], ['cols.hide', 'Hide columns', 'Columns'], ['cols.group', 'Group columns', 'Columns'],
     ['sheets.add', 'Add sheets', 'Sheets'], ['sheets.delete', 'Delete sheets', 'Sheets'], ['sheets.rename', 'Rename sheets', 'Sheets'], ['sheets.move', 'Move sheets', 'Sheets'], ['sheets.hide', 'Hide sheets', 'Sheets'],
     ['view.area', 'Only this part of a sheet shows', 'View'], ['view.sheet', 'Only these sheets show', 'View'], ['view.freeze', 'Freeze rows and columns', 'View'], ['view.gridlines', 'Show or hide gridlines', 'View'],
-    ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['pivot', 'Pivot tables', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
+    ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['pivot', 'Pivot tables', 'Data'], ['chart', 'Charts', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
     ['copy', 'Copy out', 'Clipboard and files'], ['paste', 'Paste', 'Clipboard and files'], ['download', 'Download', 'Clipboard and files'], ['import', 'Import', 'Clipboard and files'],
     ['comment.read', 'See comments', 'Comments'], ['comment.create', 'Start a comment', 'Comments'], ['comment.reply', 'Reply', 'Comments'], ['comment.edit', 'Edit own comments', 'Comments'], ['comment.delete', 'Delete own comments', 'Comments'], ['comment.moderate', 'Edit and delete anyone\'s comments', 'Comments'],
     ['access', 'Change the access policy', 'Access']
@@ -259,10 +259,10 @@ export const UI_ITEMS = [
         ['menu.view:freezeRows', 'View > Freeze rows'], ['menu.view:freezeCols', 'View > Freeze columns'], ['menu.view:group', 'View > Group'], ['menu.view:comments', 'View > Comments'],
         ['menu.view:zoom', 'View > Zoom'], ['menu.insert:rowsAbove', 'Insert > Rows'], ['menu.insert:colsLeft', 'Insert > Columns'], ['menu.insert:sheet', 'Insert > Sheet'],
         ['menu.insert:checkbox', 'Insert > Checkbox'], ['menu.insert:dropdown', 'Insert > Dropdown'], ['menu.insert:fn', 'Insert > Function'], ['menu.insert:link', 'Insert > Link'],
-        ['menu.insert:comment', 'Insert > Comment'], ['menu.insert:pivot', 'Insert > Pivot table'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
+        ['menu.insert:comment', 'Insert > Comment'], ['menu.insert:pivot', 'Insert > Pivot table'], ['menu.insert:chart', 'Insert > Chart'], ['menu.format:conditional', 'Format > Conditional formatting'], ['menu.data:sortSheet', 'Data > Sort sheet'],
         ['menu.data:sortRange', 'Data > Sort range'], ['menu.data:filter', 'Data > Filter'], ['menu.data:validation', 'Data > Data validation'], ['menu.data:names', 'Data > Named ranges']
     ].map(([id, label]) => ({ id, label, group: 'Menu items' })),
-    [['panel.comments', 'Comments panel'], ['panel.pivot', 'Pivot table editor'], ['panel.conditional', 'Conditional formatting panel'], ['panel.names', 'Named ranges panel'], ['panel.validation', 'Data validation dialog'],
+    [['panel.comments', 'Comments panel'], ['panel.pivot', 'Pivot table editor'], ['panel.chart', 'Chart editor'], ['panel.conditional', 'Conditional formatting panel'], ['panel.names', 'Named ranges panel'], ['panel.validation', 'Data validation dialog'],
         ['panel.find', 'Find and replace'], ['panel.settings', 'Settings dialog'], ['panel.filter', 'Filter buttons and menu']].map(([id, label]) => ({ id, label, group: 'Panels' })),
     [['feature.contextMenu', 'Right-click menu'], ['feature.fillHandle', 'Fill handle'], ['feature.resize', 'Resizing rows and columns by dragging'], ['feature.groups', 'Group buttons'],
         ['cell.commentMark', 'Comment marks on cells'], ['cell.validation', 'Dropdown arrows and checkboxes']].map(([id, label]) => ({ id, label, group: 'Features' }))

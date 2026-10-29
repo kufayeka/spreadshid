@@ -136,6 +136,50 @@ export interface PivotSpec {
     totals?: boolean;
 }
 export interface PivotInfo { id: string; source: string; spec: PivotSpec; area: Rect | null }
+
+// ---- charts -----------------------------------------------------------------------------------------------------------------------------------
+
+export type ChartType = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'combo' | 'bullet' | 'waterfall';
+/** How a value axis is written and how far it goes. */
+export interface ChartAxis { min?: number; max?: number; prefix?: string; suffix?: string; decimals?: number; percent?: boolean }
+/** One series' own settings, by its place in the data (first series first). */
+export interface ChartSeriesSpec {
+    name?: string; color?: string; type?: 'line' | 'column' | 'area'; axis?: 'left' | 'right'; dash?: boolean; hidden?: boolean; labels?: boolean;
+    smooth?: boolean; markers?: boolean; width?: number;
+    /** A label after the last point: true for "name value", a text for "text value" (an S-curve's "Realisasi 49,5%"). */
+    endLabel?: boolean | string;
+}
+/** What a chart is: where it stands, what it reads, how it looks. `at` and `data` are range text when given ("F3:L18", "Data!A1:D7", a named range). */
+export interface ChartSpec {
+    at?: string; data?: string; type?: ChartType;
+    /** The series run down the columns or along the rows; 'auto' (the default) as Excel: down the columns when the range is at least as tall as wide. */
+    seriesIn?: 'auto' | 'cols' | 'rows';
+    /** The first column holds the categories: found from its text when left out. */
+    categories?: boolean;
+    title?: string; subtitle?: string; legend?: 'top' | 'right' | 'bottom' | 'none'; labels?: boolean; stacked?: boolean; grid?: boolean;
+    smooth?: boolean; markers?: boolean;
+    /** 'none': transparent, laid over its cells (the mouse goes through to them; the chart is picked by its edge). */
+    background?: 'white' | 'none';
+    /** 'cells': the plot is the block of cells itself and category i stands in the middle of column i (an S-curve over the weeks of a schedule). */
+    align?: 'fit' | 'cells';
+    xAxis?: boolean; yAxis?: boolean; y?: ChartAxis; y2?: ChartAxis; colors?: string[]; series?: ChartSeriesSpec[];
+    /** bullet: amber when the actual is below the target by more than `warn`, red by more than `bad` (percentage points on a percent axis). */
+    warn?: number; bad?: number;
+    /** waterfall: the categories (from 0) that are totals; the last one is a total when its cell is empty. */
+    totals?: number[];
+    /** donut: the text in the middle (the total by default) and under it (the series' name). */
+    centerText?: string; centerLabel?: string;
+    upColor?: string; downColor?: string; totalColor?: string;
+    [key: string]: unknown;
+}
+/** A chart as wb.charts() gives it: its settings, and where its cells and data are now. */
+export interface ChartInfo extends Omit<ChartSpec, 'at' | 'data'> { id: string; type: ChartType; at: Rect | null; atText: string | null; dataText: string | null }
+/** What a chart draws, read from its data now. */
+export interface ChartModel {
+    categories: string[];
+    series: Array<ChartSeriesSpec & { name: string; values: Array<number | null>; index: number; format: object | null }>;
+    seriesIn: 'cols' | 'rows';
+}
 export interface PivotResult {
     cells: CellResult[][];
     header: number;
@@ -344,6 +388,12 @@ export interface SheetFns {
     removePivot(id: string, how?: How): Op[] | null;
     pivots(): PivotInfo[];
     pivotAt(at: CellAt, c?: number): PivotInfo | null;
+    // charts
+    addChart(spec: ChartSpec & { at: string; data: string }, how?: How): string;
+    setChart(id: string, patch: ChartSpec, how?: How): Op[] | null;
+    removeChart(id: string, how?: How): Op[] | null;
+    charts(): ChartInfo[];
+    chartData(id: string): ChartModel;
     // comments
     addComment(at: CellAt, text: string, how?: How): { thread: string; item: string };
     replyComment(thread: string, text: string, how?: How): string;
@@ -473,6 +523,10 @@ export function sortRange(wb: Workbook, sheet: SheetRef, range: string | Rect, b
 export function tableOf(wb: Workbook, sheet: SheetRef | null, where: string | Rect): { fields: string[]; records: Array<Record<string, CellResult>> };
 export function pivot(records: Array<Record<string, unknown>>, spec: PivotSpec): PivotResult;
 export const PIVOT_FUNCTIONS: Record<PivotFunction, (values: unknown[]) => CellResult>;
+/** The categories and series of a block of cells, read as Excel reads a selection for a chart. */
+export function chartSeries(block: Array<Array<{ value: unknown; text: string; format?: object | null }>>, spec?: ChartSpec): ChartModel;
+export const CHART_TYPES: ChartType[];
+export const CHART_DEFAULTS: Readonly<ChartSpec>;
 
 export function exportXlsx(wb: Workbook): Uint8Array;
 export function importXlsx(bytes: Uint8Array, options?: WorkbookOptions & { settings?: Settings }): Promise<{ workbook: Workbook; warnings: string[]; active: string }>;

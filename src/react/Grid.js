@@ -17,6 +17,7 @@ import { fillTarget } from '../core/fill.js';
 import { sortRange } from '../core/search.js';
 import { Menu } from './Menu.js';
 import { rememberCopy, forgetCut, pasteFromClipboard } from './commands.js';
+import { ChartObject } from './chart/ChartObject.js';
 
 // the smallest a column or a row can be dragged to
 const MIN_SIZE = 4;
@@ -166,7 +167,7 @@ function Pane({ className, left, top, width, height, shiftX, shiftY, children })
  *   arrows then end the edit and move, as in Google Sheets), "edit" when F2, Enter or a double click did (the arrows move in the text).
  * @param {(editing: any) => void} props.setEditing
  */
-export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectStart, onSelectEnd, onLink, painting, showProtected, setup, onFilterMenu, ui, onComment }) {
+export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, setEditing, marks, revealTick, container, onFind, onError, scrollMemory, sinkRef, zoom = 1, onSelectStart, onSelectEnd, onLink, painting, showProtected, setup, onFilterMenu, ui, onComment, chartSel = null, onChartSel }) {
     // what the access policy lets this person see (policy.js): no headers, no grid lines, only an area of the sheet
     const seen = ui || {};
     const HW = seen.headers === false ? 0 : ROW_HEADER_WIDTH, HH = seen.headers === false ? 0 : HEADER_HEIGHT;
@@ -183,6 +184,10 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     const reveal = useRef(false);
     // the line that shows where a dragged edge of a column or a row will be
     const [guide, setGuide] = useState(null);
+    // The charts of the sheet that stand on cells (made again after a change), and a chart being moved or resized: where it would go, shown as a frame
+    // until the mouse is let go (then it is one change).
+    const chartList = useMemo(() => wb.charts(sheetId).filter((c) => c.at), [wb, sheetId, revision]);
+    const [chartDrag, setChartDrag] = useState(null); // { id, rect }
     // the cells last copied or cut, framed with a moving dashed line until Escape (or until a cut is pasted)
     const [clipMark, setClipMark] = useState(null);
     // the cells the fill handle is being dragged over
@@ -246,6 +251,48 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         return { x, y, w: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), h: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) };
     }
 
+    // A press on a chart (its body, its edge or a handle): it is selected, and the drag moves it (or moves the side or corner of the handle) by whole
+    // cells, as the cells under the mouse say; letting go is one change (setChart). Someone who may not change charts only sees the tooltip.
+    function onChartPointer(e, id, mode) {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        if (!wb.can('chart')) return;
+        e.preventDefault();
+        if (editing) commit(null);
+        if (onChartSel) onChartSel(id);
+        if (sinkRef && sinkRef.current) sinkRef.current.focus({ preventScroll: true });
+        const chart = chartList.find((c) => c.id === id);
+        if (!chart) return;
+        const v = view.current.getBoundingClientRect();
+        const cellOf = (ev) => { const h = hit(ev.clientX - v.left, ev.clientY - v.top); return { r: h.r === undefined ? chart.at.r1 : h.r, c: h.c === undefined ? chart.at.c1 : h.c }; };
+        const start = cellOf(e), b = chart.at;
+        let rect = b;
+        const move = (ev) => {
+            const h = cellOf(ev);
+            if (mode === 'move') {
+                const dr = Math.max(-b.r1, h.r - start.r), dc = Math.max(-b.c1, h.c - start.c);
+                rect = { r1: b.r1 + dr, c1: b.c1 + dc, r2: b.r2 + dr, c2: b.c2 + dc };
+            } else {
+                rect = { ...b };
+                if (mode.includes('n')) rect.r1 = Math.min(h.r, b.r2);
+                if (mode.includes('s')) rect.r2 = Math.max(h.r, b.r1);
+                if (mode.includes('w')) rect.c1 = Math.min(h.c, b.c2);
+                if (mode.includes('e')) rect.c2 = Math.max(h.c, b.c1);
+            }
+            setChartDrag({ id, rect });
+        };
+        const up = () => {
+            window.removeEventListener('mousemove', move);
+            window.removeEventListener('mouseup', up);
+            setChartDrag(null);
+            if (rect.r1 === b.r1 && rect.c1 === b.c1 && rect.r2 === b.r2 && rect.c2 === b.c2) return;
+            const text = colName(rect.c1) + (rect.r1 + 1) + ':' + colName(rect.c2) + (rect.r2 + 1);
+            try { wb.setChart(sheetId, id, { at: text }, { source: 'user' }); } catch (err) { onError(err.message[0].toUpperCase() + err.message.slice(1)); }
+        };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+    }
+
     /** What is under a point of the view: a cell, a column letter, a row number, or the corner (everything). */
     function hit(x, y) {
         if (x < left && y < top) return { kind: 'all' };
@@ -295,6 +342,16 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
 
     function onSinkKeyDown(e) {
         if (e.nativeEvent.isComposing) return;
+        // a selected chart: Delete takes it away, Escape lets it go (the keys go to the cells again)
+        if (chartSel && !editing) {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                try { wb.removeChart(sheetId, chartSel, { source: 'user' }); } catch (err) { onError(err.message[0].toUpperCase() + err.message.slice(1)); }
+                if (onChartSel) onChartSel(null);
+                return;
+            }
+            if (e.key === 'Escape') { e.preventDefault(); if (onChartSel) onChartSel(null); return; }
+        }
         if (editing) {
             if (e.key === 'Escape') { e.preventDefault(); setEditing(null); e.currentTarget.value = ''; return; }
             if (e.key === 'Enter' && (e.altKey || e.ctrlKey || e.metaKey)) {
@@ -522,6 +579,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
 
     function onMouseDown(e) {
         if (e.button !== 0) return;
+        if (chartSel && onChartSel) onChartSel(null);
         const edge = e.target && e.target.dataset;
         // a square of the rules editor: the host is told which rule it stands for (the cell is selected as well, as a click on it would)
         const square = e.target && e.target.closest && e.target.closest('[data-rule]');
@@ -868,6 +926,25 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (!(a.r1 > rows.to || a.r2 < rows.from || a.c1 > cols.to || a.c2 < cols.from)) {
             out.push(<div key="active" className="ks-active" style={{ left: colAxis.start(a.c1) - xBase, top: rowAxis.start(a.r1) - yBase,
                 width: colAxis.start(a.c2 + 1) - colAxis.start(a.c1), height: rowAxis.start(a.r2 + 1) - rowAxis.start(a.r1) }} />);
+        }
+        // the charts that reach into this pane, on their blocks of cells (a chart laid over its cells knows the middle of each of its columns)
+        for (const chart of chartList) {
+            const b = chart.at;
+            if (b.r1 > rows.to || b.r2 < rows.from || b.c1 > cols.to || b.c2 < cols.from) continue;
+            const boxLeft = colAxis.start(b.c1) - xBase;
+            const xs = [];
+            if (chart.align === 'cells') for (let c = b.c1; c <= b.c2; c++) xs.push(colAxis.start(c) + colAxis.size(c) / 2 - colAxis.start(b.c1));
+            out.push(<ChartObject key={'chart' + chart.id} workbook={wb} sheetId={sheetId} chart={chart} revision={revision} xs={xs} selected={chartSel === chart.id}
+                box={{ left: boxLeft, top: rowAxis.start(b.r1) - yBase, width: colAxis.start(b.c2 + 1) - colAxis.start(b.c1), height: rowAxis.start(b.r2 + 1) - rowAxis.start(b.r1) }}
+                onPointer={onChartPointer} />);
+        }
+        // where a chart being moved or resized would go
+        if (chartDrag) {
+            const d = chartDrag.rect;
+            if (!(d.r1 > rows.to || d.r2 < rows.from || d.c1 > cols.to || d.c2 < cols.from)) {
+                out.push(<div key="chartdrag" className="ks-chart-ghost" style={{ left: colAxis.start(d.c1) - xBase, top: rowAxis.start(d.r1) - yBase,
+                    width: colAxis.start(d.c2 + 1) - colAxis.start(d.c1), height: rowAxis.start(d.r2 + 1) - rowAxis.start(d.r1) }} />);
+            }
         }
         return out;
     };

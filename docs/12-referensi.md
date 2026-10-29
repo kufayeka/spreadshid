@@ -124,6 +124,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `sortRange` | urutkan range menurut satu kolom | [7.3](07-data.md#73-mengurutkan) |
 | `findAll`, `replaceIn` | cari dan ganti | [7.7](07-data.md#77-mencari-dan-mengganti) |
 | `pivot`, `tableOf`, `PIVOT_FUNCTIONS` | ringkasan per kelompok tanpa sheet, dan range sebagai daftar record | [7.6](07-data.md#76-pivot-table) |
+| `chartSeries`, `CHART_TYPES`, `CHART_DEFAULTS` | membaca range menjadi kategori dan seri seperti Excel, jenis-jenis chart, dan pengaturan awal chart baru | [12](12-dashboard.md) |
 | `populate` | data dari luar ke sheet, tetap sebagai data | [4.5](04-api-workbook.md#45-mengisi-dari-data-api) |
 | `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [8.5](08-menjaga-isi.md#85-tipe-kolom) |
 | `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [9](09-menyimpan.md) |
@@ -169,6 +170,7 @@ Handle juga punya `id` dan `name`.
 | grup | `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups` | [7.5](07-data.md#75-melipat-kelompok-baris) |
 | validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | pivot | `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt` | [7.6](07-data.md#76-pivot-table) |
+| chart | `addChart`, `setChart`, `removeChart`, `charts`, `chartData` | [12](12-dashboard.md) |
 | aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [8](08-menjaga-isi.md) |
 | komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `mayChangeComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
 

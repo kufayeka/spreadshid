@@ -397,3 +397,37 @@
 .ks-pivot-filter { display: flex; flex-direction: column; gap: 4px; }
 .ks-check-row { display: flex; align-items: center; gap: 6px; }
 .ks-radios { display: flex; gap: 16px; }
+/* charts on the grid: a card on its block of cells, or (background none) a drawing laid over the cells that the mouse goes through, picked by its edge */
+.ks-chart { position: absolute; z-index: 6; box-sizing: border-box; border: 1px solid #c6c6c6; background: #fff; cursor: default; }
+.ks-chart-over { border-color: transparent; background: transparent; pointer-events: none; }
+.ks-chart-canvas { position: absolute; display: block; }
+.ks-chart-over .ks-chart-canvas { pointer-events: none; }
+/* four thin strips along the sides: only there does the mouse pick a transparent chart (inside, it goes through to the cells) */
+.ks-chart-edge { position: absolute; pointer-events: auto; cursor: move; }
+.ks-chart-edge:hover { background: rgba(105, 41, 196, 0.35); }
+.ks-edge-top { left: -3px; right: -3px; top: -3px; height: 5px; } .ks-edge-bottom { left: -3px; right: -3px; bottom: -3px; height: 5px; }
+.ks-edge-left { top: -3px; bottom: -3px; left: -3px; width: 5px; } .ks-edge-right { top: -3px; bottom: -3px; right: -3px; width: 5px; }
+.ks-chart-selected { outline: 2px solid var(--ks-chart, #6929c4); outline-offset: 0; }
+.ks-chart-over.ks-chart-selected { outline-style: dashed; outline-width: 1.5px; }
+.ks-chart-handle { position: absolute; width: 8px; height: 8px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff; border: 1.5px solid var(--ks-chart, #6929c4);
+    pointer-events: auto; z-index: 2; }
+.ks-h-nw { left: 0; top: 0; cursor: nwse-resize; } .ks-h-n { left: 50%; top: 0; cursor: ns-resize; } .ks-h-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.ks-h-e { left: 100%; top: 50%; cursor: ew-resize; } .ks-h-se { left: 100%; top: 100%; cursor: nwse-resize; } .ks-h-s { left: 50%; top: 100%; cursor: ns-resize; }
+.ks-h-sw { left: 0; top: 100%; cursor: nesw-resize; } .ks-h-w { left: 0; top: 50%; cursor: ew-resize; }
+.ks-chart-ghost { position: absolute; z-index: 7; border: 2px dashed var(--ks-chart, #6929c4); background: rgba(105, 41, 196, 0.06); pointer-events: none; }
+.ks-chart-tip { position: absolute; z-index: 3; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; background: #161616; color: #fff;
+    border-radius: 3px; font: 12px 'IBM Plex Sans', Arial, sans-serif; white-space: nowrap; }
+.ks-chart-tip span { color: #c6c6c6; font-size: 11px; }
+/* the chart editor */
+.ks-chart-panel { width: 320px; }
+.ks-chart-sec { margin: 6px 0 -4px; font-size: 11px; color: #5f6368; text-transform: uppercase; letter-spacing: 0.04em; }
+.ks-chart-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ks-chart-type { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; border: 1px solid #dadce0; border-radius: 4px; background: #fff;
+    color: #525252; font: inherit; font-size: 11px; cursor: pointer; }
+.ks-chart-type.ks-on { border-color: var(--ks-chart, #6929c4); background: #f4effc; color: #491d8b; box-shadow: 0 0 0 1px var(--ks-chart, #6929c4); }
+.ks-chart-series { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ks-chart-series li { display: grid; grid-template-columns: 28px 1fr auto; gap: 6px; align-items: end; }
+.ks-chart-series input[type="color"] { width: 28px; height: 28px; padding: 0; border: 1px solid #dadce0; border-radius: 4px; background: none; }
+.ks-chart-series-flags { grid-column: 2 / -1; display: flex; gap: 10px; font-size: 12px; color: #5f6368; }
+.ks-chart-toggle { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.ks-chart-row { display: flex; gap: 8px; }

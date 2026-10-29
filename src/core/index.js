@@ -15,6 +15,7 @@ export { colName, colIndex } from './formula/address.js';
 export { ERR, isError } from './formula/xlvalue.js';
 export { formatValue, localeInfo, FORMAT_PRESETS, dateToSerial, serialToDate } from './format.js';
 export { displayOf } from './display.js';
+export { chartSeries, CHART_TYPES, CHART_DEFAULTS } from './chart.js';
 export { populate } from './populate.js';
 export { fromApiMakerType, fieldType, checkValue } from './types.js';
 export { mergePatch, checkPatch, viewFor } from './server.js';

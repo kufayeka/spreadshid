@@ -17,6 +17,7 @@ import { ConditionalPanel } from './ConditionalPanel.js';
 import { NamesPanel } from './NamesPanel.js';
 import { CommentsPanel } from './CommentsPanel.js';
 import { CommentCard } from './CommentCard.js';
+import { ChartPanel } from './chart/ChartPanel.js';
 import { PivotPanel, PivotDialog } from './PivotPanel.js';
 import { FilterMenu } from './FilterMenu.js';
 import { sortRange } from '../core/search.js';
@@ -185,6 +186,28 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     // another cell is picked. `hoverAt` is the one the mouse shows while it is on a marked cell (comments.open 'hover'); it goes 300 ms after
     // the mouse leaves the cell and the card, so the mouse can travel from one to the other. Typing in a hover card keeps it open (pinned).
     const [card, setCard] = useState(null); // { s, r, c, start }
+    // The chart selected on the grid (its frame and handles show, Delete takes it away); someone who may change charts gets its editor on the right.
+    const [chartSel, setChartSelState] = useState(null);
+    const selectChart = (id) => {
+        setChartSelState(id);
+        if (id && wb.can('chart') && wb.shows('panel.chart')) setPanel({ kind: 'chart', id });
+        else setPanel((p) => (p && p.kind === 'chart' ? null : p));
+    };
+    useEffect(() => { setChartSelState(null); setPanel((p) => (p && p.kind === 'chart' ? null : p)); }, [sheetId]);
+    // Insert > Chart: a column chart of the selection (or of the filled block around the active cell), on the cells to the right of it, selected
+    function insertChart() {
+        if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: refusalOf('chart', wb.access().message) }); return; }
+        const b = rectsOf(sel)[rectsOf(sel).length - 1];
+        const data = b.r1 === b.r2 && b.c1 === b.c2 ? wb.dataRegion(sheetId, b.r1, b.c1) : b;
+        const c1 = data.c2 + 2, r1 = data.r1;
+        const at = rectText({ r1, c1, r2: r1 + 15, c2: c1 + 6 });
+        try {
+            const id = wb.addChart(sheetId, { at, data: rectText(data), type: 'column' }, { source: 'user' });
+            selectChart(id);
+        } catch (err) {
+            tellError(err.message[0].toUpperCase() + err.message.slice(1));
+        }
+    }
     const [hoverAt, setHoverAt] = useState(null); // { s, r, c }
     const [bodyEl, setBodyEl] = useState(null);
     const drafts = useRef(new Map());
@@ -388,6 +411,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onComment={writeComment}
+                onChart={insertChart}
                 onPivot={() => {
                     // the data to start with: the selection, or the block of filled cells around the active cell
                     const b = rectsOf(sel)[rectsOf(sel).length - 1];
@@ -425,7 +449,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')} ref={setBodyEl} onMouseOver={onBodyOver} onMouseLeave={() => { if (hoverAt) leave(); }}>
                 <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!cellMarks} setup={setup} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
-                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={writeComment} />
+                    marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={writeComment} chartSel={chartSel} onChartSel={selectChart} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
                         onQuery={(query) => setFind((f) => ({ ...f, query, index: -1 }))}
@@ -442,6 +466,8 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     start={shownCard === card ? card.start : 0} onError={tellError} onEnter={stay} onLeave={() => { if (hoverAt) leave(); }}
                     onPin={() => { if (shownCard === hoverAt) { stay(); setHoverAt(null); setCard({ s: sheetId, r: hoverAt.r, c: hoverAt.c, start: 0 }); } }}
                     onClose={() => { stay(); setHoverAt(null); setCard(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'chart' && wb.shows('panel.chart') ? <ChartPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
+                    onError={tellError} onClose={() => { setPanel(null); setChartSelState(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'pivot' && wb.shows('panel.pivot') ? <PivotPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
                     key={panel.id} onError={tellError} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'names' && wb.shows('panel.names') ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
