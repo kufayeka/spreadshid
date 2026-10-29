@@ -333,7 +333,7 @@ export async function readXlsx(bytes) {
                     const chartPart = files.get(chartRels[anchor.rid]);
                     const chart = chartPart ? readChart(kid(parseXml(new TextDecoder().decode(chartPart)), 'chartSpace')) : null;
                     if (chart) read.charts.push({ ...chart, at: anchor.at });
-                    else warnings.push('"' + s.attrs.name + '": a chart whose data is not one block of one sheet was not imported');
+                    else warnings.push('"' + s.attrs.name + '": a chart with no series of values was not imported');
                 }
                 if (others) warnings.push('"' + s.attrs.name + '": pictures and shapes were not imported');
             }

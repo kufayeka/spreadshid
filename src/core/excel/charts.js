@@ -54,6 +54,14 @@ function seriesXml(s, i, chartType) {
         ? '<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill><a:srgbClr val="' + color + '"/></a:solidFill>' + (s.dash ? '<a:prstDash val="dash"/>' : '') + '<a:round/></a:ln></c:spPr>'
         : chartType === 'pie' ? '' : '<c:spPr><a:solidFill><a:srgbClr val="' + color + '"/></a:solidFill></c:spPr>';
     const marker = line ? '<c:marker><c:symbol val="circle"/><c:size val="5"/></c:marker>' : '';
+    if (chartType === 'scatter') {
+        // a scatter's series: its own x and y; a line through its points unless it is points only
+        const ln = s.lined ? '<a:ln w="25400" cap="rnd"><a:solidFill><a:srgbClr val="' + color + '"/></a:solidFill>' + (s.dash ? '<a:prstDash val="dash"/>' : '') + '</a:ln>' : '<a:ln w="25400"><a:noFill/></a:ln>';
+        return '<c:ser><c:idx val="' + i + '"/><c:order val="' + i + '"/>' + tx + '<c:spPr>' + ln + '</c:spPr>'
+            + '<c:marker><c:symbol val="circle"/><c:size val="6"/><c:spPr><a:solidFill><a:srgbClr val="' + color + '"/></a:solidFill></c:spPr></c:marker>'
+            + (s.xRef ? '<c:xVal><c:numRef><c:f>' + esc(s.xRef) + '</c:f></c:numRef></c:xVal>' : '')
+            + '<c:yVal><c:numRef><c:f>' + esc(s.valRef) + '</c:f></c:numRef></c:yVal><c:smooth val="' + (s.smooth ? 1 : 0) + '"/></c:ser>';
+    }
     const cat = s.catRef ? '<c:cat><c:strRef><c:f>' + esc(s.catRef) + '</c:f></c:strRef></c:cat>' : '';
     const val = '<c:val><c:numRef><c:f>' + esc(s.valRef) + '</c:f></c:numRef></c:val>';
     return '<c:ser><c:idx val="' + i + '"/><c:order val="' + i + '"/>' + tx + fill + (chartType === 'bar' ? '<c:invertIfNegative val="0"/>' : '') + marker + cat + val
@@ -75,7 +83,14 @@ export function chartXml(c) {
     const visible = c.refs.filter((s) => !s.hidden);
     const seriesKind = (s) => (type === 'combo' ? (s.kind === 'line' || s.kind === 'area' ? s.kind : 'bar') : type === 'line' ? (s.kind === 'column' ? 'bar' : 'line') : type === 'area' ? 'area' : 'bar');
     let plot = '';
-    if (type === 'pie' || type === 'donut') {
+    if (type === 'scatter') {
+        const sers = visible.map((s, i) => seriesXml({ ...s, smooth: c.smooth || s.smooth, lined: s.kind === 'line' || (c.lines && s.kind !== 'points') }, i, 'scatter')).join('');
+        const valAx = (id, cross, pos, grid) => '<c:valAx><c:axId val="' + id + '"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="' + pos + '"/>'
+            + (grid ? '<c:majorGridlines><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="E0E0E0"/></a:solidFill></a:ln></c:spPr></c:majorGridlines>' : '')
+            + '<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="' + cross + '"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/></c:valAx>';
+        plot = '<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>' + sers + '<c:axId val="500000011"/><c:axId val="500000012"/></c:scatterChart>'
+            + valAx(500000011, 500000012, 'b', false) + valAx(500000012, 500000011, 'l', true);
+    } else if (type === 'pie' || type === 'donut') {
         const s = visible[0];
         const tag = type === 'donut' ? 'c:doughnutChart' : 'c:pieChart';
         // each slice its own colour, as the sheet draws them
@@ -166,15 +181,16 @@ const val = (node) => (node ? node.attrs.val : undefined);
 const formulaIn = (node) => { const f = node && (kid(kid(node, 'numRef'), 'f') || kid(kid(node, 'strRef'), 'f')); return f ? f.text : null; };
 
 /**
- * A chart part read back into what the sheet keeps: its type, title, legend, stacked, the series' colours and kinds, and the one block of cells
- * that holds all its parts (the categories, the names and the values), with how its series run. Null when its parts are not one block of one sheet.
- * @param {any} space  The parsed c:chartSpace.
+ * A chart part read back into what the sheet keeps: its type, title, legend, stacked, and its series with their colours and kinds. When all its parts
+ * make one block of one sheet it comes back as that block (`box`, read as Excel reads a selection); else each series comes back with its own ranges
+ * (`own`: { categories, series: [{ values, nameFrom, x }] }, the ranges as { sheet, r1, c1, r2, c2 }). Null when it has no series with values.
+ * @param {any} space  The parsed chartSpace.
  */
 export function readChart(space) {
     const chart = kid(space, 'chart');
     const plot = kid(chart, 'plotArea');
     if (!plot) return null;
-    const kinds = { 'barChart': 'bar', 'lineChart': 'line', 'areaChart': 'area', 'pieChart': 'pie', 'doughnutChart': 'donut', 'pie3DChart': 'pie', 'bar3DChart': 'bar', 'line3DChart': 'line' };
+    const kinds = { 'barChart': 'bar', 'lineChart': 'line', 'areaChart': 'area', 'pieChart': 'pie', 'doughnutChart': 'donut', 'pie3DChart': 'pie', 'bar3DChart': 'bar', 'line3DChart': 'line', 'scatterChart': 'scatter' };
     const parts = [];
     let horizontal = false, stacked = false;
     const rightAxes = new Set();
@@ -185,43 +201,63 @@ export function readChart(space) {
         if (kind === 'bar' && val(kid(node, 'barDir')) === 'bar') horizontal = true;
         const grouping = val(kid(node, 'grouping'));
         if (grouping === 'stacked' || grouping === 'percentStacked') stacked = true;
-        const right = kids(node, 'axId').some((a) => rightAxes.has(val(a)));
+        const right = kind !== 'scatter' && kids(node, 'axId').some((a) => rightAxes.has(val(a)));
         for (const ser of kids(node, 'ser')) parts.push({ kind, right, ser });
     }
     if (!parts.length) return null;
     const kindsUsed = new Set(parts.map((p) => p.kind));
     let type;
-    if (kindsUsed.has('pie')) type = 'pie';
+    if (kindsUsed.has('scatter')) type = 'scatter';
+    else if (kindsUsed.has('pie')) type = 'pie';
     else if (kindsUsed.has('donut')) type = 'donut';
     else if (kindsUsed.size > 1 || parts.some((p) => p.right)) type = 'combo';
     else type = kindsUsed.has('line') ? 'line' : kindsUsed.has('area') ? 'area' : horizontal ? 'bar' : 'column';
-    const refs = [], series = [];
+    const series = [];
     for (const p of parts) {
-        const v = readRef(formulaIn(kid(p.ser, 'val')));
-        if (!v) return null;
-        const cat = readRef(formulaIn(kid(p.ser, 'cat')));
+        const v = readRef(formulaIn(kid(p.ser, type === 'scatter' ? 'yVal' : 'val')));
+        if (!v) continue;
+        const cat = type === 'scatter' ? null : readRef(formulaIn(kid(p.ser, 'cat')));
+        const x = type === 'scatter' ? readRef(formulaIn(kid(p.ser, 'xVal'))) : null;
         const name = readRef(formulaIn(kid(p.ser, 'tx')));
-        refs.push(v); if (cat) refs.push(cat); if (name) refs.push(name);
-        const fill = kid(kid(kid(p.ser, 'spPr'), 'solidFill'), 'srgbClr') || kid(kid(kid(kid(p.ser, 'spPr'), 'ln'), 'solidFill'), 'srgbClr');
+        const literal = kid(kid(p.ser, 'tx'), 'v');
+        const spPr = kid(p.ser, 'spPr');
+        const fill = kid(kid(spPr, 'solidFill'), 'srgbClr') || kid(kid(kid(spPr, 'ln'), 'solidFill'), 'srgbClr') || kid(kid(kid(kid(p.ser, 'marker'), 'spPr'), 'solidFill'), 'srgbClr');
         const own = {};
         if (fill && fill.attrs.val) own.color = '#' + fill.attrs.val.toLowerCase();
         if (type === 'combo') own.type = p.kind === 'bar' ? 'column' : p.kind;
+        if (type === 'scatter' && kid(kid(spPr, 'ln'), 'noFill')) own.type = 'points';
         if (p.right) own.axis = 'right';
-        if (kid(kid(kid(p.ser, 'spPr'), 'ln'), 'prstDash')) own.dash = true;
-        series.push({ own, v });
+        if (kid(kid(spPr, 'ln'), 'prstDash')) own.dash = true;
+        if (!name && literal && literal.text) own.name = literal.text;
+        series.push({ own, v, cat, x, name });
     }
-    if (new Set(refs.map((x) => x.sheet)).size !== 1) return null;
-    const box = refs.reduce((b, x) => ({ r1: Math.min(b.r1, x.r1), c1: Math.min(b.c1, x.c1), r2: Math.max(b.r2, x.r2), c2: Math.max(b.c2, x.c2) }), { r1: Infinity, c1: Infinity, r2: -1, c2: -1 });
-    // the values of one series in a column: the series run down the columns
-    const v0 = series[0].v;
-    const seriesIn = v0.c1 === v0.c2 && v0.r2 > v0.r1 ? 'cols' : v0.r1 === v0.r2 && v0.c2 > v0.c1 ? 'rows' : 'auto';
+    if (!series.length) return null;
     const titleRuns = kids(kid(kid(kid(kid(chart, 'title'), 'tx'), 'rich'), 'p'), 'r');
     const title = titleRuns.map((r) => (kid(r, 't') || {}).text || '').join('');
     const legendPos = val(kid(kid(chart, 'legend'), 'legendPos'));
-    const out = { type, sheet: refs[0].sheet, box, seriesIn, stacked, series: series.map((s) => s.own) };
+    const out = { type, stacked };
     if (title) out.title = title;
     out.legend = !kid(chart, 'legend') ? 'none' : legendPos === 'r' ? 'right' : legendPos === 'b' ? 'bottom' : 'top';
     if (kid(kid(space, 'spPr'), 'noFill')) out.background = 'none';
+    // a scatter with lines through its points
+    if (type === 'scatter' && series.some((s) => s.own.type !== 'points')) { out.lines = true; series.forEach((s) => { if (s.own.type !== 'points') delete s.own.type; }); }
+    // one block: every part on one sheet, and together they fill the block but (perhaps) its top-left corner, as a selection read by Excel does
+    const refs = series.flatMap((s) => [s.v, s.cat, s.name, s.x].filter(Boolean));
+    const box = refs.reduce((b, r) => ({ r1: Math.min(b.r1, r.r1), c1: Math.min(b.c1, r.c1), r2: Math.max(b.r2, r.r2), c2: Math.max(b.c2, r.c2) }), { r1: Infinity, c1: Infinity, r2: -1, c2: -1 });
+    const covered = new Set();
+    for (const r of refs) for (let y = r.r1; y <= r.r2; y++) for (let xx = r.c1; xx <= r.c2; xx++) covered.add(y + ':' + xx);
+    const area = (box.r2 - box.r1 + 1) * (box.c2 - box.c1 + 1);
+    const oneSheet = new Set(refs.map((r) => r.sheet)).size === 1;
+    const block = type !== 'scatter' && oneSheet && (covered.size === area || (covered.size === area - 1 && !covered.has(box.r1 + ':' + box.c1)));
+    if (block) {
+        const v0 = series[0].v;
+        out.sheet = refs[0].sheet;
+        out.box = box;
+        out.seriesIn = v0.c1 === v0.c2 && v0.r2 > v0.r1 ? 'cols' : v0.r1 === v0.r2 && v0.c2 > v0.c1 ? 'rows' : 'auto';
+        out.series = series.map((s) => s.own);
+    } else {
+        out.own = { categories: series.find((s) => s.cat) ? series.find((s) => s.cat).cat : null, series: series.map((s) => ({ ...s.own, values: s.v, ...(s.name ? { nameFrom: s.name } : {}), ...(s.x ? { x: s.x } : {}) })) };
+    }
     return out;
 }
 

@@ -164,7 +164,7 @@ export function drawChart(ctx, o) {
     ctx.clearRect(0, 0, o.width, o.height);
     const series = model.series.filter((s) => !s.hidden);
     const hits = [];
-    if (!series.length || !model.categories.length) {
+    if (!series.length || (!model.categories.length && spec.type !== 'scatter')) {
         const p = frame(ctx, o, []);
         ctx.font = '12px ' + FONT; ctx.fillStyle = INK.muted; ctx.textAlign = 'center';
         ctx.fillText('No data', p.x + p.w / 2, p.y + p.h / 2);
@@ -174,6 +174,7 @@ export function drawChart(ctx, o) {
     if (spec.type === 'pie' || spec.type === 'donut') drawPie(ctx, o, series[0], hits);
     else if (spec.type === 'bullet') drawBullet(ctx, o, series, hits);
     else if (spec.type === 'waterfall') drawWaterfall(ctx, o, series[0], hits);
+    else if (spec.type === 'scatter') drawScatter(ctx, o, series, hits);
     else drawAxes(ctx, o, series, hits);
     ctx.restore();
     return hits;
@@ -337,6 +338,62 @@ function drawAxes(ctx, o, series, hits) {
             const last = runs[runs.length - 1][runs[runs.length - 1].length - 1];
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
             label(ctx, (s.endLabel === true ? s.name + ' ' : String(s.endLabel)) + numberText(last[3], s.axis === 'right' ? axisR : axisL, locale, false), last[0] + 8, last[1], color, true);
+        }
+    });
+}
+
+// ---- scatter: each series its own x and y, the x axis a number (or a date) with its real distances ----------------------------------------------
+
+// a day number as a short date in the workbook's locale ("27 Okt"), for a date x axis
+function dateText(serial, locale) {
+    const d = new Date(Math.round((serial - 25569) * 86400000));
+    try { return new Intl.DateTimeFormat(locale || undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(d); } catch (err) { return d.toISOString().slice(5, 10); }
+}
+
+function drawScatter(ctx, o, series, hits) {
+    const { spec, locale } = o;
+    const halo = spec.background === 'none';
+    const lined = (s) => s.type === 'line' || (spec.lines && s.type !== 'points');
+    const legendItems = series.map((s, i) => ({ name: s.name, color: colorOf(spec, s, s.index ?? i), line: lined(s), dash: !!s.dash }));
+    const plot = frame(ctx, o, spec.legend === 'none' ? [] : legendItems);
+    // every point with both an x and a y
+    const pts = series.map((s) => (s.x || s.values.map((_, i) => i + 1)).map((x, i) => [x, s.values[i]]).filter(([x, y]) => x !== null && y !== null && x !== undefined));
+    const all = pts.flat();
+    if (!all.length) return;
+    const isDate = series.some((s) => s.xFormat && /date|time/.test(s.xFormat.type || ''));
+    // a number axis starts at 0 as any value axis does; a date axis runs from the first date to the last
+    const xLo = Math.min(...all.map((p) => p[0])), xHi = Math.max(...all.map((p) => p[0]));
+    const xs = isDate ? niceScale(xLo, xHi, { min: xLo, max: xHi, ...(spec.x || {}) }) : niceScale(xLo, xHi, spec.x || {});
+    const yAxis = { ...(series[0].format && series[0].format.type === 'percent' ? { percent: true } : {}), ...(spec.y || {}) };
+    const ys = niceScale(Math.min(...all.map((p) => p[1])), Math.max(...all.map((p) => p[1])), spec.y || {});
+    ctx.font = '11px ' + FONT;
+    const wL = spec.yAxis === false ? 0 : Math.max(...ys.ticks.map((v) => ctx.measureText(numberText(v, yAxis, locale, true)).width)) + 8;
+    const P = { x: plot.x + wL, y: plot.y + 6, w: plot.w - wL - 8, h: plot.h - 6 - (spec.xAxis === false ? 0 : 18) };
+    if (P.w < 10 || P.h < 10) return;
+    const X = (v) => P.x + ((v - xs.lo) / (xs.hi - xs.lo || 1)) * P.w, Y = (v) => P.y + P.h - ((v - ys.lo) / (ys.hi - ys.lo || 1)) * P.h;
+    for (const v of ys.ticks) {
+        const y = Math.round(Y(v)) + 0.5;
+        if (spec.grid !== false) { ctx.strokeStyle = INK.grid; ctx.beginPath(); ctx.moveTo(P.x, y); ctx.lineTo(P.x + P.w, y); ctx.stroke(); }
+        if (spec.yAxis !== false) { ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; label(ctx, numberText(v, yAxis, locale, true), P.x - 6, y, INK.muted, halo, '400'); }
+    }
+    ctx.strokeStyle = INK.base; ctx.beginPath(); ctx.moveTo(P.x, P.y + P.h + 0.5); ctx.lineTo(P.x + P.w, P.y + P.h + 0.5); ctx.stroke();
+    if (spec.xAxis !== false) {
+        const ticks = isDate ? Array.from({ length: 5 }, (_, i) => xs.lo + ((xs.hi - xs.lo) * i) / 4) : xs.ticks;
+        for (const v of ticks) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; label(ctx, isDate ? dateText(v, locale) : numberText(v, spec.x || {}, locale, true), X(v), P.y + P.h + 10, INK.axis, halo, '400'); }
+    }
+    series.forEach((s, i) => {
+        const color = colorOf(spec, s, s.index ?? i);
+        const list = pts[i].slice().sort((a, b) => a[0] - b[0]);
+        if (lined(s) && list.length > 1) {
+            const px = list.map((p) => X(p[0])), py = list.map((p) => Y(p[1]));
+            ctx.beginPath(); ctx.moveTo(px[0], py[0]);
+            if ((spec.smooth || s.smooth) && list.length > 2) for (const seg of monotone(px, py)) ctx.bezierCurveTo(...seg); else for (let k = 1; k < px.length; k++) ctx.lineTo(px[k], py[k]);
+            ctx.strokeStyle = color; ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash ? [6, 4] : []); ctx.stroke(); ctx.setLineDash([]);
+        }
+        for (const [x, y] of list) {
+            ctx.beginPath(); ctx.arc(X(x), Y(y), s.size || 4, 0, Math.PI * 2); ctx.fillStyle = color; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+            hits.push({ x: X(x) - 6, y: Y(y) - 6, w: 12, h: 12, category: -1, series: i, value: y, xValue: isDate ? dateText(x, locale) : x });
+            if (spec.labels || s.labels) { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; label(ctx, numberText(y, yAxis, locale, false), X(x), Y(y) - 6, color, true); }
         }
     });
 }

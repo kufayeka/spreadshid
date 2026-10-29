@@ -141,13 +141,24 @@ export interface PivotInfo { id: string; source: string; spec: PivotSpec; area: 
 
 // ---- charts -----------------------------------------------------------------------------------------------------------------------------------
 
-export type ChartType = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'combo' | 'bullet' | 'waterfall';
+export type ChartType = 'column' | 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'combo' | 'scatter' | 'bullet' | 'waterfall';
 /** How a value axis is written and how far it goes. */
 export interface ChartAxis { min?: number; max?: number; prefix?: string; suffix?: string; decimals?: number; percent?: boolean }
 /** One series' own settings, by its place in the data (first series first). */
 export interface ChartSeriesSpec {
-    name?: string; color?: string; type?: 'line' | 'column' | 'area'; axis?: 'left' | 'right'; dash?: boolean; hidden?: boolean; labels?: boolean;
+    name?: string; color?: string;
+    /** How it is drawn: in a combo, line or column (or area) chart a line, columns or an area; in a scatter 'points' leaves the line out. */
+    type?: 'line' | 'column' | 'area' | 'points';
+    axis?: 'left' | 'right'; dash?: boolean; hidden?: boolean; labels?: boolean;
     smooth?: boolean; markers?: boolean; width?: number;
+    /** A scatter's point size, in pixels. */
+    size?: number;
+    /** Its own values (y), as a range: a series of its own ranges, after the block's series (or with no block at all). */
+    values?: string;
+    /** A scatter series' own x values, as a range (numbers or dates, at their real distances). */
+    x?: string;
+    /** The cell that holds its name, as a range of one cell (when `name` is not given). */
+    nameFrom?: string;
     /** A label after the last point: true for "name value", a text for "text value" (an S-curve's "Realisasi 49,5%"). */
     endLabel?: boolean | string;
 }
@@ -156,8 +167,12 @@ export interface ChartSpec {
     at?: string; data?: string; type?: ChartType;
     /** The series run down the columns or along the rows; 'auto' (the default) as Excel: down the columns when the range is at least as tall as wide. */
     seriesIn?: 'auto' | 'cols' | 'rows';
-    /** The first column holds the categories: found from its text when left out. */
-    categories?: boolean;
+    /** The block's first column holds the categories (found from its text when left out); or a range of its own that every series shares. */
+    categories?: boolean | string;
+    /** scatter: a line through each series' points (a series of type 'points' has none). */
+    lines?: boolean;
+    /** scatter: the x axis. */
+    x?: ChartAxis;
     title?: string; subtitle?: string; legend?: 'top' | 'right' | 'bottom' | 'none'; labels?: boolean; stacked?: boolean; grid?: boolean;
     smooth?: boolean; markers?: boolean;
     /** 'none': transparent, laid over its cells (the mouse goes through to them; the chart is picked by its edge). */
@@ -175,7 +190,7 @@ export interface ChartSpec {
     [key: string]: unknown;
 }
 /** A chart as wb.charts() gives it: its settings, and where its cells and data are now. */
-export interface ChartInfo extends Omit<ChartSpec, 'at' | 'data'> { id: string; type: ChartType; at: Rect | null; atText: string | null; dataText: string | null; dataAt: (Rect & { s: string }) | null }
+export interface ChartInfo extends Omit<ChartSpec, 'at' | 'data' | 'x'> { id: string; type: ChartType; at: Rect | null; atText: string | null; dataText: string | null; dataAt: (Rect & { s: string }) | null }
 /** A group of sparklines: where they stand, what they read, how they look. */
 export interface SparklineSpec {
     at?: string; data?: string; type?: 'line' | 'column' | 'winloss'; color?: string; negColor?: string;
@@ -190,7 +205,9 @@ export interface SparklineInfo extends Omit<SparklineSpec, 'at' | 'data'> {
 /** What a chart draws, read from its data now. */
 export interface ChartModel {
     categories: string[];
-    series: Array<ChartSeriesSpec & { name: string; values: Array<number | null>; index: number; format: object | null }>;
+    series: Array<Omit<ChartSeriesSpec, 'values' | 'x'> & { name: string; values: Array<number | null>; x?: Array<number | null>; index: number; format: object | null; xFormat?: object | null }>;
+    /** How many of the series came from the block (the rest are series of their own ranges). */
+    fromBlock?: number;
     seriesIn: 'cols' | 'rows';
     /** How the range was read: series down the columns or along the rows, its first column the categories, its first row the names. */
     layout?: { by: 'cols' | 'rows'; catCol: boolean; headerRow: boolean };
@@ -404,7 +421,7 @@ export interface SheetFns {
     pivots(): PivotInfo[];
     pivotAt(at: CellAt, c?: number): PivotInfo | null;
     // charts
-    addChart(spec: ChartSpec & { at: string; data: string }, how?: How): string;
+    addChart(spec: ChartSpec & { at: string }, how?: How): string;
     setChart(id: string, patch: ChartSpec, how?: How): Op[] | null;
     removeChart(id: string, how?: How): Op[] | null;
     charts(): ChartInfo[];

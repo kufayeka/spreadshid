@@ -7,7 +7,7 @@
 // so it moves with its cells when rows or columns are inserted or deleted above or left of it, as a named range does.
 
 /** The kinds of chart. */
-export const CHART_TYPES = ['column', 'bar', 'line', 'area', 'pie', 'donut', 'combo', 'bullet', 'waterfall'];
+export const CHART_TYPES = ['column', 'bar', 'line', 'area', 'pie', 'donut', 'combo', 'scatter', 'bullet', 'waterfall'];
 
 /** What a new chart starts with (anything the host leaves out). */
 export const CHART_DEFAULTS = Object.freeze({

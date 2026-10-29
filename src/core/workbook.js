@@ -1027,38 +1027,77 @@ export function createWorkbook(doc, options) {
         if (!src) throw new Error('there is no sheet "' + parts.sheet + '"');
         return { s: src, rect: rangeOf(parts.a + ':' + parts.b) };
     }
+    // A range a chart keeps: by the ids of its sheet, rows and columns ({ s, r1, c1, r2, c2 }), so it moves with its cells. Given and given back as
+    // text ("Progres!C2:C8"); a range of another sheet keeps that sheet's name in its text.
+    const refOf = (s, text, what) => { const d = chartRange(s, text, what); return { s: d.s, ...idsOfRect(d.s, d.rect) }; };
+    function refText(s, ref) {
+        const d = ref && rectOfIds(ref.s, ref);
+        if (!d) return null;
+        return (ref.s !== s && sheets.has(ref.s) ? quoteSheet(api.sheetProps(ref.s).name) + '!' : '') + rectText(d);
+    }
+    // the keys of a series that are ranges: its values (y), its own x (a scatter's), and the cell that holds its name
+    const SERIES_REFS = ['values', 'x', 'nameFrom'];
+
     // a chart's own settings from what the host gives: the ranges as ids, the rest as given (unknown keys are kept, for the host's own use)
     function chartOwn(s, spec, base) {
         const out = { ...base };
         for (const [k, v] of Object.entries(spec || {})) {
             if (k === 'id') continue;
             if (k === 'at') { const at = chartRange(s, v, 'place'); if (at.s !== s) throw new Error('a chart stands on its own sheet'); out.at = idsOfRect(s, at.rect); }
-            else if (k === 'data') { const d = chartRange(s, v, 'data'); out.data = { s: d.s, ...idsOfRect(d.s, d.rect) }; }
+            else if (k === 'data') { if (v === null || v === '') delete out.data; else out.data = refOf(s, v, 'data'); }
+            // the categories: true or false (the first column of the block, or not), or a range of their own, shared by every series
+            else if (k === 'categories' && typeof v === 'string') { if (v.trim()) out.categories = { ref: refOf(s, v, 'categories') }; else delete out.categories; }
+            else if (k === 'series') out.series = (v || []).map((one) => seriesOwn(s, one || {}));
             else if (v === undefined) delete out[k];
             else out[k] = clone(v);
         }
         if (out.type !== undefined && !CHART_TYPES.includes(out.type)) throw new Error('a chart is one of ' + CHART_TYPES.join(', ') + ', not "' + out.type + '"');
         return out;
     }
+    // one series' settings: its ranges (given as text, or kept ids coming back) as ids, the rest as given
+    function seriesOwn(s, one) {
+        const out = {};
+        for (const [k, v] of Object.entries(one)) {
+            if (v === undefined || v === null || v === '') continue;
+            if (SERIES_REFS.includes(k)) out[k] = typeof v === 'string' ? refOf(s, v, k === 'x' ? 'x values' : k === 'nameFrom' ? 'name cell' : 'values') : clone(v);
+            else out[k] = clone(v);
+        }
+        return out;
+    }
+    // a chart's settings as the host sees them: its ranges as text again
+    function chartPublic(s, x) {
+        const out = clone(x);
+        if (x.categories && typeof x.categories === 'object') out.categories = refText(s, x.categories.ref);
+        if (x.series) out.series = x.series.map((one) => {
+            const o = clone(one);
+            for (const k of SERIES_REFS) if (one[k] && typeof one[k] === 'object') o[k] = refText(s, one[k]);
+            return o;
+        });
+        delete out.data;
+        return out;
+    }
 
     /**
-     * A new chart on the sheet: `at` is the block of cells it covers ("F3:L18"), `data` the range it reads ("A1:D7", "Data!A1:D7" or a named
-     * range); the rest is how it looks (type, title, legend, series ...). Returns its id. One change.
+     * A new chart on the sheet: `at` is the block of cells it covers ("F3:L18"); what it reads is `data`, one block read as Excel reads a selection
+     * ("A1:D7", "Data!A1:D7" or a named range), and/or its series each with their own ranges (series: [{ values, name or nameFrom, x }] with
+     * `categories` a range shared by them). The rest is how it looks (type, title, legend ...). Returns its id. One change.
      */
     function addChart(s, spec, how) {
         s = sheetIdOf(s);
-        if (!spec || !spec.at || !spec.data) throw new Error('a chart needs `at` (the cells it covers) and `data` (the range it reads)');
+        const ownSeries = spec && Array.isArray(spec.series) && spec.series.some((x) => x && (x.values || x.x));
+        if (!spec || !spec.at || (!spec.data && !ownSeries)) throw new Error('a chart needs `at` (the cells it covers) and `data` (the range it reads) or series with their own `values`');
         const chart = { id: newId(), ...chartOwn(s, spec, { ...CHART_DEFAULTS }) };
         putCharts(s, chartsOf(s).concat([chart]), how);
         return chart.id;
     }
-    /** Changes a chart: only what is given (at and data as range text again). One change. */
+    /** Changes a chart: only what is given (the ranges as text again; `data: null` takes the block away, for a chart of its series' own ranges). One change. */
     function setChart(s, id, patch, how) {
         s = sheetIdOf(s);
         const all = chartsOf(s);
         const old = all.find((x) => x.id === id);
         if (!old) throw new Error('there is no chart "' + id + '"');
         const next = { id, ...chartOwn(s, patch, old) };
+        if (!next.data && !(next.series || []).some((x) => x.values || x.x)) throw new Error('a chart needs `data` or series with their own `values`');
         return putCharts(s, all.map((x) => (x.id === id ? next : x)), how);
     }
     /** Takes a chart away. One change. */
@@ -1070,38 +1109,80 @@ export function createWorkbook(doc, options) {
     }
     /**
      * The charts of a sheet as they stand now: each with `at` (the cells it covers, as indexes, null when its cells were deleted), `atText` ("F3:L18"),
-     * `dataText` ("Data!A1:D7") and the rest of its settings.
+     * `dataText` ("Data!A1:D7", null for a chart of its series' own ranges), `dataAt`, and the rest of its settings with their ranges as text.
      */
     function charts(s) {
         s = sheetIdOf(s);
         return chartsOf(s).map((x) => {
             const at = rectOfIds(s, x.at);
             const d = x.data && rectOfIds(x.data.s, x.data);
-            const sheetName = x.data && x.data.s !== s && sheets.has(x.data.s) ? quoteSheet(api.sheetProps(x.data.s).name) + '!' : '';
-            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? sheetName + rectText(d) : null, dataAt: d ? { s: x.data.s, ...d } : null };
+            return { ...chartPublic(s, x), at, atText: at ? rectText(at) : null, dataText: x.data ? refText(s, x.data) : null, dataAt: d ? { s: x.data.s, ...d } : null };
         });
     }
+    // the cells of a kept range, in reading order: [{ value, text, format }]
+    function cellsOfRef(ref) {
+        const d = ref && rectOfIds(ref.s, ref);
+        if (!d) return null;
+        const out = [];
+        for (let r = d.r1; r <= d.r2; r++) for (let c = d.c1; c <= d.c2; c++) out.push({ value: api.value(ref.s, r, c), text: api.display(ref.s, r, c).text, format: api.cellFormat(ref.s, r, c) });
+        return out;
+    }
+    const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     /**
-     * What a chart draws: its categories and series, read from its data range now ({ categories: [], series: [] } when the range was deleted).
-     * Each series carries its own settings from the chart's `series` list (name, type, axis, colour ...).
+     * What a chart draws, read from its ranges now: { categories, series: [{ name, values, x?, format, xFormat?, index, ...its settings }] }.
+     * The block (`data`) gives its series first, as Excel reads a selection; a series of the chart's list with its own `values` comes after them
+     * (or alone, with no block). The categories are the block's, or the chart's own range, or 1, 2, 3 ...
      */
     function chartData(s, id) {
         s = sheetIdOf(s);
         const x = chartsOf(s).find((c) => c.id === id);
         if (!x) throw new Error('there is no chart "' + id + '"');
-        const d = x.data && rectOfIds(x.data.s, x.data);
-        if (!d) return { categories: [], series: [], seriesIn: 'cols' };
-        const block = [];
-        for (let r = d.r1; r <= d.r2; r++) {
-            const row = [];
-            for (let c = d.c1; c <= d.c2; c++) row.push({ value: api.value(x.data.s, r, c), text: api.display(x.data.s, r, c).text, format: api.cellFormat(x.data.s, r, c) });
-            block.push(row);
+        let out = { categories: [], series: [], seriesIn: 'cols' };
+        const own = (x.series || []);
+        if (x.data) {
+            const d = rectOfIds(x.data.s, x.data);
+            if (d) {
+                const block = [];
+                for (let r = d.r1; r <= d.r2; r++) {
+                    const row = [];
+                    for (let c = d.c1; c <= d.c2; c++) row.push({ value: api.value(x.data.s, r, c), text: api.display(x.data.s, r, c).text, format: api.cellFormat(x.data.s, r, c) });
+                    block.push(row);
+                }
+                out = chartSeries(block, { ...x, categories: typeof x.categories === 'boolean' ? x.categories : undefined, series: undefined });
+            }
         }
-        const out = chartSeries(block, x);
-        out.series = out.series.map((one) => ({ ...((x.series && x.series[one.index]) || {}), ...one }));
+        // the series of the list: settings of the block's series by their place, and, past them (or with no block), series of their own ranges
+        const fromBlock = out.series.length;
+        out.series = out.series.map((one, i) => ({ ...publicSeries(s, own[i]), ...one }));
+        own.forEach((one, i) => {
+            if (i < fromBlock || !(one.values || one.x)) return;
+            const ys = cellsOfRef(one.values) || [];
+            const xs = one.x ? cellsOfRef(one.x) || [] : null;
+            const head = one.nameFrom ? cellsOfRef(one.nameFrom) : null;
+            const name = one.name || (head && head.length ? String(head[0].text || head[0].value || '') : '') || 'Series ' + (i + 1);
+            const first = ys.find((c) => numOrNull(c.value) !== null);
+            out.series.push({ ...publicSeries(s, one), name, values: ys.map((c) => numOrNull(c.value)), index: i, format: (first && first.format) || null,
+                ...(xs ? { x: xs.map((c) => numOrNull(c.value)), xFormat: (xs.find((c) => numOrNull(c.value) !== null) || {}).format || null } : {}) });
+        });
+        // how many of the series came from the block (the rest are series of their own ranges, each with its place in the list: `index`)
+        out.fromBlock = fromBlock;
+        // the chart's own categories (a range shared by its series), else the block's, else 1, 2, 3 ... as long as the longest series
+        if (x.categories && typeof x.categories === 'object') {
+            const cats = cellsOfRef(x.categories.ref) || [];
+            out.categories = cats.map((c) => String(c.text !== '' ? c.text : c.value ?? ''));
+        } else if (!out.categories.length || out.series.length > fromBlock) {
+            const n = Math.max(out.categories.length, ...out.series.map((one) => one.values.length));
+            out.categories = Array.from({ length: n }, (_, i) => out.categories[i] ?? String(i + 1));
+        }
         return out;
     }
-
+    // a series' own settings as the host sees them (its ranges as text)
+    function publicSeries(s, one) {
+        if (!one) return {};
+        const o = clone(one);
+        for (const k of SERIES_REFS) if (one[k] && typeof one[k] === 'object') o[k] = refText(s, one[k]);
+        return o;
+    }
     // ---- sparklines: a small line or columns in each cell of a block, as in Excel; cell i of the block draws row i of the data (or column i when the
     // block is a row). Kept in the sheet's props by ids, as charts are; changing them asks for the access row `chart`.
     const sparksOf = (s) => sheetOf(s).props.sparklines || [];

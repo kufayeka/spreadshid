@@ -157,5 +157,43 @@ const cells = (rows) => rows.map((r) => r.map((v) => ({ value: v, text: v === nu
     ok('in an .xlsx file: Excel charts on their cells, sparklines and data bars, and back');
 }
 
+// ---- series with their own ranges, and scatter (each series its own x)
+{
+    const wb = createWorkbook();
+    wb.addSheet('Opname');
+    const s = wb.sheet('Sheet1');
+    s.setValues('A1', [['Proyek', 'Minggu', 'Aktual', 'Catatan', 'Rencana'], ['A', 1, 0.5, 'x', 0.6], ['B', 2, 0.2, 'y', 0.25]]);
+    // Aktual in C and Rencana in E, a column between them: no block, each series its own range
+    const id = s.addChart({ at: 'H1:M10', type: 'bullet', categories: 'A2:A3', series: [{ name: 'Aktual', values: 'C2:C3' }, { nameFrom: 'E1', values: 'E2:E3' }] });
+    let m = s.chartData(id);
+    assert.deepStrictEqual([m.categories, m.series.map((x) => [x.name, x.values]), m.fromBlock], [['A', 'B'], [['Aktual', [0.5, 0.2]], ['Rencana', [0.6, 0.25]]], 0], 'series of their own ranges, the name from a cell');
+    let c = s.charts()[0];
+    assert.deepStrictEqual([c.dataText, c.categories, c.series], [null, 'A2:A3', [{ name: 'Aktual', values: 'C2:C3' }, { nameFrom: 'E1', values: 'E2:E3' }]], 'given back as text');
+    s.insertCols('B');
+    c = s.charts()[0];
+    assert.deepStrictEqual([c.categories, c.series.map((x) => x.values)], ['A2:A3', ['D2:D3', 'F2:F3']], 'each range moves with its cells');
+    // a block and, after its series, one of its own range
+    const both = s.addChart({ at: 'H12:M20', data: 'C1:D3', type: 'line', series: [{}, {}, { name: 'Rencana', values: 'F2:F3', dash: true }] });
+    m = s.chartData(both);
+    assert.deepStrictEqual([m.series.map((x) => x.name), m.fromBlock, m.series[2].dash], [['Minggu', 'Aktual', 'Rencana'], 2, true], 'the series of the block first, then the one of its own range');
+    assert.throws(() => s.setChart(id, { series: [] }), /needs `data` or series/);
+    assert.throws(() => s.addChart({ at: 'A1:B2', series: [{ name: 'x' }] }), /needs `at`/);
+    // scatter: x and y of each series, a date x
+    const o = wb.sheet('Opname');
+    o.setValues('A1', [[46300, 0.1], [46310, 0.3], [46330, 0.5]]);
+    o.setColProps('A', { format: { type: 'date' } });
+    const sc = s.addChart({ at: 'O1:T10', type: 'scatter', lines: true, series: [{ name: 'Realisasi', x: 'Opname!A1:A3', values: 'Opname!B1:B3' }] });
+    m = s.chartData(sc);
+    assert.deepStrictEqual([m.series[0].x, m.series[0].values, m.series[0].xFormat.type], [[46300, 46310, 46330], [0.1, 0.3, 0.5], 'date'], 'a scatter series: its x and its y, the format of its x');
+    ok('series with their own ranges (a column between them, another sheet), a block and own series together, scatter');
+
+    const back = await importXlsx(exportXlsx(wb));
+    assert.deepStrictEqual(back.warnings, []);
+    const got = back.workbook.sheet('Sheet1').charts().map((x) => [x.type, x.dataText, x.categories || null, x.lines || false, x.series.map((y) => [y.values || null, y.x || null, y.nameFrom || y.name || null])]);
+    assert.deepStrictEqual(got[0], ['bar', null, 'A2:A3', false, [['D2:D3', null, 'Aktual'], ['F2:F3', null, 'F1']]], 'own ranges through a file (a bullet comes back as bars)');
+    assert.deepStrictEqual(got[2], ['scatter', null, null, true, [['Opname!B1:B3', 'Opname!A1:A3', 'Realisasi']]], 'a scatter through a file');
+    ok('own ranges and scatter in an .xlsx file, and back');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');

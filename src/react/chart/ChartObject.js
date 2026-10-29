@@ -54,7 +54,7 @@ export const ChartObject = memo(function ChartObject({ workbook: wb, sheetId, ch
         if (!h) { if (tip) setTip(null); return; }
         const m = hits.current.model;
         const s = m.series.filter((x) => !x.hidden)[h.series];
-        const name = chart.type === 'pie' || chart.type === 'donut' ? m.categories[h.category] : (s ? s.name : '') + ' · ' + m.categories[h.category];
+        const name = chart.type === 'pie' || chart.type === 'donut' ? m.categories[h.category] : (s ? s.name : '') + ' · ' + (h.category < 0 ? h.xValue : m.categories[h.category]);
         let value;
         try { value = new Intl.NumberFormat(wb.settings().locale || undefined, { maximumFractionDigits: 2 }).format(h.value); } catch (err) { value = String(h.value); }
         setTip({ x: x + 12, y: y + 12, name, value });

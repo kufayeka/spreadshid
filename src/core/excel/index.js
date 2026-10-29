@@ -101,6 +101,16 @@ export function exportXlsx(wb) {
     const ids = wb.sheetIds();
     // the name a sheet has in the file (Excel takes a sheet name of 31 characters at most, without \ / ? * [ ] :)
     const fileName = (s) => String(wb.sheetProps(s).name || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet1';
+    // a range of a chart, as the host wrote it ("C2:C8", "Progres!C2:C8"), as the file writes it: "'Progres'!$C$2:$C$8"
+    const fileRef = (s, text) => {
+        const m = /^\s*(?:(?:'((?:[^']|'')+)'|([^!'"]+))!)?\s*\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?\s*$/.exec(String(text || ''));
+        if (!m) return null;
+        const sheetName = m[1] ? m[1].replace(/''/g, "'") : m[2] ? m[2].trim() : null;
+        const id = sheetName ? wb.sheetIdByName(sheetName) : s;
+        if (!id) return null;
+        const a = '$' + m[3].toUpperCase() + '$' + m[4], b = m[5] ? '$' + m[5].toUpperCase() + '$' + m[6] : null;
+        return "'" + fileName(id).replace(/'/g, "''") + "'!" + a + (b && b !== a ? ':' + b : '');
+    };
     const sheets = ids.map((s) => {
         const props = wb.sheetProps(s);
         const size = wb.size(s);
@@ -131,12 +141,23 @@ export function exportXlsx(wb) {
             // every thread, as one note on its cell
             notes: wb.comments(s).filter((t) => t.at && t.items.length).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) })),
             // the charts, each naming the cells of its series in the file (a chart whose data is gone is left out), and the sparklines
-            charts: wb.charts(s).filter((c) => c.at && c.dataAt).map((c) => {
+            charts: wb.charts(s).filter((c) => c.at).map((c) => {
                 const model = wb.chartData(s, c.id);
-                if (!model.layout || !model.series.length) return null;
+                if (!model.series.length) return null;
                 const series = model.series.map((x) => ({ ...x, kind: x.type }));
                 const percent = !!(model.series[0].format && model.series[0].format.type === 'percent');
-                return { ...c, percent, refs: seriesRefs({ sheet: fileName(c.dataAt.s), rect: c.dataAt, layout: model.layout, series }) };
+                // the block's series name their parts of the block; a series of its own ranges names them; the chart's categories go with every series
+                const fromBlock = c.dataAt && model.layout ? seriesRefs({ sheet: fileName(c.dataAt.s), rect: c.dataAt, layout: model.layout, series: series.slice(0, model.fromBlock) }) : [];
+                const catRef = c.categories && typeof c.categories === 'string' ? fileRef(s, c.categories) : null;
+                if (catRef) fromBlock.forEach((x) => { x.catRef = catRef; });
+                // a series of its own ranges: the numbers drawn are in `model`, its ranges (as text) in the chart's list at its place (`index`)
+                const own = series.slice(model.fromBlock).map((x) => {
+                    const spec = (c.series || [])[x.index] || {};
+                    return { name: x.name, color: x.color, kind: x.kind, axis: x.axis, dash: x.dash, hidden: x.hidden, smooth: x.smooth,
+                        valRef: fileRef(s, spec.values), xRef: spec.x ? fileRef(s, spec.x) : null, nameRef: spec.nameFrom ? fileRef(s, spec.nameFrom) : null,
+                        catRef: catRef || (fromBlock[0] && fromBlock[0].catRef) || null };
+                });
+                return { ...c, percent, refs: fromBlock.concat(own.filter((x) => x.valRef)) };
             }).filter(Boolean),
             sparklines: wb.sparklines(s).filter((g) => g.at && g.dataAt).map((g) => ({ ...g, cells: g.cells.map((x, i) => {
                 const d = g.dataAt, down = g.at.c1 === g.at.c2;
@@ -196,9 +217,16 @@ function addCharts(wb, docs, read) {
     const quoted = (name) => "'" + String(name).replace(/'/g, "''") + "'";
     read.sheets.forEach((sh, i) => {
         for (const c of sh.charts || []) {
-            if (!idOfName.get(String(c.sheet).toLowerCase())) { read.warnings.push('"' + sh.name + '": a chart of a sheet that was not read was left out'); continue; }
-            const spec = { type: c.type, at: rect(c.at), data: quoted(c.sheet) + '!' + rect(c.box), seriesIn: c.seriesIn, stacked: c.stacked, legend: c.legend, series: c.series };
+            const sheetsUsed = c.box ? [c.sheet] : [c.own.categories, ...c.own.series.flatMap((x) => [x.values, x.x, x.nameFrom])].filter(Boolean).map((r) => r.sheet);
+            if (sheetsUsed.some((n) => !idOfName.get(String(n).toLowerCase()))) { read.warnings.push('"' + sh.name + '": a chart of a sheet that was not read was left out'); continue; }
+            const range = (r) => quoted(r.sheet) + '!' + rect(r);
+            const spec = c.box
+                ? { type: c.type, at: rect(c.at), data: quoted(c.sheet) + '!' + rect(c.box), seriesIn: c.seriesIn, stacked: c.stacked, legend: c.legend, series: c.series }
+                : { type: c.type, at: rect(c.at), stacked: c.stacked, legend: c.legend,
+                    ...(c.own.categories ? { categories: range(c.own.categories) } : {}),
+                    series: c.own.series.map((x) => ({ ...x, values: range(x.values), ...(x.x ? { x: range(x.x) } : {}), ...(x.nameFrom ? { nameFrom: range(x.nameFrom) } : {}) })) };
             if (c.title) spec.title = c.title;
+            if (c.lines) spec.lines = true;
             if (c.background) spec.background = c.background;
             try { wb.addChart(docs[i].id, spec, { source: 'remote' }); } catch (err) { read.warnings.push('"' + sh.name + '": a chart was not imported (' + err.message + ')'); }
         }
