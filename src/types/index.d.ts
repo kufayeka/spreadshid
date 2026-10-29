@@ -103,6 +103,13 @@ export interface SheetProps {
 export const Sheet: ForwardRefExoticComponent<SheetProps & RefAttributes<SheetHandle>>;
 
 /** Read a workbook in a component: it draws again when what `read` gives changes. A workbook still loading (null) gives undefined. */
+/**
+ * Reads something of a workbook in a component, and draws the component again when it changes.
+ * With a workbook that is always there, the answer is T; with one that may still be loading (null), it is T | undefined.
+ * @example
+ * const total = useWorkbook(wb, (w) => w.display('Produk', 'E5').text);
+ */
+export function useWorkbook<T>(wb: Workbook, read: (wb: Workbook) => T): T;
 export function useWorkbook<T>(wb: Workbook | null | undefined, read: (wb: Workbook) => T): T | undefined;
 export function useWorkbook(wb: Workbook): Workbook;
 export function useWorkbook(wb: Workbook | null | undefined): Workbook | undefined;

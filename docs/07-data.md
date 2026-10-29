@@ -372,7 +372,7 @@ Yang perlu diketahui:
 | `choicesAt(alamat)` | pilihan dropdown sebuah sel |
 | `invalidAt(alamat)` | apa yang dilanggar nilai sel itu (teks), atau `null` kalau sesuai |
 
-Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([2.5](02-konsep.md#25-perubahan-event-dan-undo))
+Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([4.10](04-api-workbook.md#410-beforeop-memeriksa-setiap-perubahan))
 atau aturan dan tipe kolom ([bab 10](10-aturan.md)).
 
 ## 7.5 Cari dan ganti

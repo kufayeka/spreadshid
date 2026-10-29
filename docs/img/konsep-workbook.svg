@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 300" font-family="Segoe UI, system-ui, sans-serif" font-size="14">
+  <rect width="820" height="300" fill="#ffffff"/>
+  <!-- the workbook -->
+  <g transform="translate(20,20)">
+    <rect width="420" height="260" rx="8" fill="#f8f9fa" stroke="#dadce0"/>
+    <text x="16" y="28" font-weight="600" font-size="15">Workbook</text>
+    <text x="110" y="28" font-size="12" fill="#5f6368">createWorkbook(): data, tanpa layar</text>
+    <g transform="translate(16,44)">
+      <rect width="388" height="196" rx="6" fill="#ffffff" stroke="#dadce0"/>
+      <text x="12" y="22" font-weight="600">Sheet "Produk"</text>
+      <text x="200" y="22" font-size="12" fill="#5f6368">juga: sheet lain</text>
+      <g font-size="12" transform="translate(12,36)">
+        <g fill="#5f6368"><text x="40" y="12">A</text><text x="120" y="12">B</text><text x="230" y="12">C</text><text x="300" y="12">D</text></g>
+        <g stroke="#e8eaed"><line x1="0" y1="20" x2="360" y2="20"/><line x1="0" y1="46" x2="360" y2="46"/><line x1="0" y1="72" x2="360" y2="72"/><line x1="0" y1="98" x2="360" y2="98"/></g>
+        <g fill="#5f6368"><text x="4" y="38">1</text><text x="4" y="64">2</text><text x="4" y="90">3</text></g>
+        <text x="24" y="38">Kode</text><text x="96" y="38">Produk</text><text x="210" y="38">Harga</text><text x="290" y="38">Stok</text>
+        <text x="24" y="64">SMN-01</text><text x="96" y="64">Semen Portland</text><text x="210" y="64">72000</text><text x="290" y="64">420</text>
+        <rect x="200" y="78" width="70" height="18" rx="2" fill="#e8f0fe" stroke="#1a73e8"/>
+        <text x="206" y="91" fill="#1a73e8">=C2*1,1</text>
+        <text x="24" y="124" font-size="12" fill="#3c4043">Setiap sel: isi (angka, teks, rumus) dan gaya.</text>
+        <text x="24" y="142" font-size="12" fill="#3c4043">Setiap baris dan kolom: id tetap (2.9).</text>
+      </g>
+    </g>
+  </g>
+  <!-- the readers -->
+  <g stroke="#5f6368" stroke-width="2" fill="none">
+    <path d="M440 100 L540 70"/><path d="M440 200 L540 230"/>
+  </g>
+  <g transform="translate(540,30)">
+    <rect width="260" height="80" rx="8" fill="#e8f0fe" stroke="#aecbfa"/>
+    <text x="16" y="28" font-weight="600">&lt;Sheet workbook={wb} /&gt;</text>
+    <text x="16" y="50" font-size="12" fill="#3c4043">grid, menu, toolbar (bab 3)</text>
+    <text x="16" y="68" font-size="12" fill="#3c4043">membaca dan mengubah wb</text>
+  </g>
+  <g transform="translate(540,190)">
+    <rect width="260" height="80" rx="8" fill="#e6f4ea" stroke="#a8dab5"/>
+    <text x="16" y="28" font-weight="600">Komponenmu sendiri</text>
+    <text x="16" y="50" font-size="12" fill="#3c4043">useWorkbook(wb, baca)</text>
+    <text x="16" y="68" font-size="12" fill="#3c4043">label, tombol, tabel (bab ini)</text>
+  </g>
+  <text x="470" y="155" font-size="12" fill="#5f6368">sama-sama</text>
+  <text x="470" y="171" font-size="12" fill="#5f6368">memakai wb</text>
+</svg>

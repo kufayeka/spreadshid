@@ -24,6 +24,13 @@ const typeAt = (r, c, text) => async ({ js, click, type, wait }) => {
     const p = await cellAt(js, r, c);
     await click(p.x, p.y); await wait(200); await type(text); await wait(300);
 };
+// a button of a page, clicked as a person clicks it (chapter 2's pages are plain React with buttons)
+const press = (...selectors) => async ({ js, click, wait }) => {
+    for (const sel of selectors) {
+        const p = await js(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()`);
+        await click(p.x, p.y); await wait(250);
+    }
+};
 // a picture of chapter 13: the page's top 1000 x 330 (menus, toolbar, formula bar and the first rows)
 const akses = (name, page, act) => ({ name, page, act, clip: { x: 0, y: 0, width: 1000, height: 330 } });
 
@@ -56,6 +63,15 @@ export const SHOTS = [
         const p = await cellAt(js, 1, 2); await click(p.x, p.y); await wait(150); await type('15'); await key('Enter', 'Enter', 13); await wait(300);
         const q = await cellAt(js, 1, 1); await click(q.x, q.y); await wait(150); await type('Besi'); await key('Enter', 'Enter', 13); await wait(400);
     }, clip: { x: 0, y: 0, width: 1000, height: 480 } },
+    // chapter 2: plain React around a workbook, a sheet only at the end
+    { name: 'konsep-baca', page: '02-05-baca.page.tsx', clip: { x: 0, y: 0, width: 520, height: 70 } },
+    { name: 'konsep-ubah', page: '02-06-ubah.page.tsx', act: press('.ubah'), clip: { x: 0, y: 0, width: 520, height: 110 } },
+    { name: 'konsep-isi-sel', page: '02-07-isi-sel.page.tsx', clip: { x: 0, y: 0, width: 620, height: 170 } },
+    { name: 'konsep-tabel', page: '02-08-tabel.page.tsx', clip: { x: 0, y: 0, width: 620, height: 230 } },
+    { name: 'konsep-id', page: '02-09-id.page.tsx', act: press('.sisipkan'), clip: { x: 0, y: 0, width: 620, height: 110 } },
+    { name: 'konsep-event', page: '02-10-event.page.tsx', act: press('.isi', '.tebal', '.orang', '.undo'), clip: { x: 0, y: 0, width: 760, height: 200 } },
+    { name: 'konsep-undo', page: '02-11-undo.page.tsx', act: press('.kurang', '.kurang', '.undo'), clip: { x: 0, y: 0, width: 520, height: 110 } },
+    { name: 'konsep-sheet', page: '02-12-sheet.page.tsx', act: async (p) => { await typeAt(1, 3, '400')(p); await p.key('Enter', 'Enter', 13); await p.wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 330 } },
     // chapter 1, one picture per step
     { name: 'mulai-kosong', page: '01-05-kosong.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 420 } },
     { name: 'mulai-isi', page: '01-06-isi.page.tsx', act: async ({ js, click, wait }) => { const p = await cellAt(js, 4, 4); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
@@ -174,7 +190,8 @@ export async function takeShots(filter) {
     execFileSync(process.execPath, [join(here, '..', 'build.js')], { stdio: 'inherit' });
     for (const shot of SHOTS.filter((x) => !filter || x.name.includes(filter))) {
         await withExample(async (p) => {
-            for (let i = 0; i < 60 && !(await p.js('!!document.querySelector(".ks-sheet")')); i++) await p.wait(250);
+            // a page is ready when its sheet is drawn, or, for a page with no sheet (chapter 2), when it says so (data-siap)
+            for (let i = 0; i < 60 && !(await p.js('!!document.querySelector(".ks-sheet, [data-siap]")')); i++) await p.wait(250);
             await p.wait(600);
             if (shot.act) await shot.act(p);
             const res = await p.send('Page.captureScreenshot', { format: 'png', clip: { ...(shot.clip || { x: 0, y: 0, width: 1366, height: 768 }), scale: 1 } });

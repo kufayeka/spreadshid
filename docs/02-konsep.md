@@ -1,289 +1,575 @@
 # 2. Konsep dasar
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai cepat](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai dalam 5 menit](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)
 
-Cara library ini berpikir. Kalau enam hal di bawah sudah jelas, bab-bab berikutnya tinggal pakai.
+Bab ini menjelaskan **workbook**: apa isinya, bagaimana membaca dan mengubahnya, dan bagaimana perubahannya bisa diikuti. Sengaja **tanpa
+`<Sheet>`** sampai langkah terakhir: semua contoh adalah komponen React biasa (label, tombol, tabel) yang membaca workbook. Dengan begitu
+terlihat jelas bahwa workbook adalah data, dan `<Sheet>` hanyalah salah satu cara menampilkannya.
 
-- [2.1 Workbook dan sheet](#21-workbook-dan-sheet)
+**Bagian A. Pengenalan (tanpa kode)**
+- [2.1 Workbook adalah data](#21-workbook-adalah-data)
 - [2.2 Alamat sel](#22-alamat-sel)
-- [2.3 Isi sel: value, input, display, raw](#23-isi-sel-value-input-display-raw)
-- [2.4 Id baris dan kolom](#24-id-baris-dan-kolom)
-- [2.5 Perubahan, event, dan undo](#25-perubahan-event-dan-undo)
-- [2.6 Menyimpan](#26-menyimpan)
+- [2.3 Isi sel: value, input, display](#23-isi-sel-value-input-display)
+- [2.4 Perubahan dan undo](#24-perubahan-dan-undo)
 
-## 2.1 Workbook dan sheet
+**Bagian B. Langkah demi langkah**
+- [2.5 Membaca satu nilai](#25-membaca-satu-nilai)
+- [2.6 Mengubah dari kode](#26-mengubah-dari-kode)
+- [2.7 Tiga sisi isi sel](#27-tiga-sisi-isi-sel)
+- [2.8 Seluruh sheet sebagai tabel](#28-seluruh-sheet-sebagai-tabel)
+- [2.9 Nomor bergeser, id tetap](#29-nomor-bergeser-id-tetap)
+- [2.10 Mendengar perubahan](#210-mendengar-perubahan)
+- [2.11 Undo dan redo](#211-undo-dan-redo)
+- [2.12 Sekarang dengan `<Sheet>`](#212-sekarang-dengan-sheet)
 
-**Workbook** itu satu file spreadsheet: isinya satu atau lebih **sheet** (tab), pengaturan (locale, mata uang, named range), dan riwayat undo.
-Dibikin dengan `createWorkbook()` dari `@kufayeka/sheet/core` dan **tidak butuh React**. Workbook yang sama bisa diisi kode, ditampilkan `<Sheet>`,
-dan dicek di server.
+**Bagian C. Yang sering keliru, dan referensi**
+- [2.13 Yang sering keliru](#213-yang-sering-keliru)
+- [2.14 Referensi](#214-referensi)
 
-`<Sheet>` cuma **tampilan** dari workbook. Kalau tidak dikasih workbook, dia bikin yang kosong sendiri. Kalau dikasih (`<Sheet workbook={wb} />`),
-semua yang dilakukan orang di layar terjadi di workbook itu, dan kodemu bisa baca, ubah, dengarkan tiap perubahan, dan simpan.
+---
 
-Tiap sheet punya **id** (string acak, tetap sama walau namanya diganti) dan **props** (nama, baris beku, filter, dan lain-lain):
+# Bagian A. Pengenalan
 
-<!-- contoh: 02-workbook.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
+## 2.1 Workbook adalah data
 
-const wb = createWorkbook();
-wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
-const sh = wb.sheet('Sheet1');
+![Workbook, Sheet, dan komponenmu](img/konsep-workbook.svg)
 
-sh.setValues('A1', [
-    ['Volume', 'Harga', 'Jumlah'],
-    [12.5, 85000, '=A2*B2']
-]);
-sh.setStyle('B2:C2', { format: { type: 'money', decimals: 0 } });
+Sebuah **workbook** berisi satu atau beberapa **sheet**. Setiap sheet berisi sel, dan setiap sel berisi angka, teks, atau rumus, ditambah
+gayanya. Workbook tidak punya layar sama sekali. Ia hanya data, dibuat dengan `createWorkbook()`.
 
-console.log('ukuran      :', sh.size());
-console.log('value(C2)   :', sh.value('C2'));          // nilai sebenarnya
-console.log('input(C2)   :', sh.input('C2'));          // yang muncul saat sel diedit
-console.log('display(C2) :', sh.display('C2').text);   // yang tampil di sel
+Ada dua pihak yang bisa memakai workbook yang sama:
 
-// teks dibaca seperti diketik orang, pakai locale workbook (id-ID)
-sh.setValues('A2', '1.250,5');
-console.log('A2 sekarang :', sh.value('A2'), '->', sh.display('C2').text);
+- **`<Sheet>`** menampilkannya sebagai grid, dan mengubahnya saat orang mengetik.
+- **Komponenmu sendiri** membaca nilai darinya (total di header, tombol yang aktif atau tidak) dan mengubahnya (tombol "isi dari API").
 
-// cara yang sama dengan angka (baris dan kolom mulai dari 0)
-const [s] = wb.sheetIds();
-console.log('pakai angka :', wb.value(s, 1, 2));
-```
-<!-- /contoh -->
+Keduanya selalu melihat isi yang sama, karena hanya ada satu workbook. Ketik di sheet, dan label totalmu ikut berubah (2.12).
 
-Hasilnya:
-
-<!-- hasil: 02-workbook.js -->
-```text
-ukuran      : { rows: 1000, cols: 26 }
-value(C2)   : 1062500
-input(C2)   : =A2*B2
-display(C2) : Rp 1.062.500
-A2 sekarang : 1250.5 -> Rp 106.292.500
-pakai angka : 106292500
-```
-<!-- /hasil -->
+Workbook juga bisa dipakai tanpa React sama sekali, misalnya di server, dengan kode yang persis sama.
 
 ## 2.2 Alamat sel
 
-Ada dua cara menyebut sel, dan dua-duanya diterima di semua fungsi.
+Ada dua cara menyebut sel, dan semua fungsi menerima keduanya.
 
-**Pakai alamat**, seperti di layar. Biasanya ini yang paling enak:
+**Dengan alamat**, seperti yang terlihat di layar. Ini cara yang paling mudah dibaca:
 
-| Tulis | Artinya |
+| Ditulis | Artinya |
 |---|---|
 | `'C2'` | satu sel |
-| `'A1:F1'` | range |
-| `'A1:F1, A6:F6'` | beberapa range sekaligus (untuk `setStyle`, `clear`, `mergeCells`, dan sejenisnya) |
-| `'B'`, `'B:D'` | kolom (untuk `setColProps`, `insertCols`, `groupCols`, kolom filter) |
-| `'2'`, `'2:5'` | baris, nomor seperti di layar (untuk `setRowProps`, `insertRows`, `groupRows`) |
+| `'A1:E1'` | sebuah range |
+| `'A1:E1, A5:E5'` | beberapa range sekaligus (untuk memberi gaya, menghapus, dan sejenisnya) |
+| `'B'`, `'B:D'` | kolom (untuk lebar kolom, menyisipkan kolom) |
+| `'2'`, `'2:5'` | baris, dengan nomor seperti di layar (untuk tinggi baris, menyisipkan baris) |
 
-**Pakai nomor**, mulai dari 0 seperti indeks array. Enak dipakai waktu looping:
+**Dengan nomor**, mulai dari **0** seperti indeks array. Cocok untuk looping:
 
 | Di layar | Nomor |
 |---|---|
-| sel `A1` | baris `0`, kolom `0` → `wb.value(s, 0, 0)` |
-| sel `C2` | baris `1`, kolom `2` → `wb.value(s, 1, 2)` |
-| range `B2:C4` | `{ r1: 1, c1: 1, r2: 3, c2: 2 }` |
-| kolom `E:F` | `[4, 5]` |
+| A1 | baris `0`, kolom `0` |
+| C2 | baris `1`, kolom `2` |
+| E5 | baris `4`, kolom `4` |
 
-Parameter pertama hampir semua fungsi workbook adalah **sheet** (id atau namanya). Kalau capek nulis itu terus, ambil sheet-nya sekali pakai
-`wb.sheet('BOQ')`. Hasilnya punya fungsi yang sama, tanpa parameter sheet:
+Hampir semua fungsi workbook menerima nama sheet sebagai parameter pertama: `wb.value('Produk', 'C2')`. Supaya tidak menulis nama sheet terus,
+ambil sheet-nya sekali dengan `wb.sheet('Produk')`, lalu pakai fungsinya tanpa parameter sheet: `wb.sheet('Produk').value('C2')`.
 
-```js
-wb.setStyle(s, 'A1:F1', { bold: true });   // sama dengan
-const boq = wb.sheet('BOQ');
-boq.setStyle('A1:F1', { bold: true });
-```
+## 2.3 Isi sel: value, input, display
 
-`boq.id` adalah id sheet-nya, dan `boq.name` namanya yang sekarang.
+Satu sel bisa dilihat dari tiga sisi. Contohnya sel E2 di daftar produk, yang berisi rumus `=C2*D2` dengan format Rupiah:
 
-## 2.3 Isi sel: value, input, display, raw
-
-Satu sel punya empat sisi. Contohnya sel berisi rumus `=A2*B2` yang hasilnya 1.062.500 dengan format Rupiah:
-
-| Fungsi | Hasil | Artinya |
-|---|---|---|
-| `value('C2')` | `1062500` | nilai sebenarnya: angka, teks, `true`/`false`, `null` (kosong), atau error `{ code: '#DIV/0!' }`. Rumus sudah dihitung. Ini yang dipakai buat logika aplikasi |
-| `input('C2')` | `'=A2*B2'` | yang muncul waktu sel diedit: rumus apa adanya, angka sesuai locale |
-| `display('C2')` | `{ text: 'Rp 1.062.500', align: 'right', kind: 'number' }` | yang tampil di sel, sudah diformat |
-| `raw('C2')` | `{ f: '=⟦0⟧*⟦1⟧', refs: [...] }` | yang disimpan: nilai, atau rumus dengan referensi berupa id (lihat 2.4). Jarang perlu |
-
-`setValues` menerima nilai seperti orang ngetik: angka tetap angka, teks diawali `=` jadi rumus, `'TRUE'` jadi boolean, dan teks seperti `'1.250,5'`
-atau `'26/10/2026'` dibaca sesuai locale workbook. Mau menyimpan teks apa adanya (misalnya kode `'007'`)? Awali dengan petik satu: `"'007"`, sama
-seperti di Excel.
-
-## 2.4 Id baris dan kolom
-
-Tiap baris dan kolom punya **id tetap** (UUID), bukan cuma nomor. Nomor baris bisa geser, misalnya kalau ada baris disisipkan di atasnya. Id-nya
-tidak:
-
-<!-- contoh: 02-id.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-
-const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [[10], [20], ['=SUM(A1:A2)']]);
-
-// tiap baris dan kolom punya id tetap; nomor barisnya bisa berubah
-const idBaris = sh.rowId(0);
-console.log('id baris pertama :', typeof idBaris, idBaris.length, 'karakter');
-
-sh.insertRows('1', 2); // dua baris baru di atas baris 1
-console.log('baris tadi sekarang nomor', sh.rowIndex(idBaris) + 1);
-console.log('rumus ikut pindah:', sh.input('A5'), '=', sh.value('A5'));
-
-sh.insertRows('4');    // satu baris di tengah range SUM
-sh.setValues('A4', 70);
-console.log('range ikut lebar :', sh.input('A6'), '=', sh.value('A6'));
-```
-<!-- /contoh -->
-
-Hasilnya:
-
-<!-- hasil: 02-id.js -->
-```text
-id baris pertama : string 36 karakter
-baris tadi sekarang nomor 3
-rumus ikut pindah: =SUM(A3:A4) = 30
-range ikut lebar : =SUM(A3:A5) = 100
-```
-<!-- /hasil -->
-
-Id ini yang bikin semuanya stabil:
-
-- **Rumus** menyimpan referensinya sebagai id, jadi `=SUM(A1:A2)` otomatis jadi `=SUM(A3:A4)` kalau dua baris disisipkan di atasnya.
-- **Penyimpanan** ke database per baris berdasarkan id. Menyisipkan satu baris di tengah 100.000 baris cuma mengirim satu baris baru, tidak menggeser
-  semuanya ([12.1](12-server.md#123-isi-content)).
-- **Aturan, komentar, validasi, conditional formatting, dan named range** menempel ke sel lewat id, jadi ikut pindah bersama selnya.
-
-Fungsi untuk bolak-balik nomor dan id: `rowId(s, r)`, `colId(s, c)`, `rowIndex(s, id)`, `colIndex(s, id)`. Nomor `-1` artinya baris atau kolom itu
-sudah dihapus.
-
-## 2.5 Perubahan, event, dan undo
-
-Tiap perubahan, dari orang di layar, dari kode, atau dari undo, bentuknya daftar **op** (operasi kecil). Satu ketikan = satu op `cells`. Menyisipkan
-baris = op `insertRows`. Paste bisa beberapa op sekaligus. Satu perubahan selalu utuh: diterapkan semua, atau tidak sama sekali.
-
-<!-- contoh: 02-op.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-
-const wb = createWorkbook(null, {
-    user: { id: 'u1', name: 'Rina' },
-    // lihat tiap perubahan sebelum diterapkan: kembalikan op, null (abaikan), atau { reject: 'alasan' }
-    beforeOp(op, ctx) {
-        if (op.t === 'deleteRows' && ctx.source === 'user') return { reject: 'Baris BOQ tidak boleh dihapus' };
-        return op;
-    }
-});
-const sh = wb.sheet('Sheet1');
-
-wb.on('op', (e) => console.log('op     :', e.source, '->', e.ops.map((o) => o.t).join(', ')));
-wb.on('reject', (e) => console.log('tolak  :', e.reason));
-
-sh.setValues('A1', 5, { source: 'user' }); // seolah diketik orang
-sh.setValues('A1', 7);                     // dari kode
-wb.undo();
-console.log('undo   :', sh.value('A1'));
-wb.redo();
-console.log('redo   :', sh.value('A1'));
-
-sh.deleteRows('1', { source: 'user' }); // ditolak beforeOp
-console.log('baris  :', sh.size().rows);
-```
-<!-- /contoh -->
-
-Hasilnya:
-
-<!-- hasil: 02-op.js -->
-```text
-op     : user -> cells
-op     : code -> cells
-op     : undo -> cells
-undo   : 5
-op     : redo -> cells
-redo   : 7
-tolak  : Baris BOQ tidak boleh dihapus
-baris  : 1000
-```
-<!-- /hasil -->
-
-### Siapa yang mengubah: `source`
-
-Fungsi yang mengubah workbook menerima parameter terakhir `how`, misalnya `{ source: 'user' }`:
-
-| `source` | Artinya | Dicek aturan dan access control? | Masuk undo? |
+| Sisi | Fungsi | Hasil untuk E2 | Dipakai untuk |
 |---|---|---|---|
-| `'user'` | orang di layar. Semua yang lewat `<Sheet>` pakai ini | ya | ya |
-| `'code'` | kodemu (bawaan kalau `how` tidak dikasih) | tidak, kodemu dipercaya | ya |
-| `'undo'`, `'redo'` | dari `wb.undo()` / `wb.redo()` | | |
-| `'remote'` | dari komputer lain atau server (misalnya edit bareng) | tidak | tidak |
+| **value** | `value('E2')` | `30240000` | logika aplikasi: menghitung, membandingkan, mengirim ke server. Rumus sudah dihitung |
+| **input** | `input('E2')` | `'=C2*D2'` | yang muncul saat sel diedit: rumus apa adanya |
+| **display** | `display('E2')` | `{ text: 'Rp 30.240.000', align: 'right', ... }` | yang tampil di layar, sudah diformat |
 
-### Opsi `createWorkbook(doc, options)`
+Sel kosong memberi value `null`. Rumus yang gagal memberi error, misalnya `{ code: '#DIV/0!' }`.
 
-| Opsi | Tipe | Artinya |
+## 2.4 Perubahan dan undo
+
+Setiap perubahan pada workbook dicatat sebagai sebuah **op** (operasi): "sel D2 dari 420 menjadi 400", "B2 jadi tebal", "satu baris disisipkan".
+Setiap op membawa **sumbernya**, yaitu siapa yang mengubah:
+
+| Sumber (`source`) | Artinya |
+|---|---|
+| `'code'` | kodemu. Ini bawaan setiap fungsi yang mengubah workbook |
+| `'user'` | orang di layar. Semua yang diketik lewat `<Sheet>` memakai ini |
+| `'undo'`, `'redo'` | dari tombol atau tombol keyboard undo dan redo |
+| `'remote'` | dari komputer lain atau server, misalnya saat mengedit bersama |
+
+Karena semua perubahan tercatat, workbook bisa **undo** dan **redo**, dan aplikasimu bisa **mendengar** setiap perubahan, misalnya untuk menandai
+"belum disimpan" atau mencatat riwayat.
+
+Sumber `'user'` juga yang diperiksa oleh aturan dan hak akses (bab 8 dan bab 10). Kodemu sendiri dianggap dipercaya.
+
+---
+
+# Bagian B. Langkah demi langkah
+
+Semua contoh di bagian ini memakai daftar produk dari bab 1, dibuat oleh satu fungsi bersama:
+
+<!-- contoh: data/produk.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+
+// Bahan bersama bab 2 sampai 4: daftar produk toko bangunan dari bab 1, dengan rumus nilai stok dan total.
+//
+//       A        B                      C        D      E
+//   1   Kode     Produk                 Harga    Stok   Nilai stok
+//   2   SMN-01   Semen Portland 50 kg   72000    420    =C2*D2
+//   3   BSI-10   Besi beton 10 mm       79500    260    =C3*D3
+//   4   CAT-05   Cat tembok 5 kg        145000   64     =C4*D4
+//   5            Total                           =SUM   =SUM
+
+export function buatProduk() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const s = wb.sheet('Sheet1');
+    s.setSheetProps({ name: 'Produk', freezeRows: 1 });
+    s.setValues('A1', [
+        ['Kode', 'Produk', 'Harga', 'Stok', 'Nilai stok'],
+        ['SMN-01', 'Semen Portland 50 kg', 72000, 420, '=C2*D2'],
+        ['BSI-10', 'Besi beton 10 mm', 79500, 260, '=C3*D3'],
+        ['CAT-05', 'Cat tembok 5 kg', 145000, 64, '=C4*D4'],
+        ['', 'Total', '', '=SUM(D2:D4)', '=SUM(E2:E4)']
+    ]);
+    s.setStyle('A1:E1', { bold: true, fill: '#eef2f7' });
+    s.setStyle('A5:E5', { bold: true });
+    s.setColProps('C', { format: { type: 'money', decimals: 0 } });
+    s.setColProps('E', { format: { type: 'money', decimals: 0 }, width: 140 });
+    s.setColProps('B', { width: 180 });
+    return wb;
+}
+```
+<!-- /contoh -->
+
+Di setiap contoh, baris yang **baru** dibanding langkah sebelumnya ditandai `// baru`.
+
+## 2.5 Membaca satu nilai
+
+**Tujuan:** menampilkan total nilai stok di sebuah label biasa.
+
+<!-- contoh: 02-05-baca.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { useWorkbook } from '@kufayeka/sheet';
+import { buatProduk } from './data/produk.js';
+
+// 2.5 Membaca satu nilai dari workbook ke komponen React. Belum ada <Sheet>.
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    // E5 berisi =SUM(E2:E4); display memberi teks yang sudah diformat
+    const total = useWorkbook(wb, (w) => w.display('Produk', 'E5').text);
+    return (
+        <div data-siap style={{ font: '15px system-ui', padding: 16 }}>
+            <p>Total nilai stok: <b>{total}</b></p>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Label total nilai stok](img/konsep-baca.png)
+
+**Penjelasan:**
+
+- `useState(buatProduk)` membuat workbook sekali, sama seperti di bab 1. Tidak ada `<Sheet>`.
+- `useWorkbook(wb, (w) => ...)` membaca sesuatu dari workbook. Fungsi kedua menerima workbook dan mengembalikan yang ingin ditampilkan.
+- `w.display('Produk', 'E5').text` adalah teks sel E5 seperti di layar, yaitu `Rp 60.190.000`. E5 berisi rumus `=SUM(E2:E4)`, yang sudah dihitung.
+- `data-siap` hanya penanda untuk pengambilan foto dokumentasi ini. Tidak perlu ditulis di aplikasimu.
+
+## 2.6 Mengubah dari kode
+
+**Tujuan:** sebuah tombol mengubah stok semen, dan total di label ikut berubah sendiri.
+
+<!-- contoh: 02-06-ubah.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { useWorkbook } from '@kufayeka/sheet';
+import { buatProduk } from './data/produk.js';
+
+// 2.6 Mengubah dari tombol: stok semen diubah dari kode, dan total yang dibaca di 2.5 ikut berubah sendiri.
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const total = useWorkbook(wb, (w) => w.display('Produk', 'E5').text);
+    const stokSemen = useWorkbook(wb, (w) => w.value('Produk', 'D2'));          // baru
+
+    const ubah = () => wb.sheet('Produk').setValues('D2', 400);                 // baru
+
+    return (
+        <div data-siap style={{ font: '15px system-ui', padding: 16 }}>
+            <p>Stok semen: <b>{String(stokSemen)}</b> <button className="ubah" onClick={ubah}>Jadikan 400</button></p>
+            <p>Total nilai stok: <b>{total}</b></p>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Setelah tombol diklik:
+
+![Stok diubah dari tombol, total ikut berubah](img/konsep-ubah.png)
+
+**Penjelasan:**
+
+- `wb.sheet('Produk').setValues('D2', 400)` mengubah sel D2 menjadi 400.
+- Rumus `=C2*D2` di E2 dan `=SUM(E2:E4)` di E5 dihitung ulang. Hanya rumus yang terkena yang dihitung, bukan seluruh sheet.
+- `useWorkbook` melihat bahwa nilai yang dibacanya berubah, lalu merender ulang komponen. Kamu tidak perlu `setState` sendiri.
+- `w.value('Produk', 'D2')` memberi angka `400`, bukan teks. Gunakan `value` untuk logika, `display` untuk ditampilkan.
+
+## 2.7 Tiga sisi isi sel
+
+**Tujuan:** melihat value, input, dan display dari beberapa sel sekaligus.
+
+<!-- contoh: 02-07-isi-sel.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { useWorkbook } from '@kufayeka/sheet';
+import { buatProduk } from './data/produk.js';
+
+// 2.7 Tiga sisi isi sebuah sel: value (nilai sebenarnya), input (yang diketik), display (yang tampil).
+const SEL = ['E2', 'C2', 'B2'];
+
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const w = useWorkbook(wb);                                     // tanpa fungsi baca: komponen dirender ulang di setiap perubahan
+    return (
+        <div data-siap style={{ font: '14px system-ui', padding: 16 }}>
+            <table cellPadding={6} style={{ borderCollapse: 'collapse' }}>
+                <thead><tr><th align="left">Sel</th><th align="left">value</th><th align="left">input</th><th align="left">display.text</th></tr></thead>
+                <tbody>
+                    {SEL.map((a) => (
+                        <tr key={a} style={{ borderTop: '1px solid #ddd' }}>
+                            <td><b>{a}</b></td>
+                            <td><code>{JSON.stringify(w.value('Produk', a))}</code></td>
+                            <td><code>{JSON.stringify(w.input('Produk', a))}</code></td>
+                            <td><code>{JSON.stringify(w.display('Produk', a).text)}</code></td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Value, input, dan display](img/konsep-isi-sel.png)
+
+**Penjelasan:**
+
+| Sel | Yang terlihat di foto |
+|---|---|
+| E2 (rumus) | value adalah hasil hitungannya, input adalah rumusnya, display adalah hasilnya dalam Rupiah |
+| C2 (angka) | value adalah angka, input adalah angka itu sebagai teks, display dalam Rupiah |
+| B2 (teks) | ketiganya sama |
+
+- `useWorkbook(wb)` **tanpa fungsi baca** mengembalikan workbook-nya sendiri, dan merender ulang komponen di setiap perubahan apa pun. Cocok untuk
+  komponen yang membaca banyak sel sekaligus.
+
+## 2.8 Seluruh sheet sebagai tabel
+
+**Tujuan:** menampilkan seluruh daftar produk sebagai tabel HTML biasa, dengan looping baris dan kolom.
+
+<!-- contoh: 02-08-tabel.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { useWorkbook } from '@kufayeka/sheet';
+import { buatProduk } from './data/produk.js';
+
+// 2.8 Seluruh sheet sebagai tabel HTML biasa: workbook adalah data, tampilannya boleh apa saja.
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const w = useWorkbook(wb);
+    const akhir = w.sheet('Produk').lastFilled();                  // baru: baris dan kolom terakhir yang berisi (mulai dari 0)
+    const rows = akhir.r + 1, cols = akhir.c + 1;
+
+    const baris = [];
+    for (let r = 0; r < rows; r++) {                               // baru: nomor baris dan kolom mulai dari 0
+        const sel = [];
+        for (let c = 0; c < cols; c++) {
+            const d = w.display('Produk', r, c);                   // baru: sel ditunjuk dengan nomor, bukan alamat
+            sel.push(<td key={c} align={d.align} style={{ padding: '4px 10px', fontWeight: r === 0 || r === rows - 1 ? 600 : 400 }}>{d.text}</td>);
+        }
+        baris.push(<tr key={r} style={{ borderTop: '1px solid #ddd' }}>{sel}</tr>);
+    }
+
+    return (
+        <div data-siap style={{ font: '14px system-ui', padding: 16 }}>
+            <p>{rows} baris, {cols} kolom</p>
+            <table style={{ borderCollapse: 'collapse' }}><tbody>{baris}</tbody></table>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Daftar produk sebagai tabel HTML](img/konsep-tabel.png)
+
+**Penjelasan:**
+
+- `lastFilled()` memberi baris dan kolom terakhir yang berisi, dengan nomor mulai dari 0: di sini `{ r: 4, c: 4 }`. Jumlah barisnya `r + 1`.
+- `w.display('Produk', r, c)` menunjuk sel dengan **nomor**, bukan alamat (2.2). `display(0, 0)` adalah A1.
+- `d.align` memberi perataan yang dipakai sheet: angka rata kanan, teks rata kiri.
+- Ini menunjukkan bahwa workbook bisa ditampilkan dengan cara apa pun: tabel laporan, kartu, grafik. `<Sheet>` hanya satu pilihan.
+
+## 2.9 Nomor bergeser, id tetap
+
+**Tujuan:** memahami kenapa sebuah baris sebaiknya disimpan dengan id-nya, bukan dengan nomornya.
+
+<!-- contoh: 02-09-id.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { useWorkbook } from '@kufayeka/sheet';
+import { buatProduk } from './data/produk.js';
+
+// 2.9 Nomor baris bisa bergeser, id baris tidak. Baris total dicari lewat id-nya, jadi tetap ketemu walaupun baris baru disisipkan.
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    // baru: id baris total (baris 5), diambil sekali; id ini tidak pernah berubah
+    const [idTotal] = useState(() => wb.sheet('Produk').rowId(4));
+
+    // setiap render, cari lagi nomor baris dari id-nya
+    const nomor = useWorkbook(wb, (w) => w.sheet('Produk').rowIndex(idTotal));
+    const rumus = useWorkbook(wb, (w) => w.sheet('Produk').input(nomor, 4));
+    const total = useWorkbook(wb, (w) => w.sheet('Produk').display(nomor, 4).text);
+
+    function sisipkan() {                                                    // baru
+        const s = wb.sheet('Produk');
+        s.insertRows('3');                                                   // baris kosong di atas baris 3
+        s.setValues('A3', [['PSR-01', 'Pasir beton', 290000, 31, '=C3*D3']]);
+    }
+
+    return (
+        <div data-siap style={{ font: '15px system-ui', padding: 16 }}>
+            <p><button className="sisipkan" onClick={sisipkan}>Sisipkan produk di baris 3</button></p>
+            <p>Baris total sekarang nomor <b>{nomor + 1}</b>, rumusnya <code>{rumus}</code> = <b>{total}</b></p>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Setelah tombol diklik, produk baru masuk di baris 3:
+
+![Baris total pindah dari nomor 5 ke nomor 6](img/konsep-id.png)
+
+**Penjelasan:**
+
+- Setiap baris dan kolom punya **id tetap**, sebuah teks acak yang tidak pernah berubah. Nomornya bisa berubah, misalnya saat baris
+  disisipkan di atasnya.
+- `rowId(4)` mengambil id baris ke-5 (total) sekali saja. Setelah satu baris disisipkan, `rowIndex(idTotal)` memberi nomor barunya: 5, yaitu
+  baris ke-6 di layar.
+- Rumus totalnya juga ikut menyesuaikan sendiri: dari `=SUM(E2:E4)` menjadi `=SUM(E2:E5)`, karena rumus menyimpan referensinya sebagai id.
+- Hal yang sama berlaku untuk penyimpanan ke server, komentar, aturan, dan validasi: semuanya menempel ke baris lewat id, jadi ikut pindah.
+
+Kapan memakai id: setiap kali kamu perlu mengingat sebuah baris **lebih lama dari satu kali render**, misalnya baris yang sedang dipilih, atau
+baris yang menunggu jawaban dari server.
+
+## 2.10 Mendengar perubahan
+
+**Tujuan:** mencatat setiap perubahan, dengan sumbernya.
+
+<!-- contoh: 02-10-event.page.tsx -->
+```tsx
+import { useEffect, useState } from 'react';
+import { buatProduk } from './data/produk.js';
+
+// 2.10 Mendengar perubahan: setiap perubahan adalah sebuah op, dengan sumbernya (siapa yang mengubah).
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const [catatan, setCatatan] = useState<string[]>([]);
+
+    useEffect(() => {
+        // baru: wb.on mengembalikan fungsi untuk berhenti mendengar; dipanggil saat komponen dilepas
+        return wb.on('op', (e) => {
+            const jenis = e.ops.map((op) => op.t).join(', ');
+            setCatatan((c) => [...c, e.source + ': ' + jenis]);
+        });
+    }, [wb]);
+
+    const s = wb.sheet('Produk');
+    return (
+        <div data-siap style={{ font: '15px system-ui', padding: 16 }}>
+            <p>
+                <button className="isi" onClick={() => s.setValues('D2', 400)}>Ubah stok</button>{' '}
+                <button className="tebal" onClick={() => s.setStyle('B2', { bold: true })}>Tebalkan B2</button>{' '}
+                <button className="orang" onClick={() => s.setValues('D3', 250, { source: 'user' })}>Ubah stok sebagai orang</button>{' '}
+                <button className="undo" onClick={() => wb.undo()}>Undo</button>
+            </p>
+            <ol className="catatan">{catatan.map((c, i) => <li key={i}><code>{c}</code></li>)}</ol>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Setelah keempat tombol diklik berurutan:
+
+![Daftar perubahan dengan sumbernya](img/konsep-event.png)
+
+**Penjelasan:**
+
+- `wb.on('op', fn)` memanggil `fn` setiap kali workbook berubah. `e.source` adalah sumbernya (2.4), `e.ops` daftar perubahannya.
+- `wb.on` **mengembalikan fungsi untuk berhenti mendengar**. Mengembalikannya dari `useEffect` membuat pendengarnya dilepas saat komponen hilang.
+- Baris di foto, satu per tombol:
+  1. `code: cells`: isi sel diubah oleh kode.
+  2. `code: styles`: gaya diubah oleh kode.
+  3. `user: cells`: isi sel diubah dengan `{ source: 'user' }`, seolah-olah oleh orang di layar.
+  4. `undo: cells`: perubahan terakhir dibatalkan.
+
+Event lain yang bisa didengar ada di 2.14. Untuk hal yang lebih sederhana, seperti "ada perubahan atau tidak", `useWorkbook` sudah cukup (1.8).
+
+## 2.11 Undo dan redo
+
+**Tujuan:** tombol Undo dan Redo milik aplikasimu sendiri, yang hanya aktif saat bisa dipakai.
+
+<!-- contoh: 02-11-undo.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { useWorkbook } from '@kufayeka/sheet';
+import { buatProduk } from './data/produk.js';
+
+// 2.11 Undo dan redo dari tombol sendiri, yang tahu kapan bisa dipakai.
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const stok = useWorkbook(wb, (w) => w.value('Produk', 'D2'));
+    const bisaUndo = useWorkbook(wb, (w) => w.canUndo());                    // baru
+    const bisaRedo = useWorkbook(wb, (w) => w.canRedo());                    // baru
+
+    return (
+        <div data-siap style={{ font: '15px system-ui', padding: 16 }}>
+            <p>Stok semen: <b>{String(stok)}</b></p>
+            <p>
+                <button className="kurang" onClick={() => wb.sheet('Produk').setValues('D2', Number(stok) - 10)}>Kurangi 10</button>{' '}
+                <button className="undo" onClick={() => wb.undo()} disabled={!bisaUndo}>Undo</button>{' '}
+                <button className="redo" onClick={() => wb.redo()} disabled={!bisaRedo}>Redo</button>
+            </p>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Setelah "Kurangi 10" diklik dua kali, lalu Undo sekali:
+
+![Stok 410, Undo dan Redo sama-sama aktif](img/konsep-undo.png)
+
+**Penjelasan:**
+
+- `wb.undo()` dan `wb.redo()` membatalkan dan mengulang perubahan, sama seperti Ctrl+Z dan Ctrl+Y di sheet.
+- `canUndo()` dan `canRedo()` dibaca dengan `useWorkbook`, sehingga tombolnya aktif dan nonaktif sendiri.
+- Di foto, stok 420 dikurangi dua kali menjadi 400, lalu undo mengembalikannya ke 410. Masih ada yang bisa di-undo dan di-redo, jadi kedua tombol
+  aktif.
+
+## 2.12 Sekarang dengan `<Sheet>`
+
+**Tujuan:** workbook yang sama ditampilkan oleh `<Sheet>`, dan label total di luar sheet ikut berubah saat orang mengetik.
+
+<!-- contoh: 02-12-sheet.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet, useWorkbook } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { buatProduk } from './data/produk.js';
+
+// 2.12 Workbook yang sama, sekarang juga dengan <Sheet>. Yang diketik di sheet langsung terbaca oleh komponen lain.
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const total = useWorkbook(wb, (w) => w.display('Produk', 'E5').text);
+    return (
+        <div data-siap style={{ font: '15px system-ui' }}>
+            <p style={{ padding: '0 16px' }}>Total nilai stok: <b>{total}</b></p>
+            <div style={{ height: 280 }}>
+                <Sheet workbook={wb} />                                              {/* baru */}
+            </div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Stok semen diketik 400 di sheet, lalu Enter:
+
+![Label total di luar sheet ikut berubah](img/konsep-sheet.png)
+
+**Penjelasan:**
+
+- Satu tambahan dari 2.5: `<Sheet workbook={wb} />`.
+- Orang mengetik di sheet, sheet mengubah `wb`, lalu `useWorkbook` di label total melihat perubahan itu. Total di atas sheet berubah dari
+  Rp 60.190.000 menjadi Rp 58.750.000.
+- Semua yang dipelajari di bab ini berlaku apa adanya saat ada `<Sheet>`. Bab berikutnya membahas `<Sheet>` itu sendiri.
+
+---
+
+# Bagian C. Yang sering keliru, dan referensi
+
+## 2.13 Yang sering keliru
+
+| Keliru | Benar |
+|---|---|
+| Menghitung dengan `display(...).text` | `display` adalah teks (`'Rp 72.000'`). Untuk menghitung, pakai `value` |
+| Nomor baris dimulai dari 1 | nomor di kode dimulai dari **0**: A1 adalah `(0, 0)`. Alamat teks (`'A1'`) tetap seperti di layar |
+| Menyimpan nomor baris untuk dipakai nanti | nomornya bisa bergeser. Simpan id-nya (`rowId`), lalu cari nomornya saat dibutuhkan (`rowIndex`) |
+| `useWorkbook(wb, (w) => [w.value('A1'), w.value('A2')])` di komponen yang berat | array baru di setiap pembacaan membuat komponen dirender di setiap perubahan workbook. Pakai dua `useWorkbook` yang masing-masing memberi satu nilai |
+| Lupa melepas `wb.on(...)` | kembalikan fungsi dari `wb.on` di `useEffect` (2.10) |
+| Mengira perubahan dari kode diperiksa aturan | sumber `'code'` tidak diperiksa (2.4). Tambahkan `{ source: 'user' }` kalau perubahan itu mewakili orang |
+
+## 2.14 Referensi
+
+### Membaca
+
+| Fungsi | Hasilnya |
+|---|---|
+| `wb.value(sheet, sel)` | nilai sebenarnya: angka, teks, `true`/`false`, `null`, atau error |
+| `wb.input(sheet, sel)` | yang muncul saat sel diedit: rumus atau angka sebagai teks |
+| `wb.display(sheet, sel)` | yang tampil: `{ text, align, kind }` |
+| `wb.sheet(nama).lastFilled()` | `{ r, c }`: baris dan kolom terakhir yang berisi, mulai dari 0; `{ r: -1, c: -1 }` kalau kosong |
+| `wb.sheet(nama).rowId(r)`, `colId(c)` | id tetap baris atau kolom nomor `r` / `c` |
+| `wb.sheet(nama).rowIndex(id)`, `colIndex(id)` | nomor sekarang dari sebuah id; `-1` kalau sudah dihapus |
+
+`sel` boleh berupa alamat (`'C2'`) atau dua nomor (`1, 2`).
+
+### Mengubah
+
+| Fungsi | Artinya |
+|---|---|
+| `wb.sheet(nama).setValues(sel, nilai)` | mengisi satu sel, atau banyak sel dengan array di dalam array |
+| `wb.sheet(nama).setStyle(range, gaya)` | memberi gaya |
+| `wb.sheet(nama).insertRows(baris)` | menyisipkan baris |
+| `wb.undo()`, `wb.redo()` | membatalkan dan mengulang |
+| `wb.canUndo()`, `wb.canRedo()` | bisa di-undo / di-redo atau tidak |
+
+Setiap fungsi yang mengubah menerima parameter terakhir `{ source: 'user' }` untuk menandai perubahan itu sebagai perubahan orang (2.4). Semua
+fungsi untuk mengisi dan mengubah dibahas di bab 4.
+
+### React
+
+| Pembantu | Artinya |
+|---|---|
+| `useWorkbook(wb, (w) => ...)` | membaca sesuatu, dan merender ulang komponen saat nilai itu berubah |
+| `useWorkbook(wb)` | workbook-nya sendiri; merender ulang di setiap perubahan |
+
+### Event (`wb.on(nama, fn)`)
+
+| Event | Isinya | Kapan |
 |---|---|---|
-| `user` | `{ id, name }` atau string | siapa yang sedang kerja: dicatat di tiap op, dan jadi nama penulis komentar |
-| `beforeOp(op, ctx)` | fungsi | lihat tiap op sebelum diterapkan. Kembalikan `op` (atau salinannya yang sudah diubah) untuk lanjut, `null`/`false` untuk diam-diam diabaikan, atau `{ reject: 'alasan' }` untuk menolak seluruh perubahan. `ctx` berisi `source`, `user`, `workbook` |
-| `now` | `() => Date` | jam untuk `NOW()` dan `TODAY()` (berguna di test) |
+| `op` | `{ ops, source }` | setiap perubahan yang diterapkan |
+| `reject` | `{ reason, op, source }` | perubahan ditolak oleh aturan, validasi, atau hak akses (bab 8, bab 10) |
+| `saved` | `{ version }` | setelah `wb.saved()` (1.8, bab 9) |
+| `cellError` | `{ address, field, value, expected }` | nilai tidak cocok dengan tipe kolomnya (bab 8) |
+| `access` | `{ owner, roles, ui, message }` | aturan akses diganti (bab 10) |
+| `layout` | | ukuran baris atau kolom berubah |
+
+`wb.on` mengembalikan fungsi untuk berhenti mendengar.
+
+### Pilihan `createWorkbook(isi, pilihan)`
+
+`isi` adalah JSON yang pernah disimpan (`wb.toJSON()`), atau `null` untuk workbook kosong. `pilihan` boleh dikosongkan:
+
+| Pilihan | Isinya | Artinya |
+|---|---|---|
+| `user` | `{ id, name }` | siapa yang sedang bekerja: dicatat di setiap op, dan menjadi nama penulis komentar |
+| `beforeOp` | fungsi | memeriksa setiap op sebelum diterapkan, dan bisa mengubah, membuang, atau menolaknya ([4.10](04-api-workbook.md#410-beforeop-memeriksa-setiap-perubahan)) |
+| `now` | `() => Date` | jam untuk `NOW()` dan `TODAY()`; berguna untuk tes |
 | `undoLimit` | angka | berapa perubahan yang diingat undo (bawaan 200) |
 
-### Event
-
-`wb.on(nama, fungsi)` mendaftarkan pendengar, dan mengembalikan fungsi untuk berhenti.
-
-| Event | Isi | Kapan |
-|---|---|---|
-| `op` | `{ ops, source }` | tiap perubahan yang berhasil diterapkan |
-| `reject` | `{ reason, op, source }` | perubahan ditolak (oleh `beforeOp`, aturan, tipe kolom, validasi, atau access control) |
-| `cellError` | `{ address, field, value, expected }` | nilai tidak cocok dengan tipe kolomnya ([bab 10](10-aturan.md)) |
-| `saved` | | setelah `wb.saved(...)` |
-| `layout` | | ukuran baris/kolom atau aturan berubah (dipakai tampilan) |
-| `access` | `{ owner, roles, ui, message }` | aturan akses diganti ([bab 13](13-hak-akses.md)) |
-
-## 2.6 Menyimpan
-
-Workbook mencatat apa saja yang berubah sejak terakhir disimpan. `wb.pendingPatch()` kasih **bagian yang berubah saja**: sheet, kolom, dan baris
-yang ditulis utuh berdasarkan id, plus yang dihapus. Setelah server menyimpannya, panggil `wb.saved(patch)`.
-
-<!-- contoh: 02-simpan.js -->
-```js
-import { createWorkbook } from '@kufayeka/sheet/core';
-
-const wb = createWorkbook();
-const sh = wb.sheet('Sheet1');
-sh.setValues('A1', [['Pekerjaan', 'Volume'], ['Galian', 120]]);
-
-// yang belum tersimpan, siap dikirim ke server
-let patch = wb.pendingPatch();
-console.log('simpan pertama :', patch.sheets.upsert.length, 'sheet,', patch.columns.upsert.length, 'kolom,', patch.rows.upsert.length, 'baris');
-wb.saved(patch); // anggap server sudah menyimpannya
-
-sh.setValues('B2', 125);
-patch = wb.pendingPatch();
-console.log('satu perubahan :', patch.rows.upsert.length, 'baris dikirim');
-
-// seluruh workbook jadi objek biasa, lalu dibuka lagi
-const doc = wb.toJSON();
-const dibukaLagi = createWorkbook(doc);
-console.log('dibuka lagi    :', dibukaLagi.sheet('Sheet1').value('B2'));
-```
-<!-- /contoh -->
-
-Hasilnya:
-
-<!-- hasil: 02-simpan.js -->
-```text
-simpan pertama : 1 sheet, 26 kolom, 1000 baris
-satu perubahan : 1 baris dikirim
-dibuka lagi    : 125
-```
-<!-- /hasil -->
-
-Workbook baru dikirim semua di simpanan pertama. Setelah itu satu ketikan cuma mengirim satu baris. `wb.toJSON()` kasih seluruh workbook sebagai
-objek biasa, dan `createWorkbook(doc)` membukanya lagi. Bentuk tabel database, cara menggabungkan patch di server (`mergePatch`), dan cara
-mengeceknya (`checkPatch`) ada di [bab 12](12-server.md).
-
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai cepat](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai dalam 5 menit](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)

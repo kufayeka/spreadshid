@@ -90,7 +90,7 @@ Handle juga punya `id` dan `name`.
 |---|---|
 | props, event, dan handle `ref` `<Sheet>` | [3.1](03-komponen-sheet.md#31-props), [3.2](03-komponen-sheet.md#32-event), [3.3](03-komponen-sheet.md#33-handle-ref) |
 | tombol keyboard | [3.4](03-komponen-sheet.md#34-keyboard) |
-| opsi `createWorkbook` dan event workbook | [2.5](02-konsep.md#25-perubahan-event-dan-undo) |
+| opsi `createWorkbook` dan event workbook | [2.14](02-konsep.md#214-referensi) |
 | jenis op | [4.8](04-api-workbook.md#48-jenis-op) |
 | kunci gaya, props baris, kolom, dan sheet | [4.3](04-api-workbook.md#43-gaya-dan-merge), [4.4](04-api-workbook.md#44-baris-dan-kolom), [4.5](04-api-workbook.md#45-sheet) |
 | fungsi rumus | [5.8](05-rumus.md#58-semua-fungsi-buat-apa-cara-pakai-hasilnya) |

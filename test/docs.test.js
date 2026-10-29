@@ -42,7 +42,8 @@ for (const name of pages) {
     const mod = await import(pathToFileURL(file).href);
     const html = renderToString(createElement(mod.default));
     // a page that loads its workbook from an API first renders what it shows while loading (the server has no answer yet)
-    assert.ok(html.includes('ks-sheet') || html.includes('Memuat'), name + ' renders a sheet (or its loading text) on a server');
+    // (the pages of chapter 2 show a workbook without a sheet: they mark their root with data-siap)
+    assert.ok(html.includes('ks-sheet') || html.includes('Memuat') || html.includes('data-siap'), name + ' renders a sheet (or its loading text) on a server');
 }
 rmSync(tmp, { recursive: true, force: true });
 ok('every page example (' + pages.length + ') renders on a server, as Next.js does first');
