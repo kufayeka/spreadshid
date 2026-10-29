@@ -1,3 +1,4 @@
+import { SheetLoading } from './SheetLoading.js';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createWorkbook, VERSION, accessPlaces } from '../core/index.js';
 import { selectCell, stepActive, rectsOf } from '../core/selection.js';
@@ -118,10 +119,19 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {false|{ lock?: boolean, hidden?: boolean, tint?: boolean, stripes?: boolean }} [props.marks]  How the cells this person may not change are
  *   marked: a lock on a read-only cell and an eye on a hidden one by default; a tint and stripes on request; false: no marks.
  * @param {string} [props.className]  An extra class on the outer element, for the host's layout.
+ * @param {boolean} [props.loading]  Shows the loading skeleton instead of the sheet (it is shown by itself while workbook is null).
+ * @param {string} [props.loadingLabel]  The words under the skeleton's shimmer ('Loading…' by default).
  * @param {import('react').CSSProperties} [props.style]  Inline style of the outer element (its height above all: the grid fills it).
  * @param {import('react').Ref<SheetHandle>} [ref]  What the host's code can ask of the sheet (see SheetHandle).
  */
 export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetProps & import('react').RefAttributes<SheetHandle>>} */ (forwardRef(function Sheet(props, ref) {
+    // workbook={null} means the host is still fetching it: the skeleton is shown until it comes, then the real sheet in its place
+    // (undefined, no workbook at all, still means a workbook of the sheet's own)
+    if (props.workbook === null || props.loading) return <SheetLoading className={props.className} style={props.style} label={props.loadingLabel} />;
+    return <SheetView {...props} ref={ref} />;
+}));
+
+const SheetView = forwardRef(function SheetView(props, ref) {
     // a workbook of its own when the host gives none (made once, on the first render)
     const [own] = useState(() => (props.workbook ? null : createWorkbook()));
     const wb = props.workbook || own;
@@ -577,4 +587,4 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
             ) : null}
         </div>
     );
-}));
+});

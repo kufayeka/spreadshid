@@ -70,6 +70,10 @@ export interface SheetHandle {
 export interface SheetProps {
     /** The workbook to show and change. Without one the sheet makes an empty workbook. */
     workbook?: Workbook | null;
+    /** Shows the loading skeleton instead of the sheet. It is shown by itself while `workbook` is null (still being fetched). */
+    loading?: boolean;
+    /** The words under the skeleton's shimmer ('Loading…' by default). */
+    loadingLabel?: string;
     /** The id of the sheet to show (the host controls it, with onSheetChange). */
     sheet?: string | null;
     onSheetChange?: (sheetId: string) => void;

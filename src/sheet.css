@@ -474,3 +474,30 @@
 .ks-ins-switch:checked { background: var(--ks-chart, #6929c4); }
 .ks-ins-switch:checked::after { left: 16px; }
 .ks-ins-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* the loading skeleton (SheetLoading.js): the shape of the sheet, soft grey bars and a shimmer over the grid */
+.ks-loading { display: flex; flex-direction: column; overflow: hidden; }
+.ks-load-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; background: #f9fbfd; }
+.ks-load-bar i { display: block; height: 10px; border-radius: 4px; background: #e6e8eb; }
+.ks-load-menubar { height: 30px; }
+.ks-load-toolbar { height: 40px; border-bottom: 1px solid var(--ks-head-line); }
+.ks-load-toolbar i { height: 18px; }
+.ks-load-formula { height: 30px; background: var(--ks-bg); border-bottom: 1px solid var(--ks-head-line); }
+.ks-load-tabs { height: 36px; background: var(--ks-head-bg); border-top: 1px solid var(--ks-head-line); }
+.ks-load-tabs i { height: 16px; }
+.ks-load-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ks-load-heads { flex: none; display: flex; height: 24px; background: var(--ks-head-bg); border-bottom: 1px solid var(--ks-head-line); color: var(--ks-head-fg); font-size: 12px; }
+.ks-load-origin { flex: none; width: 46px; border-right: 1px solid var(--ks-head-line); }
+.ks-load-colhead { flex: none; width: 100px; display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--ks-head-line); }
+.ks-load-main { flex: 1; min-height: 0; display: flex; }
+.ks-load-rows { flex: none; width: 46px; display: flex; flex-direction: column; background: var(--ks-head-bg); border-right: 1px solid var(--ks-head-line); color: var(--ks-head-fg); font-size: 12px; }
+.ks-load-rowhead { flex: none; height: 21px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--ks-head-line); }
+.ks-load-grid { position: relative; flex: 1; overflow: hidden;
+    background-image: linear-gradient(var(--ks-grid) 1px, transparent 1px), linear-gradient(90deg, var(--ks-grid) 1px, transparent 1px);
+    background-size: 100px 21px; background-position: -1px -1px; }
+.ks-load-shine { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.75) 50%, transparent 70%);
+    background-size: 200% 100%; animation: ks-shine 1.4s ease-in-out infinite; }
+.ks-load-label { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 4px; background: var(--ks-bg);
+    color: var(--ks-head-fg); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+@keyframes ks-shine { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .ks-load-shine { animation: none; } }
