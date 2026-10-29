@@ -14,6 +14,19 @@ mkdirSync(img, { recursive: true });
 // the cell (r, c) in the window, by its headers
 const cellAt = (js, r, c) => js(`(function(){ var h = document.querySelector('.ks-colhead[data-c="${c}"]'), v = document.querySelector('.ks-rowhead[data-r="${r}"]'); var a = h.getBoundingClientRect(), b = v.getBoundingClientRect(); return { x: Math.round(a.left + a.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
 
+// The pages of chapter 13 that show one sheet as several people see it have a "Lihat sebagai" select (.lihat-sebagai): it is set as a person
+// picks it, before the picture. A person also types into a cell (as a click and keys), to show what the sheet says.
+const asWho = (who) => async ({ js, wait }) => {
+    await js(`(function(){ var e = document.querySelector('.lihat-sebagai'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, ${JSON.stringify(who)}); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(400);
+};
+const typeAt = (r, c, text) => async ({ js, click, type, wait }) => {
+    const p = await cellAt(js, r, c);
+    await click(p.x, p.y); await wait(200); await type(text); await wait(300);
+};
+// a picture of chapter 13: the page's top 1000 x 330 (menus, toolbar, formula bar and the first rows)
+const akses = (name, page, act) => ({ name, page, act, clip: { x: 0, y: 0, width: 1000, height: 330 } });
+
 /**
  * Each picture: the page it is taken of (docs/examples), what is done on it first (with real input), and the part of the window it shows.
  * @type {{ name: string, page: string, act?: (p: any) => Promise<void>, clip?: { x: number, y: number, width: number, height: number } }[]}
@@ -55,19 +68,43 @@ export const SHOTS = [
         const p = await cellAt(js, 3, 7); await click(p.x, p.y); await wait(600);
     }, clip: { x: 0, y: 0, width: 1366, height: 600 } },
     { name: 'dua-tampilan', page: '11-dua-tampilan.page.js', clip: { x: 0, y: 0, width: 1366, height: 520 } },
-    { name: 'akses-sheet', page: '13-22-sheet.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 330 } },
-    { name: 'akses-gembok', page: '13-22-sheet.page.tsx', clip: { x: 0, y: 140, width: 760, height: 110 } },
-    { name: 'akses-tanda-bawaan', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 0, width: 760, height: 130 } },
-    { name: 'akses-tanda-tint', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 144, width: 760, height: 130 } },
-    { name: 'akses-tanda-stripes', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 288, width: 760, height: 130 } },
-    { name: 'akses-tanda-tanpa-gembok', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 432, width: 760, height: 130 } },
-    { name: 'akses-tanda-tanpa-tanda', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 576, width: 760, height: 130 } },
-    { name: 'akses-pesan', page: '13-25-pesan.page.tsx', act: async ({ js, click, type, wait }) => {
-        const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(200); await type('x'); await wait(300);
-    }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
-    { name: 'akses-setup', page: '13-26-setup.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 330 } },
-    { name: 'akses-pilih', page: '13-27-pilih.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 330 } },
-    { name: 'akses-tambah', page: '13-28-tambah.page.tsx', act: async ({ js, click, mouse, wait }) => {
+    // chapter 13, one picture per step (and per person where a step compares people)
+    akses('akses-baca', '13-08-baca.page.tsx', typeAt(1, 6, '9')),
+    akses('akses-tidak-disebut-rina', '13-09-tidak-disebut.page.tsx', asWho('rina')),
+    akses('akses-tidak-disebut-tamu', '13-09-tidak-disebut.page.tsx', asWho('tamu')),
+    akses('akses-ubah', '13-10-ubah.page.tsx'),
+    akses('akses-campur', '13-11-campur.page.tsx'),
+    akses('akses-kolom', '13-12-kolom.page.tsx'),
+    akses('akses-kolom-sisip', '13-12-kolom.page.tsx', async ({ js, click, wait }) => {
+        const b = await js('(function(){ var e = document.querySelector(".sisipkan").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
+        await click(b.x, b.y); await wait(400);
+    }),
+    akses('akses-sembunyi', '13-13-sembunyi.page.tsx'),
+    { name: 'akses-gembok', page: '13-13-sembunyi.page.tsx', clip: { x: 0, y: 140, width: 760, height: 110 } },
+    akses('akses-tak-terlihat', '13-14-tak-terlihat.page.tsx'),
+    akses('akses-role-rina', '13-15-role.page.tsx', asWho('rina')),
+    akses('akses-role-joko', '13-15-role.page.tsx', asWho('joko')),
+    akses('akses-role-sari', '13-15-role.page.tsx', asWho('sari')),
+    akses('akses-semua-tamu', '13-16-semua.page.tsx', asWho('tamu')),
+    akses('akses-semua-rina', '13-16-semua.page.tsx', asWho('rina')),
+    akses('akses-akun-rina', '13-17-akun.page.tsx', asWho('rina')),
+    akses('akses-akun-budi', '13-17-akun.page.tsx', asWho('budi')),
+    akses('akses-pemilik-yeka', '13-18-pemilik.page.tsx', asWho('yeka')),
+    akses('akses-pemilik-rina', '13-18-pemilik.page.tsx', asWho('rina')),
+    akses('akses-syarat', '13-19-syarat.page.tsx', typeAt(3, 6, '5')),
+    akses('akses-format', '13-20-format.page.tsx'),
+    akses('akses-aksi', '13-21-aksi.page.tsx', async ({ js, click, wait }) => { const p = await js(`(function(){ var e = Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'Data'; }); var b = e.getBoundingClientRect(); return { x: b.left + 10, y: b.top + 8 }; })()`); await click(p.x, p.y); await wait(400); }),
+    akses('akses-layar', '13-22-layar.page.tsx'),
+    akses('akses-area', '13-23-area.page.tsx'),
+    { name: 'akses-tanda-bawaan', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 0, width: 760, height: 130 } },
+    { name: 'akses-tanda-tint', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 144, width: 760, height: 130 } },
+    { name: 'akses-tanda-stripes', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 288, width: 760, height: 130 } },
+    { name: 'akses-tanda-tanpa-gembok', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 432, width: 760, height: 130 } },
+    { name: 'akses-tanda-tanpa-tanda', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 576, width: 760, height: 130 } },
+    { name: 'akses-pesan', page: '13-26-pesan.page.tsx', act: typeAt(2, 1, 'x'), clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    akses('akses-setup', '13-27-setup.page.tsx'),
+    { name: 'akses-pilih', page: '13-28-pilih.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 330 } },
+    { name: 'akses-tambah', page: '13-29-tambah.page.tsx', act: async ({ js, click, mouse, wait }) => {
         const a = await cellAt(js, 1, 5), b = await cellAt(js, 4, 5);
         await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(200);
         const t = await js('(function(){ var e = document.querySelector(".tambah").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');

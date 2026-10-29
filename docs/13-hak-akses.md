@@ -36,26 +36,25 @@ pengertian tanpa kode, lalu satu langkah kecil demi satu langkah kecil. Setiap l
 - [13.22 Bagian layar](#1322-bagian-layar)
 - [13.23 Hanya sebagian sheet yang tampil](#1323-hanya-sebagian-sheet-yang-tampil)
 
-**Bagian E. Di React (mode live)**
-- [13.24 Memasang di `<Sheet>`](#1324-memasang-di-sheet)
-- [13.25 Tanda di sel: gembok dan mata](#1325-tanda-di-sel-gembok-dan-mata)
-- [13.26 Variasi tanda](#1326-variasi-tanda)
-- [13.27 Pesan penolakan](#1327-pesan-penolakan)
+**Bagian E. Tanda dan pesan**
+- [13.24 Tanda di sel: gembok dan mata](#1324-tanda-di-sel-gembok-dan-mata)
+- [13.25 Variasi tanda](#1325-variasi-tanda)
+- [13.26 Pesan penolakan](#1326-pesan-penolakan)
 
 **Bagian F. Mode pengaturan**
-- [13.28 Menyalakan mode pengaturan](#1328-menyalakan-mode-pengaturan)
-- [13.29 Memilih aturan](#1329-memilih-aturan)
-- [13.30 Membuat aturan dari range yang dipilih](#1330-membuat-aturan-dari-range-yang-dipilih)
-- [13.31 Berpindah mode: lihat sebagai orang lain](#1331-berpindah-mode-lihat-sebagai-orang-lain)
+- [13.27 Menyalakan mode pengaturan](#1327-menyalakan-mode-pengaturan)
+- [13.28 Memilih aturan](#1328-memilih-aturan)
+- [13.29 Membuat aturan dari range yang dipilih](#1329-membuat-aturan-dari-range-yang-dipilih)
+- [13.30 Berpindah mode: lihat sebagai orang lain](#1330-berpindah-mode-lihat-sebagai-orang-lain)
 
 **Bagian G. Server dan database**
-- [13.32 Tabel `sheet_access`](#1332-tabel-sheet_access)
-- [13.33 `viewFor`: yang dikirim ke browser](#1333-viewfor-yang-dikirim-ke-browser)
-- [13.34 `checkPatch`: yang boleh disimpan](#1334-checkpatch-yang-boleh-disimpan)
+- [13.31 Tabel `sheet_access`](#1331-tabel-sheet_access)
+- [13.32 `viewFor`: yang dikirim ke browser](#1332-viewfor-yang-dikirim-ke-browser)
+- [13.33 `checkPatch`: yang boleh disimpan](#1333-checkpatch-yang-boleh-disimpan)
 
 **Bagian H. Batas dan referensi**
-- [13.35 Batas kemampuan](#1335-batas-kemampuan)
-- [13.36 Referensi](#1336-referensi)
+- [13.34 Batas kemampuan](#1334-batas-kemampuan)
+- [13.35 Referensi](#1335-referensi)
 
 ---
 
@@ -137,7 +136,7 @@ Menambah aturan berarti menambah satu baris, dan menghapus aturan berarti mengha
 { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ```
 
-Daftar semua baris aturan sebuah spreadsheet adalah satu array. Array itulah yang disimpan di database (13.32) dan diberikan ke sheet.
+Daftar semua baris aturan sebuah spreadsheet adalah satu array. Array itulah yang disimpan di database (13.31) dan diberikan ke sheet.
 
 ## 13.6 Seberapa jauh hak akses bisa mengatur
 
@@ -146,7 +145,7 @@ Peta lengkap kemampuannya. Setiap baris dibahas di langkah yang disebut di kolom
 | Yang bisa diatur | Sampai sejauh apa | Langkah |
 |---|---|---|
 | **Sel: empat keadaan** | boleh diubah, hanya baca, tersembunyi, tidak terlihat | 13.8 – 13.14 |
-| **Di mana** | satu sel, range, kolom utuh, baris utuh, kolom berdasarkan judulnya, satu sheet, semua sheet | 13.11 – 13.12, 13.36 |
+| **Di mana** | satu sel, range, kolom utuh, baris utuh, kolom berdasarkan judulnya, satu sheet, semua sheet | 13.11 – 13.12, 13.35 |
 | **Untuk siapa** | satu akun, satu role, beberapa role sekaligus, semua orang, pemilik | 13.15 – 13.18 |
 | **Pengecualian** | aturan untuk satu akun mengalahkan aturan role-nya | 13.17 |
 | **Syarat** | aturan yang hanya berlaku di baris yang memenuhi rumus, dan berubah sendiri saat isinya berubah | 13.19 |
@@ -154,12 +153,12 @@ Peta lengkap kemampuannya. Setiap baris dibahas di langkah yang disebut di kolom
 | **Aksi lain** | sort, filter, tambah/hapus baris dan kolom, sheet, salin, tempel, unduh, impor, pivot, validasi, komentar, dan mengubah aturan itu sendiri | 13.21 |
 | **Layar** | menu, toolbar, formula bar, header, garis grid, tab, dan setiap menu, tombol, atau panel satu per satu | 13.22 |
 | **Yang tampil** | hanya sebagian sheet, atau hanya sheet tertentu | 13.23 |
-| **Tanda di sel** | gembok, mata, latar abu-abu, garis-garis; bebas dicampur atau dimatikan | 13.25 – 13.26 |
-| **Pesan** | pesan penolakan diganti, dimatikan, atau ditampilkan di luar sheet | 13.27 |
-| **Layar pengaturan** | mode pengaturan, untuk aplikasimu membuat editor aturannya sendiri | 13.28 – 13.31 |
-| **Keamanan di server** | isi tersembunyi tidak dikirim ke browser; perubahan yang tidak boleh ditolak saat disimpan | 13.33 – 13.34 |
+| **Tanda di sel** | gembok, mata, latar abu-abu, garis-garis; bebas dicampur atau dimatikan | 13.24 – 13.25 |
+| **Pesan** | pesan penolakan diganti, dimatikan, atau ditampilkan di luar sheet | 13.26 |
+| **Layar pengaturan** | mode pengaturan, untuk aplikasimu membuat editor aturannya sendiri | 13.27 – 13.30 |
+| **Keamanan di server** | isi tersembunyi tidak dikirim ke browser; perubahan yang tidak boleh ditolak saat disimpan | 13.32 – 13.33 |
 
-Yang **tidak** bisa diatur dijelaskan di 13.35.
+Yang **tidak** bisa diatur dijelaskan di 13.34.
 
 ---
 
@@ -167,7 +166,10 @@ Yang **tidak** bisa diatur dijelaskan di 13.35.
 
 ## 13.7 Cara membaca contoh di bab ini
 
-Semua contoh di bagian B sampai D memakai satu sheet bernama **Produk**, berisi 12 produk toko bangunan:
+Setiap langkah di bagian B sampai D adalah **satu halaman React** dengan satu `<Sheet>`, ditambah **foto hasilnya** di browser. Kodenya bisa
+langsung disalin ke aplikasimu.
+
+Semua contoh memakai satu sheet bernama **Produk**, berisi 12 produk toko bangunan:
 
 | | A | B | C | D | E | F | G | H | I |
 |---|---|---|---|---|---|---|---|---|---|
@@ -175,23 +177,14 @@ Semua contoh di bagian B sampai D memakai satu sheet bernama **Produk**, berisi 
 | 2 | SMN-01 | Semen Portland 50 kg | Semen | zak | 64000 | 72000 | 420 | 100 | Aktif |
 | ... | | | | | | | | | |
 
-Hasil setiap contoh dicetak sebagai **peta keadaan** untuk baris 1 sampai 5, kolom A sampai I. Setiap huruf adalah satu sel:
-
-| Huruf | Keadaan (13.2) |
-|---|---|
-| `E` | boleh diubah |
-| `r` | hanya baca |
-| `•` | tersembunyi |
-| `.` | tidak terlihat |
-
-Workbook-nya dan fungsi pencetak peta dipakai bersama oleh semua contoh. Kamu tidak perlu memahaminya untuk mengikuti bab ini:
+Workbook-nya dibuat oleh satu fungsi, `buatStok()`, yang dipakai bersama oleh semua contoh:
 
 <!-- contoh: data/stok-akses.js -->
 ```js
 import { createWorkbook } from '@kufayeka/sheet/core';
 import { PRODUK, KOLOM_PRODUK } from './toko.js';
 
-// Bahan bersama bab 13: workbook stok toko, dan "peta akses" yang mencetak apa yang didapat seseorang di setiap sel.
+// Bahan bersama bab 13: workbook stok toko.
 
 /** Sheet Produk: Kode, Nama produk, Kategori, Satuan, Harga beli, Harga jual, Stok, Stok min., Status (A..I), 12 produk. */
 export function buatStok() {
@@ -203,28 +196,17 @@ export function buatStok() {
     p.setStyle('A1:I1', { bold: true, fill: '#eef2f7' });
     return wb;
 }
-
-const TANDA = { edit: 'E', readonly: 'r', hidden: '•', invisible: '.' };
-
-/**
- * Peta akses baris 1-5, kolom A-I, untuk satu orang:
- *   E = boleh diubah, r = hanya baca, • = tersembunyi (•••), . = tidak terlihat (kosong)
- */
-export function peta(wb, rows, who, judul) {
-    wb.setAccess(rows, who);
-    console.log(judul);
-    console.log('      A B C D E F G H I');
-    for (let r = 0; r < 5; r++) {
-        let line = '  ' + String(r + 1).padStart(2) + '  ';
-        for (let c = 0; c < 9; c++) {
-            const m = wb.modeAt('Produk', r, c);
-            line += (m ? TANDA[m.mode] : TANDA.edit) + ' ';
-        }
-        console.log(line);
-    }
-}
 ```
 <!-- /contoh -->
+
+Saat membaca foto, perhatikan pojok kanan atas setiap sel (13.2):
+
+| Tanda di pojok sel | Keadaan |
+|---|---|
+| (tidak ada), dan sel berisi | boleh diubah |
+| gembok | hanya baca |
+| `•••` dengan mata dicoret | tersembunyi |
+| sel kosong tanpa tanda | tidak terlihat |
 
 Di setiap contoh, baris yang **baru** dibanding langkah sebelumnya ditandai `// baru`.
 
@@ -232,93 +214,101 @@ Di setiap contoh, baris yang **baru** dibanding langkah sebelumnya ditandai `// 
 
 **Tujuan:** kasir boleh membaca tabel produk.
 
-<!-- contoh: 13-06-baca.ts -->
-```ts
+<!-- contoh: 13-08-baca.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 6: aturan pertama. Kasir boleh MEMBACA tabel produk.
+// 13.8 Aturan pertama: kasir boleh MEMBACA tabel produk.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }   // baru
+    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
-const wb = buatStok();
-const rina = { user: 'rina', roles: ['kasir'] };
-peta(wb, rows, rina, 'rina (kasir):');
-
-// rina mencoba mengubah stok di G2
-wb.on('reject', (e) => console.log('ditolak:', e.reason));
-wb.setValues('Produk', 'G2', 999, { source: 'user' });
-console.log('G2 tetap:', wb.value('Produk', 'G2'));
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    const rina = { user: 'rina', roles: ['kasir'] };       // dari sistem login aplikasimu
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: rina }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-06-baca.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r r r r 
-   3  r r r r r r r r r 
-   4  r r r r r r r r r 
-   5  r r r r r r r r r 
-ditolak: You can only view this here
-G2 tetap: 420
-```
-<!-- /hasil -->
+Rina membuka halaman ini, mengklik G2 (stok Semen), lalu mencoba mengetik:
+
+![Kasir hanya boleh membaca](img/akses-baca.png)
 
 **Penjelasan:**
 
 - `rows` adalah daftar aturan. Isinya satu baris: untuk `role:kasir`, `allow` (boleh), `read` (membaca), di `Produk!A1:I13` (seluruh tabel).
 - `rina` adalah orang yang membuka: akun `rina`, dengan role `kasir`. Di aplikasimu, ini datang dari sistem login.
-- `peta(...)` memanggil `wb.setAccess(rows, rina)`, lalu mencetak keadaan setiap sel. Semua sel `r`: **hanya baca**.
-- Rina mencoba mengubah G2. Perubahan itu ditolak, event `reject` memberi tahu alasannya, dan G2 tetap 420.
-- `{ source: 'user' }` artinya perubahan ini dilakukan orang di layar. Perubahan dari kode aplikasimu sendiri (tanpa `source`) **tidak**
-  diperiksa: aturan akses menjaga apa yang dilakukan orang, bukan apa yang dilakukan program yang kamu tulis.
+- `access={{ rows, who: rina }}` memberikan keduanya ke sheet. Sheet langsung menerapkannya, dan menerapkannya lagi setiap kali `rows` atau
+  `who` berubah.
+- Di foto, setiap sel bergembok: **hanya baca**. Saat Rina mengetik di G2, sheet menolak dan menampilkan alasannya di bawah. Nilai G2 tetap
+  420.
+- Pesan bawaannya berbahasa Inggris. Cara menggantinya dengan kata-katamu sendiri ada di 13.26.
 
 ## 13.9 Yang tidak disebut, tidak didapat
 
 **Tujuan:** melihat apa yang terjadi pada sel yang tidak disebut di aturan mana pun.
 
-<!-- contoh: 13-07-tidak-disebut.ts -->
-```ts
-import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+<!-- contoh: 13-09-tidak-disebut.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { AccessRow, Who } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 7: yang tidak disebut, tidak didapat. Aturannya sekarang hanya untuk kolom A sampai D.
+// 13.9 Yang tidak disebut, tidak didapat. Aturannya sekarang hanya untuk kolom A sampai D.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D13' }   // baru: A-D saja
+    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D13' }     // baru: A-D saja
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir): kolom E-I tidak disebut');
-peta(wb, rows, { user: 'tamu' }, 'tamu: tidak punya satu baris pun');
+// baru: pilihan "Lihat sebagai", untuk membandingkan dua orang
+const ORANG: Record<string, Who> = {
+    rina: { user: 'rina', roles: ['kasir'] },
+    tamu: { user: 'tamu' }                                   // tanpa role
+};
+
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    const [sebagai, setSebagai] = useState('rina');
+    return (
+        <div>
+            <p>Lihat sebagai <select className="lihat-sebagai" value={sebagai} onChange={(e) => setSebagai(e.target.value)}>
+                {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
+            </select></p>
+            <div style={{ height: 300 }}>
+                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+            </div>
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-07-tidak-disebut.ts -->
-```text
-rina (kasir): kolom E-I tidak disebut
-      A B C D E F G H I
-   1  r r r r . . . . . 
-   2  r r r r . . . . . 
-   3  r r r r . . . . . 
-   4  r r r r . . . . . 
-   5  r r r r . . . . . 
-tamu: tidak punya satu baris pun
-      A B C D E F G H I
-   1  . . . . . . . . . 
-   2  . . . . . . . . . 
-   3  . . . . . . . . . 
-   4  . . . . . . . . . 
-   5  . . . . . . . . .
-```
-<!-- /hasil -->
+Halaman ini punya pilihan **Lihat sebagai**, untuk membandingkan dua orang dengan aturan yang sama.
+
+Dilihat sebagai **rina** (kasir):
+
+![Rina: kolom E sampai I tidak terlihat](img/akses-tidak-disebut-rina.png)
+
+Dilihat sebagai **tamu** (tanpa role):
+
+![Tamu: tidak ada yang terlihat](img/akses-tidak-disebut-tamu.png)
 
 **Penjelasan:**
 
-- Aturannya sekarang hanya menyebut kolom A sampai D. Kolom E sampai I **tidak disebut**, jadi untuk Rina kolom-kolom itu **tidak terlihat** (`.`).
-- Tamu tidak punya satu baris aturan pun, jadi dia tidak mendapat apa-apa.
+- Aturannya sekarang hanya menyebut kolom A sampai D. Kolom E sampai I **tidak disebut**, jadi untuk Rina kolom-kolom itu kosong: **tidak
+  terlihat**.
+- Tamu tidak punya satu baris aturan pun, jadi seluruh sheet kosong untuknya.
+- `ORANG` dan `<select>` hanya untuk mencoba. Di aplikasimu, `who` datang dari sistem login, bukan dari pilihan.
 
 Ini aturan dasar yang paling penting: **yang tidak diizinkan, tidak didapat.** Dengan begitu, lupa menulis satu aturan tidak membuat data
 bocor. Paling buruk, orang tidak bisa melihat sesuatu yang seharusnya boleh dia lihat, lalu kamu menambah satu baris.
@@ -327,210 +317,194 @@ bocor. Paling buruk, orang tidak bisa melihat sesuatu yang seharusnya boleh dia 
 
 **Tujuan:** kasir boleh mengubah seluruh tabel.
 
-<!-- contoh: 13-08-ubah.ts -->
-```ts
+<!-- contoh: 13-10-ubah.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 8: boleh mengubah. Ganti read dengan edit.
+// 13.10 Boleh mengubah. Ganti read dengan edit.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' }   // baru: edit
+    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' }     // baru: edit
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
-
-wb.setValues('Produk', 'G2', 400, { source: 'user' });
-console.log('G2 diubah rina:', wb.value('Produk', 'G2'));
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-08-ubah.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  E E E E E E E E E 
-   2  E E E E E E E E E 
-   3  E E E E E E E E E 
-   4  E E E E E E E E E 
-   5  E E E E E E E E E 
-G2 diubah rina: 400
-```
-<!-- /hasil -->
+![Kasir boleh mengubah semuanya](img/akses-ubah.png)
 
-**Penjelasan:** satu kata berubah, `read` menjadi `edit`. Semua sel jadi `E`: **boleh diubah**. `edit` sudah termasuk membaca, jadi tidak perlu
-menulis `read` lagi.
+**Penjelasan:** satu kata berubah, `read` menjadi `edit`. Tidak ada gembok lagi: semua sel **boleh diubah**. `edit` sudah termasuk membaca,
+jadi tidak perlu menulis `read` lagi.
 
 ## 13.11 Baca semua, ubah sebagian
 
 **Tujuan:** kasir membaca seluruh tabel, tapi hanya boleh mengubah kolom Stok (G).
 
-<!-- contoh: 13-09-campur.ts -->
-```ts
+<!-- contoh: 13-11-campur.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 9: baca semua, ubah sebagian. Dua baris: baca seluruh tabel, ubah kolom G saja.
+// 13.11 Baca semua, ubah sebagian: baca seluruh tabel, ubah kolom G (Stok) saja.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' }    // baru
+    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' }     // baru
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-09-campur.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r E r r 
-   3  r r r r r r E r r 
-   4  r r r r r r E r r 
-   5  r r r r r r E r r
-```
-<!-- /hasil -->
+![Hanya kolom Stok tanpa gembok](img/akses-campur.png)
 
 **Penjelasan:**
 
 - Sekarang ada dua baris. Baris pertama memberi `read` di seluruh tabel. Baris kedua memberi `edit` di G2:G13.
-- Di sel G2 sampai G13, kedua baris berlaku. **`edit` menang**, karena ia memberi lebih banyak. Di sel lain hanya baris pertama yang
-  berlaku, jadi `r`.
+- Di kolom Stok, kedua baris berlaku. **`edit` menang**, karena ia memberi lebih banyak, sehingga kolom itu satu-satunya yang tanpa gembok.
+- Judul Stok (G1) tetap bergembok, karena G1 tidak termasuk G2:G13.
 - Urutan baris di daftar tidak berpengaruh. Kalau kedua baris itu ditukar, hasilnya tetap sama.
 
 ## 13.12 Kolom ditulis dengan judulnya
 
 **Tujuan:** hasil yang sama dengan 13.11, tapi kolomnya disebut dengan judulnya (`Stok`), bukan dengan hurufnya (`G`).
 
-<!-- contoh: 13-10-kolom.ts -->
-```ts
+<!-- contoh: 13-12-kolom.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 10: kolom ditulis dengan judulnya. Hasilnya sama dengan langkah 9, tapi tetap benar walaupun kolom Stok nanti dipindah.
+// 13.12 Kolom ditulis dengan judulnya: col:Stok, bukan G2:G13. Tetap benar walaupun kolomnya bergeser.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }  // baru: judul kolom, bukan G2:G13
+    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }   // baru: judul kolom
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
-
-// kolom Stok dipindah ke depan (disisipkan kolom baru di A): aturannya ikut, tanpa diubah
-wb.sheet('Produk').insertCols('A');
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'setelah kolom baru disisipkan di A (Stok kini di H):');
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    // tombol untuk mencoba: kolom baru disisipkan di A, Stok bergeser ke H, aturannya ikut
+    const sisipkan = () => wb.sheet('Produk').insertCols('A');
+    return (
+        <div>
+            <p><button className="sisipkan" onClick={sisipkan}>Sisipkan kolom di A</button></p>
+            <div style={{ height: 300 }}>
+                <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            </div>
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-10-kolom.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r E r r 
-   3  r r r r r r E r r 
-   4  r r r r r r E r r 
-   5  r r r r r r E r r 
-setelah kolom baru disisipkan di A (Stok kini di H):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r r E r 
-   3  r r r r r r r E r 
-   4  r r r r r r r E r 
-   5  r r r r r r r E r
-```
-<!-- /hasil -->
+Sebelum tombol ditekan, hasilnya sama dengan 13.11:
+
+![Kolom Stok disebut dengan judulnya](img/akses-kolom.png)
+
+Setelah menekan **Sisipkan kolom di A**, semua kolom bergeser ke kanan dan Stok sekarang ada di H. Aturannya ikut, tanpa diubah:
+
+![Setelah kolom baru disisipkan, Stok di H tetap boleh diubah](img/akses-kolom-sisip.png)
 
 **Penjelasan:**
 
-- `Produk!col:Stok` artinya kolom yang judulnya (di baris 1) adalah "Stok".
-- Baris judulnya sendiri (G1) tidak ikut, jadi tetap `r`. Judul kolom tidak bisa diubah kasir.
-- Bagian kedua contoh menyisipkan kolom baru di A, sehingga Stok bergeser ke H. Aturannya ikut bergeser tanpa diubah.
-
-Bentuk lain untuk `where` ada di 13.36, termasuk beberapa kolom sekaligus (`col:Stok,Status`), kolom utuh (`G:G`), baris utuh (`2:5`), dan
-satu sel (`G2`).
+- `Produk!col:Stok` artinya kolom yang judulnya (di baris 1) adalah "Stok". Baris judulnya sendiri tidak ikut, jadi judul tetap bergembok.
+- Kalau ditulis `G2:G13`, aturan itu tetap menunjuk ke kolom G, yang setelah disisipkan berisi Stok min.
+- Bentuk lain untuk `where` ada di 13.35, termasuk beberapa kolom sekaligus (`col:Stok,Status`), kolom utuh (`G:G`), baris utuh (`2:5`), dan
+  satu sel (`G2`).
 
 ## 13.13 Menyembunyikan isi
 
 **Tujuan:** kasir tidak boleh tahu harga beli (kolom E).
 
-<!-- contoh: 13-11-sembunyi.ts -->
-```ts
+<!-- contoh: 13-13-sembunyi.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 11: menyembunyikan isi. Harga beli (kolom E) tampil ••• untuk kasir.
+// 13.13 Menyembunyikan isi: harga beli (kolom E) tampil ••• untuk kasir.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
     { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }   // baru
 ];
 
-const wb = buatStok();
-const rina = { user: 'rina', roles: ['kasir'] };
-peta(wb, rows, rina, 'rina (kasir):');
-console.log('E2 terlihat sebagai:', JSON.stringify(wb.display('Produk', 'E2').text));
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-11-sembunyi.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r • r E r r 
-   3  r r r r • r E r r 
-   4  r r r r • r E r r 
-   5  r r r r • r E r r 
-E2 terlihat sebagai: "•••"
-```
-<!-- /hasil -->
+![Harga beli tersembunyi](img/akses-sembunyi.png)
 
 **Penjelasan:**
 
 - Baris baru: `deny` (tidak boleh), `read` (membaca), di kolom Harga beli.
 - Di kolom E, ada dua baris yang berlaku: `allow read` dari baris pertama, dan `deny read` dari baris baru. **`deny` menang** atas `allow`.
   Inilah cara membuat pengecualian di dalam area yang sudah diizinkan.
-- Hasilnya `•`: **tersembunyi**. Di layar, isinya tampil sebagai `•••`.
+- Di foto, isi kolom Harga beli tampil `•••` dengan mata dicoret: **tersembunyi**.
 
 ## 13.14 Tidak terlihat sama sekali
 
 **Tujuan:** sama dengan 13.13, tapi kasir bahkan tidak boleh tahu bahwa kolom itu berisi.
 
-<!-- contoh: 13-12-tak-terlihat.ts -->
-```ts
+<!-- contoh: 13-14-tak-terlihat.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 12: tidak terlihat sama sekali. Sama dengan langkah 11, tapi deny see: sel tampil kosong.
+// 13.14 Tidak terlihat sama sekali: sama dengan 13.13, tapi deny see. Kolom E tampil kosong.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
     { who: 'role:kasir', effect: 'deny', action: 'see', where: 'Produk!col:Harga beli' }    // baru: see, bukan read
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
-console.log('E2 terlihat sebagai:', JSON.stringify(wb.display('Produk', 'E2').text));
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-12-tak-terlihat.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r . r E r r 
-   3  r r r r . r E r r 
-   4  r r r r . r E r r 
-   5  r r r r . r E r r 
-E2 terlihat sebagai: ""
-```
-<!-- /hasil -->
+![Harga beli tidak terlihat](img/akses-tak-terlihat.png)
 
-**Penjelasan:** `read` diganti `see`. Sel jadi `.`: **tidak terlihat**, tampil kosong.
+**Penjelasan:** `read` diganti `see`. Kolom Harga beli tampil kosong, tanpa tanda apa pun: **tidak terlihat**.
 
 Kapan memakai yang mana:
 
@@ -548,107 +522,112 @@ Kapan memakai yang mana:
 
 **Tujuan:** aturan yang berlaku untuk semua orang dengan role yang sama. Ditambah satu role lagi, `gudang`.
 
-<!-- contoh: 13-13-role.ts -->
-```ts
-import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+<!-- contoh: 13-15-role.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { AccessRow, Who } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 13: role. Aturan role:kasir berlaku untuk setiap orang yang punya role kasir. Ditambah satu role lagi: gudang.
+// 13.15 Role: aturan untuk semua kasir, dan satu role lagi, gudang.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },        // baru
     { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }       // baru
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
-peta(wb, rows, { user: 'dewi', roles: ['kasir'] }, 'dewi (kasir juga): sama dengan rina');
-peta(wb, rows, { user: 'joko', roles: ['gudang'] }, 'joko (gudang):');
-peta(wb, rows, { user: 'sari', roles: ['kasir', 'gudang'] }, 'sari (kasir DAN gudang): gabungan keduanya');
+const ORANG: Record<string, Who> = {
+    rina: { user: 'rina', roles: ['kasir'] },
+    joko: { user: 'joko', roles: ['gudang'] },
+    sari: { user: 'sari', roles: ['kasir', 'gudang'] }       // dua role sekaligus
+};
+
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    const [sebagai, setSebagai] = useState('rina');
+    return (
+        <div>
+            <p>Lihat sebagai <select className="lihat-sebagai" value={sebagai} onChange={(e) => setSebagai(e.target.value)}>
+                {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
+            </select></p>
+            <div style={{ height: 300 }}>
+                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+            </div>
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-13-role.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r r r r 
-   3  r r r r r r r r r 
-   4  r r r r r r r r r 
-   5  r r r r r r r r r 
-dewi (kasir juga): sama dengan rina
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r r r r 
-   3  r r r r r r r r r 
-   4  r r r r r r r r r 
-   5  r r r r r r r r r 
-joko (gudang):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r E r r 
-   3  r r r r r r E r r 
-   4  r r r r r r E r r 
-   5  r r r r r r E r r 
-sari (kasir DAN gudang): gabungan keduanya
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r E r r 
-   3  r r r r r r E r r 
-   4  r r r r r r E r r 
-   5  r r r r r r E r r
-```
-<!-- /hasil -->
+Dilihat sebagai **rina** (kasir): semua hanya baca.
+
+![Rina, kasir](img/akses-role-rina.png)
+
+Dilihat sebagai **joko** (gudang): kolom Stok bisa diubah.
+
+![Joko, gudang](img/akses-role-joko.png)
+
+Dilihat sebagai **sari** (kasir dan gudang): gabungan keduanya.
+
+![Sari, kasir dan gudang](img/akses-role-sari.png)
 
 **Penjelasan:**
 
-- `role:kasir` berlaku untuk **setiap** orang yang role-nya kasir. Rina dan Dewi mendapat hal yang sama tanpa ditulis satu per satu.
+- `role:kasir` berlaku untuk **setiap** orang yang role-nya kasir. Kasir lain mendapat hal yang sama dengan Rina tanpa ditulis satu per satu.
 - Joko (gudang) mendapat aturan gudang: membaca semua, mengubah Stok.
-- Sari punya dua role. Aturan dari kedua role-nya **digabung**: dia mendapat yang terbaik dari keduanya, yaitu membaca semua dan mengubah
+- Sari punya dua role. Aturan dari kedua role-nya **digabung**, jadi dia mendapat yang terbaik dari keduanya: membaca semua dan mengubah
   Stok.
 
-Siapa punya role apa ditentukan aplikasimu, dan diberikan saat membuka: `{ user: 'sari', roles: ['kasir', 'gudang'] }`.
+Siapa punya role apa ditentukan aplikasimu, dan diberikan lewat `who`: `{ user: 'sari', roles: ['kasir', 'gudang'] }`.
 
 ## 13.16 Semua orang
 
 **Tujuan:** siapa pun yang membuka boleh membaca kolom A sampai D, termasuk orang yang tidak punya role.
 
-<!-- contoh: 13-14-semua.ts -->
-```ts
-import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+<!-- contoh: 13-16-semua.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { AccessRow, Who } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 14: semua orang (*). Siapa pun yang membuka boleh membaca kolom A-D, termasuk yang tidak punya role apa pun.
+// 13.16 Semua orang (*): siapa pun boleh membaca kolom A sampai D, termasuk yang tidak punya role.
 const rows: AccessRow[] = [
     { who: '*', effect: 'allow', action: 'read', where: 'Produk!A1:D13' },                  // baru
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'tamu' }, 'tamu (tanpa role):');
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
+const ORANG: Record<string, Who> = {
+    tamu: { user: 'tamu' },
+    rina: { user: 'rina', roles: ['kasir'] }
+};
+
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    const [sebagai, setSebagai] = useState('tamu');
+    return (
+        <div>
+            <p>Lihat sebagai <select className="lihat-sebagai" value={sebagai} onChange={(e) => setSebagai(e.target.value)}>
+                {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
+            </select></p>
+            <div style={{ height: 300 }}>
+                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+            </div>
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-14-semua.ts -->
-```text
-tamu (tanpa role):
-      A B C D E F G H I
-   1  r r r r . . . . . 
-   2  r r r r . . . . . 
-   3  r r r r . . . . . 
-   4  r r r r . . . . . 
-   5  r r r r . . . . . 
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r r r r r r 
-   3  r r r r r r r r r 
-   4  r r r r r r r r r 
-   5  r r r r r r r r r
-```
-<!-- /hasil -->
+Dilihat sebagai **tamu**:
+
+![Tamu melihat kolom A sampai D](img/akses-semua-tamu.png)
+
+Dilihat sebagai **rina**:
+
+![Rina melihat semua kolom](img/akses-semua-rina.png)
 
 **Penjelasan:**
 
@@ -661,42 +640,50 @@ rina (kasir):
 
 **Tujuan:** kasir tidak boleh melihat harga beli, kecuali Budi, kasir senior yang boleh mengubahnya.
 
-<!-- contoh: 13-15-akun.ts -->
-```ts
-import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+<!-- contoh: 13-17-akun.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { AccessRow, Who } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 15: satu akun. Aturan user: mengalahkan aturan role:, dan role: mengalahkan *.
+// 13.17 Satu akun: kasir tidak boleh melihat harga beli, kecuali budi, yang boleh mengubahnya.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
     { who: 'user:budi', effect: 'allow', action: 'edit', where: 'Produk!col:Harga beli' }   // baru: budi, walaupun kasir
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'rina', roles: ['kasir'] }, 'rina (kasir):');
-peta(wb, rows, { user: 'budi', roles: ['kasir'] }, 'budi (kasir + aturan akunnya):');
+const ORANG: Record<string, Who> = {
+    rina: { user: 'rina', roles: ['kasir'] },
+    budi: { user: 'budi', roles: ['kasir'] }
+};
+
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    const [sebagai, setSebagai] = useState('rina');
+    return (
+        <div>
+            <p>Lihat sebagai <select className="lihat-sebagai" value={sebagai} onChange={(e) => setSebagai(e.target.value)}>
+                {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
+            </select></p>
+            <div style={{ height: 300 }}>
+                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+            </div>
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-15-akun.ts -->
-```text
-rina (kasir):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r • r r r r 
-   3  r r r r • r r r r 
-   4  r r r r • r r r r 
-   5  r r r r • r r r r 
-budi (kasir + aturan akunnya):
-      A B C D E F G H I
-   1  r r r r r r r r r 
-   2  r r r r E r r r r 
-   3  r r r r E r r r r 
-   4  r r r r E r r r r 
-   5  r r r r E r r r r
-```
-<!-- /hasil -->
+Dilihat sebagai **rina**: Harga beli tersembunyi.
+
+![Rina: harga beli tersembunyi](img/akses-akun-rina.png)
+
+Dilihat sebagai **budi**: Harga beli terlihat dan bisa diubah.
+
+![Budi: harga beli boleh diubah](img/akses-akun-budi.png)
 
 **Penjelasan:**
 
@@ -715,54 +702,68 @@ Aturan lengkapnya, untuk setiap sel dan setiap aksi:
 
 ## 13.18 Pemilik
 
-**Tujuan:** satu orang yang boleh segalanya.
+**Tujuan:** satu orang yang boleh segalanya, dan tombol yang hanya muncul untuk dia.
 
-<!-- contoh: 13-16-pemilik.ts -->
-```ts
-import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok, peta } from './data/stok-akses.js';
+<!-- contoh: 13-18-pemilik.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet, useWorkbook } from '@kufayeka/sheet';
+import type { AccessRow, Who } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
 
-// Langkah 16: pemilik. Satu baris: user:<nama> allow * tanpa where.
+// 13.18 Pemilik: satu baris user:<nama> allow * tanpa where.
 const rows: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },                                    // baru
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: '*', effect: 'deny', action: 'edit', where: 'Produk!col:Harga beli' }
 ];
 
-const wb = buatStok();
-peta(wb, rows, { user: 'yeka', roles: ['kasir'] }, 'yeka (pemilik, juga kasir):');
-console.log('pemilik?', wb.access().owner, '| boleh mengubah aturan?', wb.can('access'));
+const ORANG: Record<string, Who> = {
+    yeka: { user: 'yeka', roles: ['kasir'] },                // pemilik, juga kasir
+    rina: { user: 'rina', roles: ['kasir'] }
+};
 
-// satu baris deny untuk akun pemilik sendiri mencabut status pemiliknya
-wb.setAccess([...rows, { who: 'user:yeka', effect: 'deny', action: 'download' }], { user: 'yeka' });
-console.log('dengan deny untuk yeka -> pemilik?', wb.access().owner);
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    const [sebagai, setSebagai] = useState('yeka');
+    // baru: wb.access().owner, untuk menampilkan tombol yang hanya untuk pemilik (misalnya "Atur hak akses")
+    const pemilik = useWorkbook(wb, (w) => w.access().owner);
+    return (
+        <div>
+            <p>
+                Lihat sebagai <select className="lihat-sebagai" value={sebagai} onChange={(e) => setSebagai(e.target.value)}>
+                    {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
+                </select>{' '}
+                {pemilik ? <button>Atur hak akses</button> : null}
+            </p>
+            <div style={{ height: 300 }}>
+                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+            </div>
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-16-pemilik.ts -->
-```text
-yeka (pemilik, juga kasir):
-      A B C D E F G H I
-   1  E E E E E E E E E 
-   2  E E E E E E E E E 
-   3  E E E E E E E E E 
-   4  E E E E E E E E E 
-   5  E E E E E E E E E 
-pemilik? true | boleh mengubah aturan? true
-dengan deny untuk yeka -> pemilik? false
-```
-<!-- /hasil -->
+Dilihat sebagai **yeka** (pemilik): semua bisa diubah, dan tombol **Atur hak akses** muncul.
+
+![Yeka, pemilik](img/akses-pemilik-yeka.png)
+
+Dilihat sebagai **rina**: hanya baca, tanpa tombol.
+
+![Rina, bukan pemilik](img/akses-pemilik-rina.png)
 
 **Penjelasan:**
 
 - Pemilik ditulis sebagai satu baris biasa: `user:yeka`, `allow`, `*` (semua aksi), tanpa `where` (di mana saja).
 - Yeka juga punya role kasir, dan ada aturan `*` yang mengunci Harga beli. Keduanya kalah, karena baris akun paling spesifik.
-- `wb.access().owner` bernilai `true`, dan `wb.can('access')` (boleh mengubah aturan) juga `true`. Pakai ini untuk memutuskan apakah layar
-  pengaturan aturan ditampilkan.
+- `useWorkbook(wb, (w) => w.access().owner)` membaca apakah orang yang membuka adalah pemilik, dan ikut berubah saat `who` berganti. Pakai ini
+  untuk menampilkan tombol yang hanya untuk pemilik, misalnya pintu ke layar pengaturan aturan (bagian F).
 
 Dua hal yang perlu dijaga, karena pemilik hanyalah sebuah baris:
 
-1. **Jangan tulis `deny` untuk akun pemilik sendiri.** Satu `deny` saja sudah mencabut status pemiliknya (bagian terakhir contoh di atas).
+1. **Jangan tulis `deny` untuk akun pemilik sendiri.** Satu `deny` saja sudah mencabut status pemiliknya.
 2. **Jangan sampai baris pemilik terhapus.** Tanpa baris itu, pemilik menjadi orang biasa. Di layar pengaturanmu, sembunyikan tombol hapus
    untuk baris itu.
 
@@ -777,12 +778,15 @@ database, tanpa perlu menyimpannya di setiap spreadsheet.
 
 **Tujuan:** orang gudang boleh mengubah stok, **kecuali** di baris produk yang sudah dihentikan.
 
-<!-- contoh: 13-17-syarat.ts -->
-```ts
+<!-- contoh: 13-19-syarat.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 17: aturan dengan syarat. Stok boleh diubah, KECUALI di baris produk yang sudah Dihentikan (kolom I).
+// 13.19 Aturan dengan syarat: gudang boleh mengubah stok, KECUALI di baris produk yang sudah Dihentikan (kolom I).
 const rows: AccessRow[] = [
     { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' },
@@ -790,90 +794,86 @@ const rows: AccessRow[] = [
       when: '=$I2="Dihentikan"', message: 'Produk ini sudah dihentikan' }                  // baru
 ];
 
-const wb = buatStok();
-wb.setAccess(rows, { user: 'joko', roles: ['gudang'] });
-wb.on('reject', (e) => console.log('ditolak:', e.reason));
-const NAMA: Record<string, string> = { readonly: 'hanya baca', hidden: 'tersembunyi', invisible: 'tidak terlihat' };
-const keadaan = (a: string) => { const m = wb.modeAt('Produk', a); return m ? NAMA[m.mode] : 'boleh diubah'; };
-console.log('G2 (Semen, Aktif)        :', keadaan('G2'));
-console.log('G9 (Keramik, Dihentikan) :', keadaan('G9'));
-wb.setValues('Produk', 'G9', 10, { source: 'user' });
+// untuk contoh ini, BSI-10 (baris 4) juga sudah dihentikan
+function buatStokDihentikan() {
+    const wb = buatStok();
+    wb.sheet('Produk').setValues('I4', 'Dihentikan');
+    return wb;
+}
 
-// pemilik mengaktifkan produknya lagi: syaratnya langsung tidak berlaku
-wb.setValues('Produk', 'I9', 'Aktif');
-console.log('setelah I9 = Aktif, G9   :', keadaan('G9'));
+export default function Halaman() {
+    const [wb] = useState(buatStokDihentikan);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'joko', roles: ['gudang'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-17-syarat.ts -->
-```text
-G2 (Semen, Aktif)        : boleh diubah
-G9 (Keramik, Dihentikan) : hanya baca
-ditolak: Produk ini sudah dihentikan
-setelah I9 = Aktif, G9   : boleh diubah
-```
-<!-- /hasil -->
+Joko (gudang) mengklik G4, stok BSI-10 yang sudah dihentikan, lalu mencoba mengetik:
+
+![Stok produk yang dihentikan dikunci](img/akses-syarat.png)
 
 **Penjelasan:**
 
 - `when` adalah syarat berupa **rumus biasa**. Aturan itu hanya berlaku di baris yang hasil rumusnya TRUE.
 - Rumusnya ditulis untuk **baris pertama** range (baris 2), lalu bergeser sendiri ke setiap baris, sama seperti rumus yang di-copy ke bawah.
-  Di baris 9, rumusnya menjadi `=$I9="Dihentikan"`. Tanda `$` menahan kolom I supaya tidak ikut bergeser.
-- Baris 9 (Keramik 40x40) berstatus Dihentikan, jadi `deny edit` berlaku di sana: G9 hanya bisa dibaca.
-- `message` adalah kalimat yang muncul saat aturan ini menolak sesuatu.
-- Syarat dihitung ulang setiap kali isi sheet berubah. Begitu I9 diubah menjadi Aktif, G9 langsung bisa diubah lagi.
+  Di baris 4, rumusnya menjadi `=$I4="Dihentikan"`. Tanda `$` menahan kolom I supaya tidak ikut bergeser.
+- Di foto, hanya G4 di kolom Stok yang bergembok, karena BSI-10 berstatus Dihentikan. Saat Joko mengetik, pesannya diambil dari `message`.
+- Syarat dihitung ulang setiap kali isi sheet berubah. Kalau I4 diubah kembali menjadi Aktif, G4 langsung bisa diubah lagi.
 
 ## 13.20 Format
 
 **Tujuan:** kasir boleh memiringkan teks, tapi tidak boleh menebalkan.
 
-<!-- contoh: 13-18-format.ts -->
-```ts
+<!-- contoh: 13-20-format.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 18: format. Kasir boleh memiringkan teks, tapi tidak boleh menebalkan.
+// 13.20 Format: kasir boleh memiringkan teks, tapi tidak boleh menebalkan.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'format.italic' }                        // baru: tanpa where = di mana saja
 ];
 
-const wb = buatStok();
-wb.setAccess(rows, { user: 'rina', roles: ['kasir'] });
-console.log('boleh miring?', wb.can('format.italic'), '| boleh tebal?', wb.can('format.bold'));
-
-wb.on('reject', (e) => console.log('ditolak:', e.reason));
-const p = wb.sheet('Produk');
-p.setStyle('B2', { italic: true }, { source: 'user' });
-p.setStyle('B2', { bold: true }, { source: 'user' });
-console.log('gaya B2:', JSON.stringify(p.style('B2')));
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-18-format.ts -->
-```text
-boleh miring? true | boleh tebal? false
-ditolak: You cannot change the formatting here
-gaya B2: {"italic":true}
-```
-<!-- /hasil -->
+![Tombol miring aktif, tombol tebal abu-abu](img/akses-format.png)
 
 **Penjelasan:**
 
 - `format.italic` adalah satu **aksi**. Aturan aksi biasanya ditulis **tanpa `where`**, artinya berlaku di mana saja.
-- `wb.can('format.italic')` menjawab boleh atau tidak. Pakai ini juga untuk menyembunyikan tombol di aplikasimu sendiri.
-- Menebalkan tidak disebut, jadi tidak boleh: perubahannya ditolak, dan B2 hanya mendapat miring.
+- Di toolbar, tombol miring (*I*) aktif, sedangkan tombol tebal (**B**) dan tombol format lainnya abu-abu, karena tidak disebut.
+- Untuk tombol di aplikasimu sendiri, `wb.can('format.italic')` menjawab boleh atau tidak.
 
 ## 13.21 Aksi lain
 
 **Tujuan:** mengenal tiga cara menyebut aksi: satu aksi, satu kelompok, dan pengecualian di dalam kelompok.
 
-<!-- contoh: 13-19-aksi.ts -->
-```ts
+<!-- contoh: 13-21-aksi.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 19: aksi lain. Satu aksi, satu kelompok (format = semua format.*), dan deny di dalam kelompok.
+// 13.21 Aksi lain: satu aksi (sort), satu kelompok (format = semua format.*), dan pengecualian di dalam kelompok (bold).
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'sort' },             // baru: satu aksi
@@ -881,76 +881,71 @@ const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'deny', action: 'format.bold' }        // baru: kecuali tebal
 ];
 
-const wb = buatStok();
-wb.setAccess(rows, { user: 'rina', roles: ['kasir'] });
-for (const a of ['sort', 'format.italic', 'format.fill', 'format.bold', 'filter', 'rows.insert', 'copy', 'download']) {
-    console.log(a.padEnd(14), wb.can(a) ? 'boleh' : 'tidak');
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
 }
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-19-aksi.ts -->
-```text
-sort           boleh
-format.italic  boleh
-format.fill    boleh
-format.bold    tidak
-filter         tidak
-rows.insert    tidak
-copy           tidak
-download       tidak
-```
-<!-- /hasil -->
+Menu Data dibuka:
+
+![Sort boleh, filter tidak](img/akses-aksi.png)
 
 **Penjelasan:**
 
-| Ditulis | Artinya |
-|---|---|
-| `sort` | satu aksi: mengurutkan |
-| `format` | satu **kelompok**: semua `format.*` (tebal, miring, warna, border, ...) |
-| `deny format.bold` | pengecualian di dalam kelompok: semua format kecuali tebal |
-| `*` | semua aksi (dipakai untuk pemilik) |
+| Ditulis | Artinya | Di foto |
+|---|---|---|
+| `sort` | satu aksi: mengurutkan | Sort sheet dan Sort range aktif |
+| `format` | satu **kelompok**: semua `format.*` (tebal, miring, warna, border, ...) | tombol format di toolbar aktif |
+| `deny format.bold` | pengecualian di dalam kelompok: semua format kecuali tebal | tombol tebal abu-abu |
+| (tidak disebut) | filter, validasi, named range | abu-abu di menu Data |
 
-Aksi yang tidak disebut tidak boleh: `filter`, `rows.insert`, `copy`, `download` di contoh ini. Daftar lengkap semua aksi ada di 13.36.
+`*` artinya semua aksi, dipakai untuk pemilik. Daftar lengkap semua aksi ada di 13.35.
 
 ## 13.22 Bagian layar
 
 **Tujuan:** kasir bekerja tanpa toolbar dan tanpa menu Insert.
 
-<!-- contoh: 13-20-layar.ts -->
-```ts
+<!-- contoh: 13-22-layar.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
 import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 20: bagian layar. Tampil kecuali di-deny.
+// 13.22 Bagian layar: kasir bekerja tanpa toolbar dan tanpa menu Insert.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'deny', action: 'ui.toolbar' },        // baru: satu bagian besar
     { who: 'role:kasir', effect: 'deny', action: 'ui.menu.Insert' }     // baru: satu menu
 ];
 
-const wb = buatStok();
-wb.setAccess(rows, { user: 'rina', roles: ['kasir'] });
-const ui = wb.access().ui;
-console.log('menubar:', ui.menubar, '| toolbar:', ui.toolbar, '| formula bar:', ui.formulaBar);
-console.log('menu Insert tampil?', wb.shows('menu.Insert'), '| menu Format tampil?', wb.shows('menu.Format'));
+export default function Halaman() {
+    const [wb] = useState(buatStok);
+    return (
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+        </div>
+    );
+}
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-20-layar.ts -->
-```text
-menubar: true | toolbar: false | formula bar: true
-menu Insert tampil? false | menu Format tampil? true
-```
-<!-- /hasil -->
+![Tanpa toolbar dan tanpa menu Insert](img/akses-layar.png)
 
 **Penjelasan:**
 
 - Bagian layar ditulis dengan awalan `ui.`. Ada bagian besar (`ui.toolbar`, `ui.menubar`, `ui.formulaBar`, `ui.headers`, `ui.gridlines`,
   `ui.tabs`) dan bagian kecil (`ui.menu.Insert`, `ui.tool.paint`, `ui.panel.comments`, ...).
+- Di foto, toolbar hilang, dan menu bar tidak punya Insert lagi.
 - Berbeda dengan semua aturan lain, **bagian layar tampil kecuali di-deny**. Kalau tidak begitu, setiap orang harus diberi daftar panjang
   `allow ui.*` hanya supaya layarnya normal.
-- `wb.shows('menu.Insert')` menjawab apakah suatu bagian tampil.
 
 > **Tampilan bukan keamanan.** Menyembunyikan toolbar tidak mencegah orang menebalkan teks dengan Ctrl+B. Yang benar-benar menjaga adalah
 > aturan sel dan aksi (`read`, `edit`, `format.bold`, ...), yang juga diperiksa di server. Pakai `ui.*` untuk merapikan layar, bukan untuk
@@ -960,49 +955,7 @@ menu Insert tampil? false | menu Format tampil? true
 
 **Tujuan:** kasir hanya melihat kolom A sampai D, dan hanya sheet Produk.
 
-<!-- contoh: 13-21-area.ts -->
-```ts
-import type { AccessRow } from '@kufayeka/sheet/core';
-import { buatStok } from './data/stok-akses.js';
-
-// Langkah 21: hanya sebagian sheet yang tampil (view.area), dan hanya sheet tertentu (view.sheet).
-const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'view.area', where: 'Produk!A1:D13' },  // baru
-    { who: 'role:kasir', effect: 'allow', action: 'view.sheet', where: 'Produk' }         // baru
-];
-
-const wb = buatStok();
-wb.addSheet('Rekap');
-wb.setAccess(rows, { user: 'rina', roles: ['kasir'] });
-console.log('area yang tampil :', JSON.stringify(wb.access().ui.area));
-console.log('sheet yang tampil:', JSON.stringify(wb.access().ui.sheets), '| Rekap tampil?', wb.sheetShown('Rekap'));
-```
-<!-- /contoh -->
-
-<!-- hasil: 13-21-area.ts -->
-```text
-area yang tampil : {"Produk":"A1:D13"}
-sheet yang tampil: ["Produk"] | Rekap tampil? false
-```
-<!-- /hasil -->
-
-**Penjelasan:**
-
-- `view.area` dengan `where` sebuah range: hanya area itu yang tampil. Baris dan kolom di luarnya tidak digambar, sehingga layar terasa seperti
-  sheet kecil.
-- `view.sheet` dengan `where` nama sebuah sheet: hanya sheet itu yang tampil di tab. Tulis satu baris per sheet.
-- Sama seperti 13.22, ini soal tampilan. Untuk menjaga isinya, pakai aturan sel.
-
----
-
-# Bagian E. Di React (mode live)
-
-## 13.24 Memasang di `<Sheet>`
-
-**Tujuan:** aturan yang sama dengan 13.13, sekarang di layar.
-
-<!-- contoh: 13-22-sheet.page.tsx -->
+<!-- contoh: 13-23-area.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -1010,39 +963,47 @@ import type { AccessRow } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 22: memasang aturan di <Sheet>. Aturan yang sama dengan langkah 11, sekarang di layar.
-const ATURAN: AccessRow[] = [
+// 13.23 Hanya sebagian sheet yang tampil (view.area), dan hanya sheet tertentu (view.sheet).
+const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
+    { who: 'role:kasir', effect: 'allow', action: 'view.area', where: 'Produk!A1:D13' },  // baru
+    { who: 'role:kasir', effect: 'allow', action: 'view.sheet', where: 'Produk' }         // baru
 ];
 
-export default function StokUntukKasir() {
-    const [wb] = useState(buatStok);
-    // who: dari sesi login aplikasimu (akun + role-nya)
-    const rina = { user: 'rina', roles: ['kasir'] };
+function buatDuaSheet() {
+    const wb = buatStok();
+    wb.addSheet('Rekap');                                   // sheet kedua, yang tidak boleh terlihat kasir
+    return wb;
+}
+
+export default function Halaman() {
+    const [wb] = useState(buatDuaSheet);
     return (
-        <div style={{ height: 420 }}>
-            <Sheet workbook={wb} access={{ rows: ATURAN, who: rina }} />
+        <div style={{ height: 330 }}>
+            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
         </div>
     );
 }
 ```
 <!-- /contoh -->
 
-![Sheet dengan aturan kasir](img/akses-sheet.png)
+![Hanya kolom A sampai D dan satu tab](img/akses-area.png)
 
 **Penjelasan:**
 
-- Prop `access={{ rows, who }}` memberikan aturan dan orangnya ke sheet. Isinya sama dengan dua bahan di 13.1.
-- Sheet langsung menerapkannya, dan menerapkannya lagi setiap kali `rows` atau `who` berubah. Kalau aturan dari database dimuat ulang, cukup
-  ganti state-nya.
-- Prop `access` sama dengan memanggil `wb.setAccess(rows, who)` sendiri. Pilih salah satu, jangan keduanya.
-- Coba klik sel B2 lalu ketik: sheet menolak dan menjelaskan alasannya. Sel di kolom Stok bisa diubah.
+- `view.area` dengan `where` sebuah range: hanya area itu yang tampil. Kolom E dan seterusnya tidak digambar, sehingga layar terasa seperti
+  sheet kecil.
+- `view.sheet` dengan `where` nama sebuah sheet: hanya sheet itu yang tampil di tab. Sheet Rekap ada di workbook, tapi tidak muncul. Tulis
+  satu baris per sheet yang boleh tampil.
+- Sama seperti 13.22, ini soal tampilan. Untuk menjaga isinya, pakai aturan sel.
 
-## 13.25 Tanda di sel: gembok dan mata
+---
 
-Di gambar 13.24, setiap sel punya tanda kecil di **pojok kanan atas**. Diperbesar:
+# Bagian E. Tanda dan pesan
+
+## 13.24 Tanda di sel: gembok dan mata
+
+Sejak 13.8, setiap foto memperlihatkan tanda kecil di **pojok kanan atas** sel. Diperbesar dari foto 13.13:
 
 ![Gembok dan mata di pojok sel](img/akses-gembok.png)
 
@@ -1057,12 +1018,12 @@ Tanda ini muncul sendiri, tanpa kode tambahan. Gunanya supaya orang tahu sebelum
 
 Tanda ini juga muncul di sel yang dikunci oleh kode aplikasimu (`setRules`, [bab 10](10-aturan.md)), bukan hanya oleh aturan akses.
 
-## 13.26 Variasi tanda
+## 13.25 Variasi tanda
 
 Prop **`marks`** mengatur tanda di sel. Pilihannya bisa **dinyalakan satu per satu dan dicampur**. Aturan dan orangnya sama di setiap gambar
 di bawah; hanya `marks` yang berbeda.
 
-<!-- contoh: 13-24-tanda.page.tsx -->
+<!-- contoh: 13-25-tanda.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -1071,7 +1032,7 @@ import type { AccessRow } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 24: variasi tanda (prop marks). Aturan dan orangnya sama; hanya marks yang berbeda, satu variasi per sheet.
+// 13.25 Variasi tanda (prop marks). Aturan dan orangnya sama; hanya marks yang berbeda, satu variasi per sheet.
 const ATURAN: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
@@ -1129,9 +1090,9 @@ export default function VariasiTanda() {
 
 Pilihan yang tidak ditulis memakai nilai bawaannya. Jadi `{ tint: true }` berarti gembok + mata + abu-abu.
 
-Tanda hanya bantuan untuk mata. Yang benar-benar menjaga datanya tetap aturannya sendiri, yang juga diperiksa di server (13.34).
+Tanda hanya bantuan untuk mata. Yang benar-benar menjaga datanya tetap aturannya sendiri, yang juga diperiksa di server (13.33).
 
-## 13.27 Pesan penolakan
+## 13.26 Pesan penolakan
 
 Saat sesuatu ditolak, sheet menampilkan pesan kecil di bawah grid. Teksnya diambil dari kolom `message` baris aturan, atau teks bawaan kalau
 `message` kosong.
@@ -1170,7 +1131,7 @@ Tiga pemakaian, dari yang paling sederhana:
 
 Contoh lengkap untuk pemakaian ketiga, dengan pesan di bar merah di atas sheet:
 
-<!-- contoh: 13-25-pesan.page.tsx -->
+<!-- contoh: 13-26-pesan.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -1179,7 +1140,7 @@ import type { AccessRow } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 25: pesan penolakan ditampilkan di luar sheet, dengan kata-kata aplikasimu sendiri. Pesan bawaan sheet dimatikan.
+// 13.26 Pesan penolakan ditampilkan di luar sheet, dengan kata-kata aplikasimu sendiri. Pesan bawaan sheet dimatikan.
 const ATURAN: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
@@ -1221,11 +1182,11 @@ Di luar React, penolakan dari workbook didengar dengan `wb.on('reject', fn)` ([4
 Bagian ini untuk membuat **layar pengaturan aturan** di aplikasimu. Library tidak punya layar pengaturan bawaan. Kamu membuatnya sendiri, sesuai
 tampilan aplikasimu. Sheet membantu dengan mode pengaturan (13.3).
 
-## 13.28 Menyalakan mode pengaturan
+## 13.27 Menyalakan mode pengaturan
 
 **Tujuan:** pemilik melihat sel mana yang punya aturan, untuk siapa.
 
-<!-- contoh: 13-26-setup.page.tsx -->
+<!-- contoh: 13-27-setup.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -1233,7 +1194,7 @@ import type { AccessRow } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 26: mode pengaturan. Satu tambahan dari langkah 22: view: 'setup', dan yang membuka adalah pemilik.
+// 13.27 Mode pengaturan. Satu tambahan dari 13.8: view: 'setup', dan yang membuka adalah pemilik.
 const ATURAN: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
@@ -1256,7 +1217,7 @@ export default function ModePengaturan() {
 
 **Penjelasan:**
 
-- Satu tambahan dari 13.24: `view: 'setup'`. Yang membuka adalah pemilik, supaya semua isi terlihat.
+- Satu tambahan dari 13.8: `view: 'setup'`. Yang membuka adalah pemilik, supaya semua isi terlihat.
 - Setiap sel yang kena aturan mendapat **kotak warna kecil di pojok kanan atas, satu kotak untuk setiap who** yang punya aturan di sel itu.
   Di gambar, kolom Stok punya dua kotak: oranye (kasir, karena membaca seluruh tabel) dan biru (gudang, karena mengubah Stok).
 - Dua aturan untuk who yang sama di satu sel tetap satu kotak.
@@ -1265,11 +1226,11 @@ export default function ModePengaturan() {
 - Kotak hanya digambar di bagian sheet yang berisi data. Aturan untuk kolom utuh tidak memberi kotak di ribuan baris kosong.
 - Kalau satu sel punya lebih dari empat who, tampil tiga kotak dan tanda `+n`.
 
-## 13.29 Memilih aturan
+## 13.28 Memilih aturan
 
 **Tujuan:** daftar aturan di samping sheet. Aturan yang dipilih diberi garis di sheet, dan kotak di sheet bisa diklik untuk memilih aturannya.
 
-<!-- contoh: 13-27-pilih.page.tsx -->
+<!-- contoh: 13-28-pilih.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -1278,7 +1239,7 @@ import { accessColor } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 27: memilih aturan. Daftar aturan di samping sheet; yang dipilih bergaris di sheet, dan kotak di sheet bisa diklik.
+// 13.28 Memilih aturan. Daftar aturan di samping sheet; yang dipilih bergaris di sheet, dan kotak di sheet bisa diklik.
 const ATURAN: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
@@ -1324,11 +1285,11 @@ export default function PilihAturan() {
 Nomor aturan adalah posisinya di array `rows`, dihitung dari 0. Warna setiap who dihitung dari namanya, jadi `role:kasir` selalu berwarna sama
 di setiap layar dan komputer. Warna sendiri bisa diberikan lewat `access.colors`: `{ 'role:kasir': '#1a73e8' }`.
 
-## 13.30 Membuat aturan dari range yang dipilih
+## 13.29 Membuat aturan dari range yang dipilih
 
 **Tujuan:** pemilik memilih range di sheet, lalu menekan satu tombol untuk membuat aturan dari range itu.
 
-<!-- contoh: 13-28-tambah.page.tsx -->
+<!-- contoh: 13-29-tambah.page.tsx -->
 ```tsx
 import { useState } from 'react';
 import { Sheet } from '@kufayeka/sheet';
@@ -1338,7 +1299,7 @@ import { accessColor } from '@kufayeka/sheet/core';
 import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 28: membuat aturan dari range yang dipilih. Satu tambahan dari langkah 27: onSelectionChange dan tombol Tambah.
+// 13.29 Membuat aturan dari range yang dipilih. Satu tambahan dari 13.28: onSelectionChange dan tombol Tambah.
 const AWAL: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
@@ -1389,7 +1350,7 @@ export default function TambahAturan() {
 - Tombol membuat **satu baris baru** di `rows`, lalu memilihnya, sehingga range-nya langsung bergaris di sheet.
 - Di gambar, F2:F5 sudah disembunyikan untuk kasir: baris baru ada di daftar, dan range-nya bergaris oranye.
 
-## 13.31 Berpindah mode: lihat sebagai orang lain
+## 13.30 Berpindah mode: lihat sebagai orang lain
 
 **Tujuan:** mencoba aturan sebelum menyimpannya, dengan melihat sheet persis seperti yang dilihat Rina.
 
@@ -1412,11 +1373,11 @@ Mode "Lihat sebagai Rina (kasir)", dengan aturan yang sama:
 
 Alur lengkap layar pengaturan:
 
-1. Pemilik memilih range di sheet (13.30).
+1. Pemilik memilih range di sheet (13.29).
 2. Memilih siapa dan aturannya, lalu menekan Tambah: satu baris baru.
-3. Klik baris di daftar: range-nya bergaris dan terpilih di sheet. Klik kotak di sheet: barisnya terpilih di daftar (13.29).
+3. Klik baris di daftar: range-nya bergaris dan terpilih di sheet. Klik kotak di sheet: barisnya terpilih di daftar (13.28).
 4. Pindah ke "Lihat sebagai ...": sheet tampil seperti untuk orang itu.
-5. `validateAccess(rows)` memeriksa barisnya (13.36), lalu baris-baris itu disimpan ke database (13.32).
+5. `validateAccess(rows)` memeriksa barisnya (13.35), lalu baris-baris itu disimpan ke database (13.31).
 
 ---
 
@@ -1425,7 +1386,7 @@ Alur lengkap layar pengaturan:
 Browser bisa diakali orang. Karena itu, aturan yang sama juga dijalankan di server, dengan dua fungsi: `viewFor` saat membuka, dan `checkPatch`
 saat menyimpan.
 
-## 13.32 Tabel `sheet_access`
+## 13.31 Tabel `sheet_access`
 
 Aturan disimpan di tabel tersendiri, satu baris per aturan:
 
@@ -1456,17 +1417,17 @@ Isinya untuk toko di bab ini:
 Karena satu aturan adalah satu baris, pertanyaan seperti "siapa saja yang boleh mengubah kolom Stok?" cukup dijawab dengan satu `select`.
 Untuk dipakai, ambil semua baris milik spreadsheet itu, lalu berikan apa adanya ke library sebagai `rows`.
 
-## 13.33 `viewFor`: yang dikirim ke browser
+## 13.32 `viewFor`: yang dikirim ke browser
 
 **Tujuan:** saat Rina membuka, server mengirim isi workbook **tanpa** isi yang tersembunyi untuknya.
 
-<!-- contoh: 13-31-viewfor.ts -->
+<!-- contoh: 13-32-viewfor.ts -->
 ```ts
 import { viewFor } from '@kufayeka/sheet/core';
 import type { AccessRow } from '@kufayeka/sheet/core';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 31: viewFor. Saat rina membuka, server mengirim isi workbook TANPA isi yang tersembunyi untuknya.
+// 13.32 viewFor. Saat rina membuka, server mengirim isi workbook TANPA isi yang tersembunyi untuknya.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
@@ -1480,7 +1441,7 @@ console.log('nama produk ikut terkirim?            ', teks.includes('Semen Portl
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-31-viewfor.ts -->
+<!-- hasil: 13-32-viewfor.ts -->
 ```text
 harga beli Semen (64000) ikut terkirim? false
 nama produk ikut terkirim?             true
@@ -1491,17 +1452,17 @@ nama produk ikut terkirim?             true
 dikosongkan. Harga beli tidak ikut terkirim, jadi tidak bisa diintip lewat DevTools. Rumus yang membaca sel tersembunyi hanya dikirim
 hasilnya, tanpa rumusnya. Cara menyambungkannya ke route GET ada di [bab 12](12-server.md).
 
-## 13.34 `checkPatch`: yang boleh disimpan
+## 13.33 `checkPatch`: yang boleh disimpan
 
 **Tujuan:** perubahan dari browser Rina diperiksa sekali lagi sebelum disimpan.
 
-<!-- contoh: 13-32-checkpatch.ts -->
+<!-- contoh: 13-33-checkpatch.ts -->
 ```ts
 import { createWorkbook, checkPatch } from '@kufayeka/sheet/core';
 import type { AccessRow } from '@kufayeka/sheet/core';
 import { buatStok } from './data/stok-akses.js';
 
-// Langkah 32: checkPatch. Perubahan dari browser rina diperiksa lagi sebelum disimpan, dengan aturan yang sama.
+// 13.33 checkPatch. Perubahan dari browser rina diperiksa lagi sebelum disimpan, dengan aturan yang sama.
 const rows: AccessRow[] = [
     { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
@@ -1522,7 +1483,7 @@ console.log('ubah nama:', hasil.ok ? 'diterima' : 'ditolak', '|', hasil.problems
 ```
 <!-- /contoh -->
 
-<!-- hasil: 13-32-checkpatch.ts -->
+<!-- hasil: 13-33-checkpatch.ts -->
 ```text
 ubah stok: diterima
 ubah nama: ditolak | B2: You can only view this here
@@ -1537,7 +1498,7 @@ menyambungkannya ke route PUT ada di [bab 12](12-server.md).
 
 # Bagian H. Batas dan referensi
 
-## 13.35 Batas kemampuan
+## 13.34 Batas kemampuan
 
 Yang **tidak** dilakukan oleh hak akses, supaya tidak ada salah paham:
 
@@ -1550,7 +1511,7 @@ Yang **tidak** dilakukan oleh hak akses, supaya tidak ada salah paham:
 | Menjaga data dengan tampilan | `ui.*`, `view.*`, dan tanda di sel hanya tampilan | aturan sel dan aksi, ditambah `viewFor` dan `checkPatch` di server |
 | Menjaga data tanpa server | browser bisa diakali | selalu jalankan `viewFor` dan `checkPatch` di server |
 
-## 13.36 Referensi
+## 13.35 Referensi
 
 Bagian ini untuk dicari, bukan dibaca dari awal.
 
@@ -1598,7 +1559,7 @@ Tanda `$` boleh dipakai (`$G$2`). `where` yang tidak bisa dibaca **tidak mengena
 
 ### Semua isi `action`
 
-<!-- tabel: 13-33-daftar.ts -->
+<!-- tabel: 13-35-daftar.ts -->
 | Kelompok | action |
 |---|---|
 | Cells | `read`, `edit`, `see` |
@@ -1626,15 +1587,15 @@ dropdown di layar pengaturanmu.
 
 | Prop | Isi | Langkah |
 |---|---|---|
-| `access.rows` | daftar aturan | 13.24 |
-| `access.who` | siapa yang membuka | 13.24 |
-| `access.view` | `'live'` (bawaan) atau `'setup'` | 13.28 |
-| `access.selected` | nomor aturan yang diberi garis (mode pengaturan) | 13.29 |
-| `access.onSelect` | dipanggil saat kotak di sel diklik (mode pengaturan) | 13.29 |
-| `access.colors` | warna sendiri untuk sebagian who | 13.29 |
-| `marks` | `{ lock, hidden, tint, stripes }` atau `false` | 13.26 |
-| `onNotice` | setiap pesan sheet, sebelum tampil | 13.27 |
-| `onSelectionChange` | range yang dipilih, sekali setelah mouse dilepas | 13.30 |
+| `access.rows` | daftar aturan | 13.8 |
+| `access.who` | siapa yang membuka | 13.8 |
+| `access.view` | `'live'` (bawaan) atau `'setup'` | 13.27 |
+| `access.selected` | nomor aturan yang diberi garis (mode pengaturan) | 13.28 |
+| `access.onSelect` | dipanggil saat kotak di sel diklik (mode pengaturan) | 13.28 |
+| `access.colors` | warna sendiri untuk sebagian who | 13.28 |
+| `marks` | `{ lock, hidden, tint, stripes }` atau `false` | 13.25 |
+| `onNotice` | setiap pesan sheet, sebelum tampil | 13.26 |
+| `onSelectionChange` | range yang dipilih, sekali setelah mouse dilepas | 13.29 |
 
 ### Fungsi
 
