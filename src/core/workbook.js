@@ -1101,6 +1101,66 @@ export function createWorkbook(doc, options) {
         out.series = out.series.map((one) => ({ ...((x.series && x.series[one.index]) || {}), ...one }));
         return out;
     }
+
+    // ---- sparklines: a small line or columns in each cell of a block, as in Excel; cell i of the block draws row i of the data (or column i when the
+    // block is a row). Kept in the sheet's props by ids, as charts are; changing them asks for the access row `chart`.
+    const sparksOf = (s) => sheetOf(s).props.sparklines || [];
+    const putSparks = (s, list, how) => setSheetProps(s, { sparklines: list.length ? list : null }, how);
+    const SPARK_TYPES = ['line', 'column', 'winloss'];
+    function sparkOwn(s, spec, base) {
+        const out = { ...base };
+        for (const [k, v] of Object.entries(spec || {})) {
+            if (k === 'id') continue;
+            if (k === 'at') { const at = chartRange(s, v, 'place'); if (at.s !== s) throw new Error('sparklines stand on their own sheet'); out.at = idsOfRect(s, at.rect); }
+            else if (k === 'data') { const d = chartRange(s, v, 'data'); out.data = { s: d.s, ...idsOfRect(d.s, d.rect) }; }
+            else if (v === undefined) delete out[k];
+            else out[k] = clone(v);
+        }
+        if (!SPARK_TYPES.includes(out.type)) throw new Error('a sparkline is one of ' + SPARK_TYPES.join(', ') + ', not "' + out.type + '"');
+        return out;
+    }
+    /** Sparklines in the cells `at` ("F2:F8") from the rows of `data` ("G2:N8"): type line (the default), column or winloss. Returns the group's id. */
+    function addSparkline(s, spec, how) {
+        s = sheetIdOf(s);
+        if (!spec || !spec.at || !spec.data) throw new Error('sparklines need `at` (their cells) and `data` (the range they read)');
+        const group = { id: newId(), ...sparkOwn(s, spec, { type: 'line', color: '#6929c4', markers: 'last' }) };
+        putSparks(s, sparksOf(s).concat([group]), how);
+        return group.id;
+    }
+    function setSparkline(s, id, patch, how) {
+        s = sheetIdOf(s);
+        const all = sparksOf(s);
+        const old = all.find((x) => x.id === id);
+        if (!old) throw new Error('there are no sparklines "' + id + '"');
+        return putSparks(s, all.map((x) => (x.id === id ? { id, ...sparkOwn(s, patch, old) } : x)), how);
+    }
+    function removeSparkline(s, id, how) {
+        s = sheetIdOf(s);
+        const all = sparksOf(s);
+        if (!all.some((x) => x.id === id)) return null;
+        return putSparks(s, all.filter((x) => x.id !== id), how);
+    }
+    /** The sparkline groups of a sheet as they stand now, each with the numbers of each of its cells: cells: [{ r, c, values: [number|null] }]. */
+    function sparklines(s) {
+        s = sheetIdOf(s);
+        return sparksOf(s).map((x) => {
+            const at = rectOfIds(s, x.at), d = x.data && rectOfIds(x.data.s, x.data);
+            const cells = [];
+            if (at && d) {
+                const down = at.c1 === at.c2 && at.r2 > at.r1 || (at.r1 === at.r2 && at.c1 === at.c2 && d.r1 === d.r2);
+                const n = down ? at.r2 - at.r1 + 1 : at.c2 - at.c1 + 1;
+                for (let i = 0; i < n; i++) {
+                    const values = [];
+                    if (down) { const r = d.r1 + i; if (r <= d.r2) for (let c = d.c1; c <= d.c2; c++) values.push(numberOrNull(api.value(x.data.s, r, c))); }
+                    else { const c = d.c1 + i; if (c <= d.c2) for (let r = d.r1; r <= d.r2; r++) values.push(numberOrNull(api.value(x.data.s, r, c))); }
+                    cells.push({ r: down ? at.r1 + i : at.r1, c: down ? at.c1 : at.c1 + i, values });
+                }
+            }
+            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? rectText(d) : null, cells };
+        });
+    }
+    const numberOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
     const quoteSheet = (name) => (/^[A-Za-z_][\w.]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'");
     const rectText = (b) => colName(b.c1) + (b.r1 + 1) + (b.r1 === b.r2 && b.c1 === b.c2 ? '' : ':' + colName(b.c2) + (b.r2 + 1));
 
@@ -2090,7 +2150,7 @@ export function createWorkbook(doc, options) {
         user: () => author(),
         // pivot tables
         addPivot, setPivot, removePivot, pivots, pivotAt,
-        addChart, setChart, removeChart, charts, chartData,
+        addChart, setChart, removeChart, charts, chartData, addSparkline, setSparkline, removeSparkline, sparklines,
         // named ranges
         addName, setName, removeName, names, nameRange, nameProblem,
         // conditional formatting

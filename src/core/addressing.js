@@ -156,4 +156,4 @@ const SHEET_FNS = [...CELL_FNS, ...Object.keys(RANGE_FNS), 'setRowProps', 'setCo
     'rowAxis', 'colAxis', 'setTypes', 'groupRows', 'ungroupRows', 'groupCols', 'ungroupCols', 'foldRowGroup', 'foldColGroup', 'showRowLevel', 'showColLevel',
     'rowGroups', 'colGroups', 'removeFilter', 'setFilterColumn', 'filterOf', 'filterValues', 'dataRegion', 'conditionals', 'removeConditional', 'moveConditional',
     'replyComment', 'editComment', 'deleteComment', 'mayChangeComment', 'comments', 'hideSheet', 'removeSheet', 'duplicateSheet', 'moveSheet', 'sheetShown',
-    'addPivot', 'setPivot', 'removePivot', 'pivots', 'addChart', 'setChart', 'removeChart', 'charts', 'chartData'];
+    'addPivot', 'setPivot', 'removePivot', 'pivots', 'addChart', 'setChart', 'removeChart', 'charts', 'chartData', 'addSparkline', 'setSparkline', 'removeSparkline', 'sparklines'];

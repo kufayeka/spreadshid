@@ -14,6 +14,8 @@
 //     style: { bold, italic, underline, strike, color, fill } }
 //   { id, ranges, kind: 'scale',
 //     min: { type: 'min' | 'number' | 'percent' | 'percentile', value, color }, mid: { ... } | null, max: { type: 'max' | ..., value, color } }
+//   { id, ranges, kind: 'bar', color, min?: { type, value }, max?: { type, value } }   a data bar: a bar in the cell as long as its number, from the
+//                                                 smallest (0 when every number is positive) to the largest of the ranges, under the cell's text
 
 import { newId } from './ids.js';
 import { shiftFormula } from './formula/formula.js';
@@ -29,6 +31,12 @@ export function makeConditional(wb, s, rects, spec) {
     const ranges = rects.map((rect) => ({ r1: wb.rowId(s, rect.r1), c1: wb.colId(s, rect.c1), r2: wb.rowId(s, rect.r2), c2: wb.colId(s, rect.c2) }));
     const rule = { ...spec, id: spec.id || newId(), ranges };
     delete rule.r1; delete rule.c1; delete rule.r2; delete rule.c2;
+    if (rule.kind === 'bar') {
+        rule.color = spec.color || '#6929c4';
+        rule.min = spec.min || null;
+        rule.max = spec.max || null;
+        return rule;
+    }
     if (rule.kind !== 'scale') {
         rule.kind = 'single';
         if (!CONDITION_OPS.includes(rule.op)) throw new Error('a rule of conditional formatting needs one of these conditions: ' + CONDITION_OPS.join(', '));
@@ -72,19 +80,30 @@ export function conditionalFormulaText(wb, s, rule) {
  */
 export function conditionalStyleOf(wb, list, s, r, c, revision, cache) {
     if (!list || !list.length) return null;
+    // a data bar goes together with whatever colour another rule gives the cell (the first bar that covers the cell)
+    let bar = null;
     for (const rule of list) {
+        if (rule.kind !== 'bar') continue;
+        const rects = rectsCached(wb, s, rule, revision, cache);
+        if (!rects.some((b) => r >= b.r1 && r <= b.r2 && c >= b.c1 && c <= b.c2)) continue;
+        bar = barOf(wb, s, rule, wb.value(s, r, c), rects, revision, cache);
+        if (bar) break;
+    }
+    const withBar = (style) => (bar ? { ...(style || {}), dataBar: bar } : style);
+    for (const rule of list) {
+        if (rule.kind === 'bar') continue;
         const rects = rectsCached(wb, s, rule, revision, cache);
         const inside = rects.find((b) => r >= b.r1 && r <= b.r2 && c >= b.c1 && c <= b.c2);
         if (!inside) continue;
         if (rule.kind === 'scale') {
             const fill = scaleColour(wb, s, rule, wb.value(s, r, c), rects, revision, cache);
-            if (fill) return { fill };
+            if (fill) return withBar({ fill });
             continue;
         }
         if (!Object.keys(rule.style || {}).length) continue;
-        if (holds(wb, s, rule, r, c, rects[0], revision, cache)) return rule.style;
+        if (holds(wb, s, rule, r, c, rects[0], revision, cache)) return withBar(rule.style);
     }
-    return null;
+    return withBar(null);
 }
 
 function entryOf(cache, rule, revision) {
@@ -204,6 +223,24 @@ function scalePoints(wb, s, rule, rects, revision, cache) {
     const mid = rule.mid ? pointValue({ type: 'percentile', value: 50, ...rule.mid }, numbers, (lo + hi) / 2) : null;
     e.scale = { lo, hi, mid };
     return e.scale;
+}
+
+// a data bar: how much of the cell its number fills (0 to 1), from the rule's min (the smallest number, or 0 when all are positive) to its max
+function barOf(wb, s, rule, v, rects, revision, cache) {
+    if (typeof v !== 'number') return null;
+    const e = entryOf(cache, rule, revision);
+    if (!e.bar) {
+        const numbers = [];
+        for (const b of rects) for (let r = b.r1; r <= b.r2; r++) for (let c = b.c1; c <= b.c2; c++) { const x = wb.value(s, r, c); if (typeof x === 'number') numbers.push(x); }
+        numbers.sort((x, y) => x - y);
+        if (!numbers.length) { e.bar = { none: true }; return null; }
+        const lo = rule.min ? pointValue(rule.min, numbers, Math.min(0, numbers[0])) : Math.min(0, numbers[0]);
+        const hi = rule.max ? pointValue(rule.max, numbers, numbers[numbers.length - 1]) : numbers[numbers.length - 1];
+        e.bar = { lo, hi };
+    }
+    if (e.bar.none || !(e.bar.hi > e.bar.lo)) return null;
+    const pct = Math.max(0, Math.min(1, (v - e.bar.lo) / (e.bar.hi - e.bar.lo)));
+    return { pct: Math.round(pct * 1000) / 1000, color: rule.color };
 }
 
 function scaleColour(wb, s, rule, v, rects, revision, cache) {

@@ -478,3 +478,46 @@ function drawWaterfall(ctx, o, s, hits) {
         }
     });
 }
+
+// ---- sparklines: a small chart in one cell, without axes ------------------------------------------------------------------------------------------
+
+/**
+ * Draws a sparkline: a line (with a dot on the last value, or on every value, or none), columns, or win/loss (up for a positive number, down for a
+ * negative one). Gaps (null) break the line and leave a column out.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ width: number, height: number, values: Array<number|null>, type?: string, color?: string, negColor?: string, markers?: string, min?: number, max?: number }} o
+ */
+export function drawSparkline(ctx, o) {
+    const { width, height, values } = o;
+    ctx.clearRect(0, 0, width, height);
+    const pad = 3, w = width - pad * 2, h = height - pad * 2;
+    const nums = values.filter((v) => v !== null);
+    if (!nums.length || w <= 2 || h <= 2) return;
+    const color = o.color || PALETTE[0], neg = o.negColor || STATUS.bad;
+    const n = values.length;
+    if (o.type === 'column' || o.type === 'winloss') {
+        const lo = o.type === 'winloss' ? -1 : Math.min(0, Number.isFinite(o.min) ? o.min : Math.min(...nums));
+        const hi = o.type === 'winloss' ? 1 : Math.max(0, Number.isFinite(o.max) ? o.max : Math.max(...nums));
+        const y = (v) => pad + h - ((v - lo) / (hi - lo || 1)) * h;
+        const band = w / n, bw = Math.max(1, band * 0.7);
+        values.forEach((v, i) => {
+            if (v === null || v === 0) return;
+            const val = o.type === 'winloss' ? Math.sign(v) : v;
+            const a = y(0), b = y(val);
+            ctx.fillStyle = v < 0 ? neg : color;
+            ctx.fillRect(pad + band * i + (band - bw) / 2, Math.min(a, b), bw, Math.max(1, Math.abs(b - a)));
+        });
+        return;
+    }
+    const lo = Number.isFinite(o.min) ? o.min : Math.min(...nums), hi = Number.isFinite(o.max) ? o.max : Math.max(...nums);
+    const x = (i) => pad + (n === 1 ? w / 2 : (i / (n - 1)) * w);
+    const y = (v) => pad + h - ((v - lo) / (hi - lo || 1)) * h;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let pen = false;
+    values.forEach((v, i) => { if (v === null) { pen = false; return; } if (pen) ctx.lineTo(x(i), y(v)); else ctx.moveTo(x(i), y(v)); pen = true; });
+    ctx.stroke();
+    const dot = (i) => { ctx.beginPath(); ctx.arc(x(i), y(values[i]), 2.2, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); };
+    if (o.markers === 'all') values.forEach((v, i) => { if (v !== null) dot(i); });
+    else if (o.markers !== 'none') { for (let i = n - 1; i >= 0; i--) if (values[i] !== null) { dot(i); break; } }
+}

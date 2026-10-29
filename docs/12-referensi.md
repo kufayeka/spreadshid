@@ -170,7 +170,7 @@ Handle juga punya `id` dan `name`.
 | grup | `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups` | [7.5](07-data.md#75-melipat-kelompok-baris) |
 | validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | pivot | `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt` | [7.6](07-data.md#76-pivot-table) |
-| chart | `addChart`, `setChart`, `removeChart`, `charts`, `chartData` | [12](12-dashboard.md) |
+| chart | `addChart`, `setChart`, `removeChart`, `charts`, `chartData`, `addSparkline`, `setSparkline`, `removeSparkline`, `sparklines` | [12](12-dashboard.md) |
 | aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [8](08-menjaga-isi.md) |
 | komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `mayChangeComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
 

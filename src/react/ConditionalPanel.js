@@ -18,6 +18,7 @@ const POINT_TYPES = [['min', 'Min'], ['max', 'Max'], ['number', 'Number'], ['per
 /** What a rule says, in words ("Text is exactly late"), for its card in the list. */
 function ruleSays(wb, s, rule) {
     if (rule.kind === 'scale') return 'Color scale';
+    if (rule.kind === 'bar') return 'Data bar';
     const label = (OPS.find(([v]) => v === rule.op) || [, rule.op])[1];
     if (rule.op === 'formula') return label + ' ' + conditionalFormulaText(wb, s, rule);
     if (rule.op === 'empty' || rule.op === 'notEmpty') return label;
@@ -31,14 +32,15 @@ const sampleStyle = (style) => ({ fontWeight: style.bold ? 'bold' : undefined, f
 
 /** A rule made ready for the editor: texts to type in, as the person sees them. */
 function draftOf(wb, s, rule, range) {
-    if (!rule) return { id: null, ranges: range, kind: 'single', op: 'notEmpty', a: '', b: '', day: 'today', formula: '', style: { ...DEFAULT_STYLE }, ...scaleDraft(SCALES[0]) };
+    if (!rule) return { id: null, ranges: range, kind: 'single', op: 'notEmpty', a: '', b: '', day: 'today', formula: '', style: { ...DEFAULT_STYLE }, ...scaleDraft(SCALES[0]), barColor: '#6929c4' };
     const show = (v) => (typeof v === 'number' && DATE_OPS.has(rule.op) ? formatValue(v, { type: 'date' }, wb.settings()).text : v === undefined || v === null ? '' : typeof v === 'number' ? formatValue(v, { type: 'general' }, wb.settings()).text : String(v));
     return {
         id: rule.id, ranges: rangesText(wb, s, rule), kind: rule.kind,
         op: rule.op || 'notEmpty', a: typeof rule.a === 'string' && DATE_OPS.has(rule.op) ? '' : show(rule.a), b: show(rule.b),
         day: DATE_OPS.has(rule.op) ? (typeof rule.a === 'number' ? 'exact' : rule.a) : 'today',
         formula: rule.op === 'formula' ? conditionalFormulaText(wb, s, rule) : '', style: { ...(rule.style || DEFAULT_STYLE) },
-        ...(rule.kind === 'scale' ? { min: { ...rule.min }, mid: rule.mid ? { ...rule.mid } : null, max: { ...rule.max } } : scaleDraft(SCALES[0]))
+        ...(rule.kind === 'scale' ? { min: { ...rule.min }, mid: rule.mid ? { ...rule.mid } : null, max: { ...rule.max } } : scaleDraft(SCALES[0])),
+        barColor: rule.kind === 'bar' ? rule.color : '#6929c4'
     };
 }
 function scaleDraft(preset) {
@@ -70,6 +72,7 @@ export function ConditionalPanel({ workbook: wb, sheetId: s, range, revision, on
 
     // the texts typed made into a rule (numbers and dates read in the sheet's locale), or a reason it cannot be
     function specOf(d) {
+        if (d.kind === 'bar') return { kind: 'bar', color: d.barColor || '#6929c4' };
         if (d.kind === 'scale') {
             const point = (p) => (p ? { type: p.type, color: p.color, ...(p.type === 'min' || p.type === 'max' ? {} : { value: Number(String(p.value).replace(',', '.')) }) } : null);
             for (const p of [d.min, d.mid, d.max]) if (p && !(p.type === 'min' || p.type === 'max') && !Number.isFinite(Number(String(p.value).replace(',', '.')))) return 'Write a number for each point that is not Min or Max';
@@ -107,7 +110,9 @@ export function ConditionalPanel({ workbook: wb, sheetId: s, range, revision, on
                     {rules.map((rule, i) => (
                         <li key={rule.id} className="ks-rule-card">
                             <button type="button" className="ks-rule-open" onClick={() => { setProblem(''); setDraft(draftOf(wb, s, rule, range)); }}>
-                                {rule.kind === 'scale'
+                                {rule.kind === 'bar'
+                                    ? <span className="ks-rule-sample" style={{ background: 'linear-gradient(90deg,' + rule.color + '55 60%, transparent 60%)' }}>123</span>
+                                    : rule.kind === 'scale'
                                     ? <span className="ks-rule-sample" style={{ background: 'linear-gradient(90deg,' + [rule.min.color, rule.mid && rule.mid.color, rule.max.color].filter(Boolean).join(',') + ')' }}>123</span>
                                     : <span className="ks-rule-sample" style={sampleStyle(rule.style || {})}>123</span>}
                                 <span className="ks-rule-text"><span className="ks-rule-says">{ruleSays(wb, s, rule)}</span><span className="ks-rule-ranges">{rangesText(wb, s, rule)}</span></span>
@@ -147,10 +152,19 @@ export function ConditionalPanel({ workbook: wb, sheetId: s, range, revision, on
             <div className="ks-tabs-choice" role="tablist">
                 <button type="button" role="tab" aria-selected={d.kind === 'single'} className={d.kind === 'single' ? 'ks-on' : ''} onClick={() => set({ kind: 'single' })}>Single color</button>
                 <button type="button" role="tab" aria-selected={d.kind === 'scale'} className={d.kind === 'scale' ? 'ks-on' : ''} onClick={() => set({ kind: 'scale' })}>Color scale</button>
+                <button type="button" role="tab" aria-selected={d.kind === 'bar'} className={d.kind === 'bar' ? 'ks-on' : ''} onClick={() => set({ kind: 'bar' })}>Data bar</button>
             </div>
             <div className="ks-form">
                 <label className="ks-field ks-field-stack"><span>Apply to range</span><input value={d.ranges} onChange={(e) => set({ ranges: e.target.value })} /></label>
-                {d.kind === 'single' ? (
+                {d.kind === 'bar' ? (
+                    <div className="ks-field-stack"><span className="ks-field-label">Bar color</span>
+                        <div className="ks-style-row">
+                            <span className="ks-rule-sample" style={{ background: 'linear-gradient(90deg,' + d.barColor + '55 60%, transparent 60%)' }}>123</span>
+                            <ColorPicker label="Bar color" icon={<Icon name="fill" under={d.barColor} />} value={d.barColor} onPick={(c) => set({ barColor: c || '#6929c4' })} container={container} />
+                        </div>
+                        <span className="ks-panel-help">Each number gets a bar as long as its share between the smallest (0 when all are positive) and the largest of the range.</span>
+                    </div>
+                ) : d.kind === 'single' ? (
                     <>
                         <label className="ks-field ks-field-stack"><span>Format cells if…</span>
                             <select value={d.op} onChange={(e) => set({ op: e.target.value })}>{OPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>

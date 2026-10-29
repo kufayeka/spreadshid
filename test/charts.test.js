@@ -94,5 +94,35 @@ const cells = (rows) => rows.map((r) => r.map((v) => ({ value: v, text: v === nu
     ok('changing charts needs the access row `chart`; reading them does not');
 }
 
+// ---- sparklines and data bars
+{
+    const wb = createWorkbook();
+    const s = wb.sheet('Sheet1');
+    s.setValues('B2', [[1, 2, 3], [4, 'x', 6], [-1, 2, -3]]);
+    const id = s.addSparkline({ at: 'A2:A4', data: 'B2:D4', type: 'column', color: '#1192e8' });
+    let g = s.sparklines()[0];
+    assert.deepStrictEqual([g.type, g.atText, g.dataText, g.cells.map((x) => x.values)], ['column', 'A2:A4', 'B2:D4', [[1, 2, 3], [4, null, 6], [-1, 2, -3]]], 'cell i draws row i of the data');
+    s.insertRows('1');
+    g = s.sparklines()[0];
+    assert.deepStrictEqual([g.atText, g.cells[0].r], ['A3:A5', 2], 'they move with their cells');
+    s.setSparkline(id, { type: 'winloss' });
+    assert.strictEqual(s.sparklines()[0].type, 'winloss');
+    assert.throws(() => s.setSparkline(id, { type: 'pie' }), /a sparkline is one of/);
+    s.removeSparkline(id);
+    assert.strictEqual(s.sparklines().length, 0);
+    // a sparkline in a row: cell i draws column i
+    s.setValues('F1', [[10, 20], [30, 40]]);
+    s.addSparkline({ at: 'F4:G4', data: 'F1:G2' });
+    assert.deepStrictEqual(s.sparklines()[0].cells.map((x) => x.values), [[10, 30], [20, 40]]);
+    ok('sparklines: cell i draws row i (or column i), move with their cells, kinds checked');
+
+    s.setValues('J1', [[50], [100], [25], ['x']]);
+    s.addConditional('J1:J4', { kind: 'bar', color: '#1192e8' });
+    s.addConditional('J1:J4', { op: 'gt', a: 60, style: { bold: true } });
+    assert.deepStrictEqual([s.shownStyle(0, 9).dataBar, s.shownStyle(1, 9), s.shownStyle(3, 9) || null],
+        [{ pct: 0.5, color: '#1192e8' }, { bold: true, dataBar: { pct: 1, color: '#1192e8' } }, null], 'a data bar from 0 to the largest, together with another rule\'s style; text has none');
+    ok('data bars: as long as the number among the range, together with other rules');
+}
+
 console.log('\n' + passed + ' passed');
 console.log('ALL OK');

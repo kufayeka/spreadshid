@@ -101,7 +101,9 @@ export type ConditionOp = 'empty' | 'notEmpty' | 'textContains' | 'textNotContai
 export interface ScalePoint { type: 'min' | 'max' | 'number' | 'percent' | 'percentile'; value?: number; color: string }
 export type ConditionalSpec =
     | { kind?: 'single'; op: ConditionOp; a?: CellValue; b?: CellValue; formula?: string; style: Pick<Style, 'bold' | 'italic' | 'underline' | 'strike' | 'color' | 'fill'> }
-    | { kind: 'scale'; min: ScalePoint; mid?: ScalePoint | null; max: ScalePoint };
+    | { kind: 'scale'; min: ScalePoint; mid?: ScalePoint | null; max: ScalePoint }
+    /** A data bar: a bar under the cell's text as long as its number, from the smallest (0 when all are positive) to the largest of the range. */
+    | { kind: 'bar'; color?: string; min?: Omit<ScalePoint, 'color'> | null; max?: Omit<ScalePoint, 'color'> | null };
 export type ConditionalRule = ConditionalSpec & { id: string; ranges: object[] };
 
 export interface ValidationSpec {
@@ -174,6 +176,17 @@ export interface ChartSpec {
 }
 /** A chart as wb.charts() gives it: its settings, and where its cells and data are now. */
 export interface ChartInfo extends Omit<ChartSpec, 'at' | 'data'> { id: string; type: ChartType; at: Rect | null; atText: string | null; dataText: string | null }
+/** A group of sparklines: where they stand, what they read, how they look. */
+export interface SparklineSpec {
+    at?: string; data?: string; type?: 'line' | 'column' | 'winloss'; color?: string; negColor?: string;
+    /** line: a dot on the last value (the default), on every value, or none. */
+    markers?: 'last' | 'all' | 'none';
+    min?: number; max?: number;
+}
+export interface SparklineInfo extends Omit<SparklineSpec, 'at' | 'data'> {
+    id: string; at: Rect | null; atText: string | null; dataText: string | null;
+    cells: Array<{ r: number; c: number; values: Array<number | null> }>;
+}
 /** What a chart draws, read from its data now. */
 export interface ChartModel {
     categories: string[];
@@ -394,6 +407,11 @@ export interface SheetFns {
     removeChart(id: string, how?: How): Op[] | null;
     charts(): ChartInfo[];
     chartData(id: string): ChartModel;
+    // sparklines: a small chart in each cell of `at`, cell i drawing row i of `data` (column i when `at` is a row)
+    addSparkline(spec: SparklineSpec & { at: string; data: string }, how?: How): string;
+    setSparkline(id: string, patch: SparklineSpec, how?: How): Op[] | null;
+    removeSparkline(id: string, how?: How): Op[] | null;
+    sparklines(): SparklineInfo[];
     // comments
     addComment(at: CellAt, text: string, how?: How): { thread: string; item: string };
     replyComment(thread: string, text: string, how?: How): string;

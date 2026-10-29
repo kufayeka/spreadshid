@@ -17,7 +17,7 @@ import { fillTarget } from '../core/fill.js';
 import { sortRange } from '../core/search.js';
 import { Menu } from './Menu.js';
 import { rememberCopy, forgetCut, pasteFromClipboard } from './commands.js';
-import { ChartObject } from './chart/ChartObject.js';
+import { ChartObject, SparkCell } from './chart/ChartObject.js';
 
 // the smallest a column or a row can be dragged to
 const MIN_SIZE = 4;
@@ -72,6 +72,8 @@ function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guard
         <div className={'ks-cell' + (merged ? ' ks-merged' : '') + (cover ? ' ks-cover' : '') + (guarded && !own ? ' ks-guarded' : '') + (noted ? ' ks-noted' : '')} data-r={r} data-c={c} data-mode={guarded || undefined}
             style={{ left: x, top: y, width: Math.max(0, w - 1), height: Math.max(0, h - 1), background: own ? undefined : css.background, alignItems: css.alignItems, justifyContent: css.justifyContent }}>
             {own ? <span className={'ks-own' + (guarded ? ' ks-guarded' : '')} style={{ width: Math.max(0, ownWidth - 1), background: css.background }} /> : null}
+            {/* a data bar (conditional formatting): under the text, as long as the cell's number among the others of its range */}
+            {style && style.dataBar ? <span className="ks-databar" style={{ width: (style.dataBar.pct * 100) + '%', background: style.dataBar.color }} /> : null}
             {rule && rule.kind === 'checkbox'
                 ? <span className={'ks-checkbox' + (display.text === 'TRUE' ? ' ks-checked' : '')} data-check="" role="checkbox" aria-checked={display.text === 'TRUE'} />
                 : <span className={'ks-text' + (style && style.link ? ' ks-link' : '')} title={style && style.link ? style.link + ' (Ctrl+click to open)' : undefined}
@@ -187,6 +189,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     // The charts of the sheet that stand on cells (made again after a change), and a chart being moved or resized: where it would go, shown as a frame
     // until the mouse is let go (then it is one change).
     const chartList = useMemo(() => wb.charts(sheetId).filter((c) => c.at), [wb, sheetId, revision]);
+    const sparkList = useMemo(() => wb.sparklines(sheetId).filter((g) => g.at), [wb, sheetId, revision]);
     const [chartDrag, setChartDrag] = useState(null); // { id, rect }
     // the cells last copied or cut, framed with a moving dashed line until Escape (or until a cut is pasted)
     const [clipMark, setClipMark] = useState(null);
@@ -926,6 +929,14 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (!(a.r1 > rows.to || a.r2 < rows.from || a.c1 > cols.to || a.c2 < cols.from)) {
             out.push(<div key="active" className="ks-active" style={{ left: colAxis.start(a.c1) - xBase, top: rowAxis.start(a.r1) - yBase,
                 width: colAxis.start(a.c2 + 1) - colAxis.start(a.c1), height: rowAxis.start(a.r2 + 1) - rowAxis.start(a.r1) }} />);
+        }
+        // the sparklines of the cells of this pane, each over its cell (under the charts)
+        for (const g of sparkList) for (const cell of g.cells) {
+            if (cell.r < rows.from || cell.r > rows.to || cell.c < cols.from || cell.c > cols.to) continue;
+            const w = colAxis.size(cell.c), h = rowAxis.size(cell.r);
+            if (!w || !h) continue;
+            out.push(<SparkCell key={'spark' + g.id + ':' + cell.r + ':' + cell.c} group={g} values={cell.values}
+                box={{ left: colAxis.start(cell.c) - xBase, top: rowAxis.start(cell.r) - yBase, width: w - 1, height: h - 1 }} />);
         }
         // the charts that reach into this pane, on their blocks of cells (a chart laid over its cells knows the middle of each of its columns)
         for (const chart of chartList) {
