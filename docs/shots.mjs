@@ -123,7 +123,6 @@ export const SHOTS = [
     { name: 'kasir', page: '11-kasir.page.js', act: async ({ js, click, wait }) => {
         const p = await cellAt(js, 3, 7); await click(p.x, p.y); await wait(600);
     }, clip: { x: 0, y: 0, width: 1366, height: 600 } },
-    { name: 'dua-tampilan', page: '11-dua-tampilan.page.js', clip: { x: 0, y: 0, width: 1366, height: 520 } },
     // chapter 13, one picture per step (and per person where a step compares people)
     akses('akses-baca', '13-08-baca.page.tsx', typeAt(1, 6, '9')),
     akses('akses-tidak-disebut-rina', '13-09-tidak-disebut.page.tsx', asWho('rina')),
@@ -184,11 +183,6 @@ export const SHOTS = [
         p = await at(`Array.from(document.querySelectorAll('.ks-menu-item')).find(function(x){ return x.textContent.indexOf('Comments') >= 0; })`);
         await mouse('mouseMoved', p.x - 20, p.y); await mouse('mouseMoved', p.x, p.y); await wait(200); await click(p.x, p.y); await wait(600);
     }, clip: { x: 0, y: 0, width: 1366, height: 480 } },
-    { name: 'langkah2', page: '11-langkah2.page.js', clip: { x: 0, y: 0, width: 760, height: 300 } },
-    { name: 'langkah3', page: '11-langkah3.page.js', act: async ({ js, click, wait }) => {
-        const p = await js('(function(){ var b = document.querySelector(".tambah").getBoundingClientRect(); return { x: Math.round(b.left + 5), y: Math.round(b.top + 5) }; })()');
-        await click(p.x, p.y); await wait(300);
-    }, clip: { x: 0, y: 0, width: 760, height: 330 } },
     { name: 'langkah5', page: '11-langkah5.page.js', act: async ({ js, click, type, key, wait }) => {
         for (let i = 0; i < 30 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(200);
         const p = await cellAt(js, 1, 7); await click(p.x, p.y); await wait(100); await type('99'); await key('Enter', 'Enter', 13); await wait(300);

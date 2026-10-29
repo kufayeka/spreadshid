@@ -243,7 +243,7 @@ Cara kerjanya:
 - **Aturan pertama yang cocok yang dipakai.** Itu sebabnya "Semen" di baris SMN-02 berwarna merah, bukan biru miring: aturan stok kurang ada di urutan
   sebelum aturan kategori. Urutannya diubah dengan `moveConditional`.
 - **Range aturan mengikuti barisnya.** Baris disisipkan di tengah, aturan ikut melebar. Baris di ujung dihapus, aturan menyusut.
-- **Ikut ke Excel.** Aturan-aturan ini diekspor ke `.xlsx` sebagai conditional formatting Excel dan dibaca kembali saat impor ([bab 15](15-excel.md)).
+- **Ikut ke Excel.** Aturan-aturan ini diekspor ke `.xlsx` sebagai conditional formatting Excel dan dibaca kembali saat impor ([bab 11](11-komentar-excel.md)).
 - Di layar, aturan dibuat lewat Format → Conditional formatting, dengan panel di sebelah kanan.
 
 ---

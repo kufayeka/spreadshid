@@ -1,7 +1,7 @@
 import { createWorkbook } from '@kufayeka/sheet/core';
 import { PRODUK, KOLOM_PRODUK } from './toko.js';
 
-// Bahan bersama bab 13: workbook stok toko.
+// Bahan bersama bab 10: workbook stok toko.
 
 /** Sheet Produk: Kode, Nama produk, Kategori, Satuan, Harga beli, Harga jual, Stok, Stok min., Status (A..I), 12 produk. */
 export function buatStok() {

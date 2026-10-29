@@ -60,7 +60,7 @@ hitung ulang semua sheet: kurang dari 50 ms
 ```
 <!-- /hasil -->
 
-Yang dihitung ulang cuma rumus yang memang terkena perubahan itu, bukan seluruh workbook. Karena itu tetap cepat walaupun sheet-nya besar (bab 14).
+Yang dihitung ulang cuma rumus yang memang terkena perubahan itu, bukan seluruh workbook. Karena itu tetap cepat walaupun sheet-nya besar ([bab 12](12-referensi.md#121-contoh-setahun-penjualan)).
 
 ## Harga dan AHSP
 

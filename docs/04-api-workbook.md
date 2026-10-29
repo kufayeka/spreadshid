@@ -464,7 +464,7 @@ Semua fungsi di bawah ini ada di pegangan sheet (`wb.sheet('Produk')`), dan juga
 | `wb.hideSheet(sheet, true/false)` | sembunyikan tab. Tetap dihitung |
 | `wb.moveSheet(sheet, ke)` | pindahkan urutan tab |
 | `setSheetProps(props)`, `sheetProps()` | `name`, `hidden`, `freezeRows`, `freezeCols`, `hideGridlines` |
-| `wb.sheetShown(sheet)` | apakah sheet ini terlihat oleh orang yang membuka, menurut hak akses ([bab 10](13-hak-akses.md)) |
+| `wb.sheetShown(sheet)` | apakah sheet ini terlihat oleh orang yang membuka, menurut hak akses ([bab 10](10-hak-akses.md)) |
 
 ### Pengaturan workbook (`wb.setSettings`)
 

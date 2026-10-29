@@ -313,7 +313,7 @@ export default function Halaman() {
 - Baris pertama, `* allow *`, membuat semua orang tetap boleh melakukan semuanya. Tanpa baris itu, sheet menjadi tidak bisa dipakai, karena
   aturan akses memakai prinsip "yang tidak diizinkan, tidak didapat".
 - Menu, tombol, atau panel satu per satu juga bisa disembunyikan (`ui.menu.Insert`, `ui.tool.paint`, ...), dan bisa berbeda per orang. Semua itu
-  dibahas di [bab 10](13-hak-akses.md#1322-bagian-layar).
+  dibahas di [bab 10](10-hak-akses.md#1022-bagian-layar).
 
 ## 3.9 Warna sendiri
 
@@ -418,11 +418,11 @@ Orang mengetik 400 di D2 pada sheet kiri:
 | `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (3.4) |
 | `onSelectionChange` | `(sel: SheetSelection) => void` | | seleksi berubah; saat men-drag, sekali setelah mouse dilepas (3.5) |
 | `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak oleh aturan atau validasi (bab 8) |
-| `onNotice` | `(n: SheetNotice) => string \| null \| undefined` | | setiap pesan sheet sebelum tampil: diganti, dimatikan, atau ditampilkan sendiri ([10](13-hak-akses.md#1326-pesan-penolakan)) |
+| `onNotice` | `(n: SheetNotice) => string \| null \| undefined` | | setiap pesan sheet sebelum tampil: diganti, dimatikan, atau ditampilkan sendiri ([10](10-hak-akses.md#1026-pesan-penolakan)) |
 | `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak cocok dengan tipe kolomnya (bab 8) |
 | `fileName` | string | `'Spreadsheet'` | nama file, tanpa ekstensi, saat orang memilih File → Download |
-| `access` | `{ rows, who, view?, ... }` | tanpa batasan | aturan akses dan bagian layar (3.8, [bab 10](13-hak-akses.md)) |
-| `marks` | `false \| { lock, hidden, tint, stripes }` | `{ lock: true, hidden: true }` | tanda di sel yang tidak boleh diubah ([10](13-hak-akses.md#1325-variasi-tanda)) |
+| `access` | `{ rows, who, view?, ... }` | tanpa batasan | aturan akses dan bagian layar (3.8, [bab 10](10-hak-akses.md)) |
+| `marks` | `false \| { lock, hidden, tint, stripes }` | `{ lock: true, hidden: true }` | tanda di sel yang tidak boleh diubah ([10](10-hak-akses.md#1025-variasi-tanda)) |
 | `user` | `{ id, name }` | | orang yang membuka sheet; namanya tercatat di komentar |
 | `className` | string | | class tambahan di elemen terluar |
 | `style` | objek style | | style elemen terluar, termasuk ukuran dan variabel tema (3.3, 3.9) |
@@ -529,10 +529,10 @@ Panel muncul di kanan grid, satu panel pada satu waktu:
 
 | Panel | Dibuka dari | Bab |
 |---|---|---|
-| Comments | View → Comments, Insert → Comment, Ctrl+Alt+M | [14](14-komentar.md) |
+| Comments | View → Comments, Insert → Comment, Ctrl+Alt+M | [11](11-komentar-excel.md) |
 | Pivot table editor | memilih sel pivot, Insert → Pivot table | [7.6](07-data.md#76-pivot-table) |
 | Conditional formatting | Format → Conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
-| Data validation | Data → Data validation, Insert → Dropdown | [8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown) |
+| Data validation | Data → Data validation, Insert → Dropdown | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | Named ranges | Data → Named ranges | [5.11](05-rumus.md#511-named-range) |
 | Find and replace | Ctrl+F, Ctrl+H | [7.7](07-data.md#77-mencari-dan-mengganti) |
 

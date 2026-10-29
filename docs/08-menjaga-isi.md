@@ -1,6 +1,6 @@
 # 8. Menjaga isi yang diketik
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Menyimpan ke server](12-server.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Memuat dan menyimpan](09-menyimpan.md)
 
 Bab ini membahas cara menjaga supaya yang diketik orang masuk akal: pilihan dari daftar, angka dengan batas, kolom yang hanya menerima bilangan
 bulat, sel yang tidak boleh diubah, dan aturan bisnis yang membaca sel lain. Setiap langkah adalah satu halaman React dengan foto hasilnya.
@@ -37,7 +37,7 @@ bulat, sel yang tidak boleh diubah, dan aturan bisnis yang membaca sel lain. Set
 Mulailah dari atas. Kalau validasi data sudah cukup, tidak perlu yang lain. `beforeOp` adalah pintu terakhir untuk yang tidak bisa ditulis dengan
 tiga cara lainnya.
 
-Untuk mengatur **siapa** boleh mengubah apa (kasir, gudang, pemilik), pakai hak akses ([bab 10](13-hak-akses.md)). Aturan sel di 8.6 adalah
+Untuk mengatur **siapa** boleh mengubah apa (kasir, gudang, pemilik), pakai hak akses ([bab 8](10-hak-akses.md)). Aturan sel di 8.6 adalah
 bagian per sel dari hak akses itu, tanpa membedakan orang.
 
 ## 8.2 Kapan diperiksa
@@ -191,8 +191,8 @@ Orang mengetik di kolom yang dilindungi:
   `'readonly'` (hanya baca) atau `'hidden'` (`•••`).
 - `when` membuat aturan hanya berlaku di baris yang rumusnya `TRUE`: di sini baris yang statusnya Dihentikan. Rumusnya ditulis untuk baris
   pertama range, lalu bergeser ke setiap baris.
-- Sel yang dilindungi diberi gembok kecil di pojok (bawaan). Tandanya bisa diganti dengan prop `marks` ([10.25](13-hak-akses.md#1325-variasi-tanda)).
-- Aturan sel sama untuk semua orang. Untuk aturan yang berbeda per orang atau per role, pakai hak akses ([bab 10](13-hak-akses.md)).
+- Sel yang dilindungi diberi gembok kecil di pojok (bawaan). Tandanya bisa diganti dengan prop `marks` ([10.25](10-hak-akses.md#1025-variasi-tanda)).
+- Aturan sel sama untuk semua orang. Untuk aturan yang berbeda per orang atau per role, pakai hak akses ([bab 8](10-hak-akses.md)).
 
 ## 8.7 Aturan yang membaca sel lain: `beforeOp`
 
@@ -568,7 +568,7 @@ dari kode                  : 999
 | Isian dari kode tidak diperiksa | memang tidak; tambahkan `{ source: 'user' }` kalau mewakili isian orang (8.2) |
 | Tipe kolom hilang setelah dibuka ulang | tipe dan aturan sel tidak disimpan; pasang lagi setiap kali dibuka |
 | Memakai `beforeOp` untuk batas angka sederhana | pakai validasi data (8.4): ikut file, ikut Excel, dan diperiksa server |
-| Aturan sel diharapkan berbeda per kasir | aturan sel sama untuk semua orang; pakai hak akses (bab 10) |
+| Aturan sel diharapkan berbeda per kasir | aturan sel sama untuk semua orang; pakai hak akses (bab 8) |
 | `beforeOp` dianggap aman dari browser yang diakali | jalankan pemeriksaan yang sama di server |
 
 ## 8.10 Referensi
@@ -594,8 +594,8 @@ dari kode                  : 999
 | `choicesAt(alamat)` | pilihan dropdown sebuah sel |
 | `invalidAt(alamat)` | apa yang dilanggar nilai sel itu (teks), atau `null` kalau sesuai |
 
-Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([8.7](10-aturan.md#87-aturan-yang-membaca-sel-lain-beforeop))
-atau aturan dan tipe kolom ([bab 8](10-aturan.md)).
+Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([8.7](08-menjaga-isi.md#87-aturan-yang-membaca-sel-lain-beforeop))
+atau aturan dan tipe kolom ([bab 8](08-menjaga-isi.md)).
 
 ### Tipe kolom
 
@@ -638,7 +638,7 @@ Yang perlu diketahui:
   aplikasimu sendiri tidak dihalangi.
 - **`when` dihitung terus.** Begitu status sebuah produk diubah menjadi "Dihentikan", barisnya langsung terkunci, seperti G3 di contoh.
 - **`hidden` hanya di layar.** Nilai asli tetap ada di workbook dan rumus tetap menghitungnya. Kalau nilainya sama sekali tidak boleh sampai ke browser,
-  jangan kirim nilainya. `viewFor` di server membuang nilai itu sebelum dikirim ([bab 12](12-server.md)).
+  jangan kirim nilainya. `viewFor` di server membuang nilai itu sebelum dikirim ([bab 9](09-menyimpan.md)).
 - **Judul kolom tetap tampil.** Baris judul (`headerRow`) tidak ikut disembunyikan atau dikunci oleh aturan `columns`.
 - **Menghapus baris yang memuat sel terlindung** ditolak, begitu juga menghapus kolomnya.
 - `setRules(daftar)` mengganti seluruh aturan. `setRules([])` membuang semuanya.
@@ -648,4 +648,4 @@ Yang perlu diketahui:
 | `wb.setRules(daftar)` | pasang aturan untuk orang yang membuka sheet |
 | `modeAt(alamat)` | `{ mode, message }` untuk sel itu, atau `null` kalau bebas |
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [11. Memakai di React](11-react.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Memuat dan menyimpan](09-menyimpan.md)

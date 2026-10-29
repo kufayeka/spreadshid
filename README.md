@@ -51,21 +51,19 @@ Server (misalnya Nexa API Maker) pakai `@kufayeka/sheet/core` untuk memeriksa ti
 ## Daftar isi
 
 1. [Mulai dalam 5 menit](docs/01-mulai-cepat.md): pasang, sheet pertama, isi dari kode, dirapikan, disimpan, Next.js
-2. [Konsep dasar](docs/02-konsep.md): workbook, sheet, alamat sel, id baris dan kolom, perubahan (op), undo, menyimpan
+2. [Konsep dasar](docs/02-konsep.md): workbook sebagai data, alamat, value/input/display, id, perubahan, undo
 3. [Komponen `<Sheet>`](docs/03-komponen-sheet.md): event, seleksi, perintah lewat `ref`, sheet yang tampil, layar sederhana, warna, menu, toolbar, keyboard
-- [Galeri: satu proyek konstruksi](docs/galeri.md)
 4. [Mengisi dan membaca dari kode](docs/04-api-workbook.md): menulis, membaca sebagai data, mengisi dari API (populate), gaya, baris dan kolom, sheet
 5. [Rumus](docs/05-rumus.md): rumus di layar, rumus dari kode, sheet lain, laporan, named range, 124 fungsi termasuk TERBILANG
 6. [Format](docs/06-format.md): uang, persen, tanggal, satuan, locale, conditional formatting
 7. [Data](docs/07-data.md): mengurutkan, menyaring, melipat grup, pivot table, cari dan ganti
-8. [Menjaga isi yang diketik](docs/10-aturan.md): dropdown, batas angka, tipe kolom, sel terkunci, beforeOp
-11. [Memakai di React](docs/11-react.md): langkah demi langkah, useWorkbook, memuat, menyimpan, Next.js
-12. [Menyimpan ke server](docs/12-server.md): dari sheet ke tabel database, patch, viewFor
-13. [Hak akses](docs/13-hak-akses.md)
-14. [Komentar](docs/14-komentar.md)
-15. [Excel dan CSV](docs/15-excel.md)
-17. [Performa](docs/17-performa.md)
-18. [Referensi](docs/18-referensi.md): semua nama, satu baris masing-masing
+8. [Menjaga isi yang diketik](docs/08-menjaga-isi.md): dropdown, batas angka, tipe kolom, sel terkunci, beforeOp
+9. [Memuat dan menyimpan](docs/09-menyimpan.md): memuat dari API, tombol simpan, simpan otomatis, database, patch, viewFor
+10. [Hak akses](docs/10-hak-akses.md): aturan per baris, role dan akun, tanda di sel, mode pengaturan, server
+11. [Komentar dan Excel](docs/11-komentar-excel.md): komentar di sel, impor dan ekspor xlsx dan CSV
+12. [Performa dan referensi](docs/12-referensi.md): data besar, semua nama, TypeScript
+
+- [Galeri: satu proyek konstruksi](docs/galeri.md)
 
 ## Soal dokumentasi ini
 

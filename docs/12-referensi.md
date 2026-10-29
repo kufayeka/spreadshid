@@ -1,27 +1,114 @@
-# 18. Referensi
+# 12. Performa dan referensi
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [17. Performa](17-performa.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Komentar dan Excel](11-komentar-excel.md)
 
-Semua yang bisa dipakai dari library ini, satu baris per nama, dengan tautan ke bab yang membahasnya. Daftar ini diperiksa oleh `test/reference.test.js`:
-test gagal kalau ada ekspor atau fungsi yang tidak tercantum di sini.
+Bab ini membahas seberapa cepat sheet untuk data besar, lalu daftar semua nama yang bisa dipakai, satu baris masing-masing.
 
-## 18.1 `@kufayeka/sheet` (React)
+- [12.1 Contoh: setahun penjualan](#121-contoh-setahun-penjualan)
+- [12.2 Angka ukur](#122-angka-ukur)
+- [12.3 Saran](#123-saran)
+- [12.4 `@kufayeka/sheet` (React)](#124-kufayekasheet-react)
+- [12.5 `@kufayeka/sheet/core`](#125-kufayekasheetcore)
+- [12.6 Workbook](#126-workbook)
+- [12.7 Handle sheet](#127-handle-sheet)
+- [12.8 Daftar lain](#128-daftar-lain)
+- [12.9 TypeScript](#129-typescript)
+
+## 12.1 Contoh: setahun penjualan
+
+<!-- contoh: 17-performa.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
+
+// Setahun penjualan: 100.000 transaksi dengan rumus Total per baris dan ringkasan per cabang.
+// Yang dicetak di sini adalah hal yang tidak bergantung pada kecepatan komputer: berapa yang dihitung ulang dan berapa yang dikirim saat menyimpan.
+const N = 100000;
+const wb = createWorkbook(null, { undoLimit: 50 });
+const jual = wb.sheet('Sheet1');
+jual.setSheetProps({ name: 'Penjualan' });
+jual.insertRows(1000, N + 1 - 1000);
+jual.setValues('A1', [KOLOM_PENJUALAN]);
+jual.setValues('A2', barisPenjualan(penjualan(N), 2));          // 1.100.000 sel, 100.000 rumus, satu perubahan
+wb.setValues('Penjualan', 'M1', [['Jakarta', `=SUMIFS(K2:K${N + 1}, C2:C${N + 1}, M1)`], ['Bandung', `=SUMIFS(K2:K${N + 1}, C2:C${N + 1}, M2)`]]);
+const sebelum = jual.value('N2');
+console.log('ukuran         :', jual.size().rows, 'baris |', N, 'rumus Total | omzet Bandung', sebelum);
+
+// satu ketikan: hanya rumus Total baris itu dan dua SUMIFS yang dihitung ulang, bukan 100.000 rumus
+let dihitung = 0;
+const off = wb.on('op', () => { dihitung++; });
+wb.saved(wb.pendingPatch());
+jual.setValues('H50001', 1000, { source: 'user' });            // transaksi ke-50.000, cabang Bandung
+console.log('satu ketikan   :', dihitung, 'perubahan | omzet Bandung', sebelum, '->', jual.value('N2'));
+off();
+
+// yang dikirim saat menyimpan: satu baris, bukan seluruh workbook
+const patch = wb.pendingPatch();
+console.log('patch          :', patch.rows.upsert.length, 'baris,', Math.round(JSON.stringify(patch).length / 100) / 10, 'KB');
+
+// menyisipkan baris di tengah tidak menulis ulang 50.000 rumus di bawahnya: rumus menyimpan id baris, bukan nomornya
+wb.saved(patch);
+jual.insertRows('50001', 1);
+console.log('sisip baris    :', wb.pendingPatch().rows.upsert.length, 'baris di patch | rumus K50002 kini', jual.input('K50002'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 17-performa.js -->
+```text
+ukuran         : 100001 baris | 100000 rumus Total | omzet Bandung 59160874325
+satu ketikan   : 1 perubahan | omzet Bandung 59160874325 -> 59888524325
+patch          : 1 baris, 1.3 KB
+sisip baris    : 1 baris di patch | rumus K50002 kini =H50002*I50002*(1-J50002)
+```
+<!-- /hasil -->
+
+## 12.2 Angka ukur
+
+Diukur oleh `test/core-scale.test.js` di laptop pengembangan (Windows, Node 24), pada sheet 100.000 baris berisi 200.000 rumus, dua di setiap baris.
+Salah satunya adalah running total yang membaca baris di atasnya, kasus terburuk untuk perhitungan ulang. Angka berubah sedikit setiap kali diukur, dan
+test-nya menjaga batas atasnya.
+
+| Kejadian | Waktu |
+|---|---|
+| satu ketikan di RAB biasa, termasuk menggambar layar | sekitar 50 ms |
+| menyisipkan satu baris di tengah 100.000 baris | 50–130 ms |
+| satu ketikan di baris 10, di atas 99.990 running total yang semuanya berubah | 150–250 ms |
+| satu ketikan di baris terakhir | di bawah 1 ms |
+| menulis 500.000 sel (200.000 rumus) sekaligus | beberapa detik, sekali saja |
+| `toJSON` 100.000 baris | sekitar 0,4 detik |
+| membuka lagi 100.000 baris dan 200.000 rumus | sekitar 2,5 detik |
+
+## 12.3 Saran
+
+- **Ringkasan dengan `SUMIFS` dan pivot, bukan running total.** Running total (`=E1+D2`) adalah rantai: mengubah baris atas mengubah semua baris di
+  bawahnya. `SUMIFS` atas sebuah kolom dihitung sekali per perubahan.
+- **Satu panggilan untuk banyak sel.** `setValues` dengan tabel, `setBlock`, atau `populate` adalah satu perubahan dan satu kali hitung ulang. Memanggil
+  `setValues` 10.000 kali dalam loop berarti 10.000 perubahan dan 10.000 langkah undo.
+- **`undoLimit`.** Bawaannya 200 langkah. Untuk sheet sangat besar, `createWorkbook(doc, { undoLimit: 50 })` menghemat memori.
+- **Simpan patch, bukan `toJSON`, setiap kali ada perubahan** ([9.5](09-menyimpan.md#95-menyimpan-otomatis)). Satu ketikan menghasilkan patch sekitar
+  1 KB, sedangkan workbook 100.000 baris berukuran puluhan MB.
+- **`useWorkbook` dengan nilai sederhana** ([bab 9](09-menyimpan.md)), supaya komponen di luar sheet tidak
+  digambar ulang di setiap ketikan.
+- **Membuka workbook besar sekali, lalu memakainya terus.** `createWorkbook(doc)` untuk 100.000 baris butuh beberapa detik. Jangan membuatnya ulang
+  saat props lain berubah ([9.3](09-menyimpan.md#93-workbook-bukan-state-react)).
+
+## 12.4 `@kufayeka/sheet` (React)
 
 | Nama | Artinya | Bab |
 |---|---|---|
 | `Sheet` | komponen spreadsheet: props, event, handle `ref`, keyboard, tema | [3](03-komponen-sheet.md) |
-| `useWorkbook` | hook untuk membaca workbook dari komponen lain | [11.7](11-react.md#117-membaca-workbook-dari-komponen-lain-useworkbook) |
+| `useWorkbook` | hook untuk membaca workbook dari komponen lain | [bab 9](09-menyimpan.md) |
 | `VERSION` | versi paket | |
 
 CSS: `import '@kufayeka/sheet/style.css'` sekali di aplikasi.
 
-## 18.2 `@kufayeka/sheet/core`
+## 12.5 `@kufayeka/sheet/core`
 
 Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan worker.
 
 | Nama | Artinya | Bab |
 |---|---|---|
-| `createWorkbook` | workbook baru, atau dibuka dari `toJSON()`: `createWorkbook(doc, { user, now, beforeOp, undoLimit })` | [2](02-konsep.md), [11.2](11-react.md#112-sheet-yang-sudah-berisi) |
+| `createWorkbook` | workbook baru, atau dibuka dari `toJSON()`: `createWorkbook(doc, { user, now, beforeOp, undoLimit })` | [2](02-konsep.md), [bab 9](09-menyimpan.md) |
 | `VERSION` | versi paket | |
 | `isError`, `ERR` | memeriksa hasil rumus yang error, dan daftar kode error | [5.7](05-rumus.md#57-error-dan-artinya) |
 | `FUNCTION_NAMES` | nama semua fungsi rumus | [5.13](05-rumus.md#513-semua-fungsi-buat-apa-cara-pakai-hasilnya) |
@@ -31,20 +118,20 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `parseInput` | teks ketikan menjadi nilai menurut locale: `'1.250,5'` → 1250.5 | [6.5](06-format.md#65-locale) |
 | `roundTo` | pembulatan yang dipakai format uang | [5.8](05-rumus.md#58-menulis-rumus-dari-kode) |
 | `colName`, `colIndex` | `2` ↔ `'C'` | [2.2](02-konsep.md#22-alamat-sel) |
-| `storeFormula`, `formulaText`, `resolveRef`, `isStoredFormula` | rumus teks ↔ rumus tersimpan `{ f, refs }`, dan ke mana sebuah referensi menunjuk | [2.3](02-konsep.md), [12.1](12-server.md#123-isi-content) |
-| `newId`, `keyBetween`, `keysBetween`, `compareKeys` | id baru, key urutan di antara dua key, dan perbandingannya | [12.1](12-server.md#123-isi-content) |
+| `storeFormula`, `formulaText`, `resolveRef`, `isStoredFormula` | rumus teks ↔ rumus tersimpan `{ f, refs }`, dan ke mana sebuah referensi menunjuk | [2.3](02-konsep.md), [9.11](09-menyimpan.md#911-isi-content) |
+| `newId`, `keyBetween`, `keysBetween`, `compareKeys` | id baru, key urutan di antara dua key, dan perbandingannya | [9.11](09-menyimpan.md#911-isi-content) |
 | `fillBlock`, `copyBlock`, `pasteClip`, `pasteText` | fill handle, copy, dan paste dari kode | [5.8](05-rumus.md#58-menulis-rumus-dari-kode) |
 | `sortRange` | urutkan range menurut satu kolom | [7.3](07-data.md#73-mengurutkan) |
 | `findAll`, `replaceIn` | cari dan ganti | [7.7](07-data.md#77-mencari-dan-mengganti) |
 | `pivot`, `tableOf`, `PIVOT_FUNCTIONS` | ringkasan per kelompok tanpa sheet, dan range sebagai daftar record | [7.6](07-data.md#76-pivot-table) |
 | `populate` | data dari luar ke sheet, tetap sebagai data | [4.5](04-api-workbook.md#45-mengisi-dari-data-api) |
-| `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [8.5](10-aturan.md#85-tipe-kolom) |
-| `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [12](12-server.md) |
-| `resolveAccess`, `validateAccess`, `parseWhere`, `ACTIONS`, `ACTION_INFO`, `UI_ITEMS` | access control | [13](13-hak-akses.md) |
-| `exportXlsx`, `importXlsx`, `importXlsxInto` | file `.xlsx` | [15](15-excel.md) |
-| `exportCsv`, `importCsvInto`, `parseCsv`, `codeOfFormat` | CSV, dan kode format Excel | [15](15-excel.md) |
+| `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [8.5](08-menjaga-isi.md#85-tipe-kolom) |
+| `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [9](09-menyimpan.md) |
+| `resolveAccess`, `validateAccess`, `parseWhere`, `ACTIONS`, `ACTION_INFO`, `UI_ITEMS` | access control | [10](10-hak-akses.md) |
+| `exportXlsx`, `importXlsx`, `importXlsxInto` | file `.xlsx` | [11](11-komentar-excel.md) |
+| `exportCsv`, `importCsvInto`, `parseCsv`, `codeOfFormat` | CSV, dan kode format Excel | [11](11-komentar-excel.md) |
 
-## 18.3 Workbook
+## 12.6 Workbook
 
 Fungsi yang hanya ada di `wb`, bukan di handle sheet:
 
@@ -56,14 +143,14 @@ Fungsi yang hanya ada di `wb`, bukan di handle sheet:
 | `setAutoHeights` | tinggi baris otomatis, dipakai grid | [4.10](04-api-workbook.md#410-referensi) |
 | `settings`, `setSettings` | locale, mata uang, named range | [4.10](04-api-workbook.md#410-referensi) |
 | `names`, `addName`, `setName`, `removeName`, `nameRange`, `nameProblem` | named range | [5.11](05-rumus.md#511-named-range) |
-| `undo`, `redo`, `canUndo`, `canRedo`, `apply`, `on`, `revision`, `tick` | perubahan, event, undo | [12.6](12-server.md#126-undo-redo-source-dan-apply) |
-| `toJSON`, `pendingPatch`, `saved`, `unsaved`, `version` | menyimpan | [11.5](11-react.md#115-tombol-simpan), [12](12-server.md) |
-| `setRules` | aturan per sel untuk orang yang membuka | [8.6](10-aturan.md#86-sel-yang-tidak-boleh-diubah) |
-| `setAccess`, `access`, `can`, `shows` | access control | [13](13-hak-akses.md) |
-| `setUser` | ganti orang yang membuka (penulis komentar dan op) | [14](14-komentar.md) |
-| `id` | id workbook | [12.1](12-server.md#123-isi-content) |
+| `undo`, `redo`, `canUndo`, `canRedo`, `apply`, `on`, `revision`, `tick` | perubahan, event, undo | [9.14](09-menyimpan.md#914-undo-redo-source-dan-apply) |
+| `toJSON`, `pendingPatch`, `saved`, `unsaved`, `version` | menyimpan | [9.2](09-menyimpan.md#92-tombol-simpan), [9](09-menyimpan.md) |
+| `setRules` | aturan per sel untuk orang yang membuka | [8.6](08-menjaga-isi.md#86-sel-yang-tidak-boleh-diubah) |
+| `setAccess`, `access`, `can`, `shows` | access control | [10](10-hak-akses.md) |
+| `setUser` | ganti orang yang membuka (penulis komentar dan op) | [11](11-komentar-excel.md) |
+| `id` | id workbook | [9.11](09-menyimpan.md#911-isi-content) |
 
-## 18.4 Handle sheet
+## 12.7 Handle sheet
 
 `wb.sheet('Nama')` memberi fungsi-fungsi di bawah tanpa parameter sheet. Semuanya juga ada di `wb` dengan nama sheet sebagai parameter pertama.
 Handle juga punya `id` dan `name`.
@@ -79,30 +166,30 @@ Handle juga punya `id` dan `name`.
 | conditional formatting | `addConditional`, `setConditional`, `moveConditional`, `removeConditional`, `conditionals`, `conditionalStyleAt` | [6.6](06-format.md#66-conditional-formatting) |
 | filter | `createFilter`, `setFilterColumn`, `removeFilter`, `filterOf`, `filterValues`, `filteredOut` | [7.4](07-data.md#74-menyaring) |
 | grup | `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups` | [7.5](07-data.md#75-melipat-kelompok-baris) |
-| validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown) |
+| validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | pivot | `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt` | [7.6](07-data.md#76-pivot-table) |
-| aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [10](10-aturan.md) |
-| komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `resolveComment`, `comments`, `commentAt`, `hasComment` | [14](14-komentar.md) |
+| aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [8](08-menjaga-isi.md) |
+| komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `resolveComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
 
-## 18.5 Daftar lain
+## 12.8 Daftar lain
 
 | Daftar | Di mana |
 |---|---|
 | props, event, dan handle `ref` `<Sheet>` | [3.12](03-komponen-sheet.md#312-referensi) |
 | tombol keyboard | [3.12](03-komponen-sheet.md#312-referensi) |
 | opsi `createWorkbook` dan event workbook | [2.14](02-konsep.md#214-referensi) |
-| jenis op | [12.7](12-server.md#127-jenis-op) |
+| jenis op | [9.15](09-menyimpan.md#915-jenis-op) |
 | kunci gaya, props baris, kolom, dan sheet | [4.10](04-api-workbook.md#410-referensi), [4.10](04-api-workbook.md#410-referensi), [4.10](04-api-workbook.md#410-referensi) |
 | fungsi rumus | [5.13](05-rumus.md#513-semua-fungsi-buat-apa-cara-pakai-hasilnya) |
 | jenis format dan huruf pola | [6.9](06-format.md#69-referensi) |
 | syarat conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
-| jenis validasi | [8.3](10-aturan.md#83-pilihan-dari-daftar-dropdown) |
+| jenis validasi | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | spesifikasi pivot | [7.6](07-data.md#76-pivot-table) |
-| semua isi `action` aturan akses | [13.35](13-hak-akses.md#1335-referensi) |
-| yang ikut dan tidak ke Excel | [15](15-excel.md) |
+| semua isi `action` aturan akses | [10.35](10-hak-akses.md#1035-referensi) |
+| yang ikut dan tidak ke Excel | [11](11-komentar-excel.md) |
 | menu dan toolbar | [3.12](03-komponen-sheet.md#312-referensi) |
 
-## 18.6 TypeScript
+## 12.9 TypeScript
 
 Paket ini membawa tipe TypeScript untuk semua fungsinya. Import tipenya dengan `import type`:
 
@@ -127,7 +214,7 @@ const onSelect = (sel: SheetSelection) => setRange(sel.address);    // "C2:C5"
 | `Style`, `Format`, `Borders` | gaya dan format (4.5, [bab 6](06-format.md)) |
 | `Op`, `Source`, `WorkbookEvents`, `WorkbookOptions` | op, `source`, isi data setiap event, opsi `createWorkbook` |
 | `WorkbookDoc`, `Patch` | yang disimpan (`toJSON()`) dan yang berubah (`pendingPatch()`) |
-| `AccessRow`, `Who`, `AccessInfo`, `AccessUi` | hak akses ([bab 13](13-hak-akses.md)) |
+| `AccessRow`, `Who`, `AccessInfo`, `AccessUi` | hak akses ([bab 8](10-hak-akses.md)) |
 | `ValidationSpec`, `ConditionalSpec`, `PivotSpec`, `TypesSpec` | aturan validasi, conditional formatting, pivot, tipe kolom |
 
 Tipe ini ditulis tangan dan diuji: `test/types.test.js` mengompilasi kode host contoh dengan `strict`, termasuk kesalahan yang **harus** ditolak
@@ -193,4 +280,4 @@ export function Lembar({ id }: { id: string }) {
 ```
 <!-- /contoh -->
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [17. Performa](17-performa.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Komentar dan Excel](11-komentar-excel.md)
