@@ -36,6 +36,8 @@ export const ACTIONS = [
 ];
 
 const UI_PARTS = ['menubar', 'toolbar', 'formulaBar', 'headers', 'gridlines', 'tabs'];
+// The ranges a where may name (as the cells' rules read them, access.js): "B2:D9", one cell "C2", whole columns "C:E", whole rows "2:5", with or without $.
+const RANGE_TEXT = /^\s*(\$?[A-Za-z]{1,3}\$?\d+(\s*:\s*\$?[A-Za-z]{1,3}\$?\d+)?|\$?[A-Za-z]{1,3}\s*:\s*\$?[A-Za-z]{1,3}|\$?\d+\s*:\s*\$?\d+)\s*$/;
 const RANK = { edit: 1, readonly: 2, hidden: 3, invisible: 4 };
 export const strongerMode = (a, b) => (!a ? b : !b ? a : RANK[b.mode] > RANK[a.mode] ? b : a);
 
@@ -70,7 +72,7 @@ export function parseWhere(where) {
     const sheet = bang >= 0 ? text.slice(0, bang).replace(/^'|'$/g, '') : null;
     const place = bang >= 0 ? text.slice(bang + 1).trim() : text;
     if (place.startsWith('col:')) return { sheet, range: null, columns: place.slice(4).split(',').map((s) => s.trim()).filter(Boolean) };
-    if (bang < 0 && !/^\$?[A-Za-z]{1,3}\$?\d*(:\$?[A-Za-z]{1,3}\$?\d*)?$/.test(place)) return { sheet: place, range: null, columns: null };
+    if (bang < 0 && !RANGE_TEXT.test(place)) return { sheet: place, range: null, columns: null };
     return { sheet, range: place || null, columns: null };
 }
 
@@ -272,7 +274,6 @@ export const UI_ITEMS = [
 const ACTION_IDS = new Set(ACTIONS);
 const GROUP_IDS = new Set(ACTIONS.filter((a) => a.includes('.')).map((a) => a.split('.')[0]));
 const UI_IDS = new Set(UI_ITEMS.map((u) => u.id));
-const RANGE_TEXT = /^\s*\$?[A-Za-z]{1,3}\$?\d*\s*(:\s*\$?[A-Za-z]{1,3}\$?\d*\s*)?$/;
 
 /**
  * What is wrong with the access rows, for an editor (and before they are kept): [{ row, problem }] (row = its index; empty when they are right).

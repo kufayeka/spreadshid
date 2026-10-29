@@ -23,10 +23,22 @@ import { storeFormula } from './refs.js';
 import { checkValue } from './types.js';
 import { strongerMode } from './policy.js';
 
+// A range as a person writes it: "B2:D9", one cell "C2", whole columns "C:E", whole rows "2:5", with or without $. Whole columns and rows reach to the
+// end of the sheet (MAX: resolveRules keeps it inside the sheet). Anything else is not a range: null, and resolveRules then lets the rule touch no cell
+// (a typing mistake must never widen a rule to the whole sheet).
+const MAX = 1e9;
 function parseRange(text) {
-    const m = /^\s*([A-Za-z]{1,3})(\d+)\s*:\s*([A-Za-z]{1,3})(\d+)\s*$/.exec(text || '');
-    if (!m) return null;
-    return { r1: Math.min(+m[2], +m[4]) - 1, c1: Math.min(colIndex(m[1]), colIndex(m[3])), r2: Math.max(+m[2], +m[4]) - 1, c2: Math.max(colIndex(m[1]), colIndex(m[3])) };
+    const t = String(text || '').replace(/\$/g, '').trim().toUpperCase();
+    let m = /^([A-Z]{1,3})(\d+)(?::([A-Z]{1,3})(\d+))?$/.exec(t);
+    if (m) {
+        const c1 = colIndex(m[1]), r1 = +m[2] - 1, c2 = m[3] ? colIndex(m[3]) : c1, r2 = m[4] ? +m[4] - 1 : r1;
+        return { r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) };
+    }
+    m = /^([A-Z]{1,3}):([A-Z]{1,3})$/.exec(t);
+    if (m) return { r1: 0, c1: Math.min(colIndex(m[1]), colIndex(m[2])), r2: MAX, c2: Math.max(colIndex(m[1]), colIndex(m[2])) };
+    m = /^(\d+):(\d+)$/.exec(t);
+    if (m) return { r1: Math.min(+m[1], +m[2]) - 1, c1: 0, r2: Math.max(+m[1], +m[2]) - 1, c2: MAX };
+    return null;
 }
 
 /**
@@ -67,6 +79,8 @@ export function resolveRules(wb, rules) {
         for (const s of sheets) {
             const headerRow = (rule.headerRow || 1) - 1;
             const rect = rule.range ? parseRange(rule.range) : null;
+            // a range that cannot be read touches no cell (validateAccess says so to the editor); it must not become the whole sheet
+            if (rule.range && !rect) continue;
             const size = wb.size(s);
             const corners = rect ? { r1: wb.rowId(s, Math.min(rect.r1, size.rows - 1)), c1: wb.colId(s, Math.min(rect.c1, size.cols - 1)), r2: wb.rowId(s, Math.min(rect.r2, size.rows - 1)), c2: wb.colId(s, Math.min(rect.c2, size.cols - 1)) } : null;
             const cols = rule.columns && rule.columns.length ? columnIds(wb, s, rule.columns, headerRow) : null;

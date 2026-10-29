@@ -17,5 +17,5 @@
       "@kufayeka/sheet/style.css": ["./style.d.ts"]
     }
   },
-  "include": ["*.ts", "*.tsx"]
+  "include": ["*.ts", "*.tsx", "gambar/*.tsx"]
 }

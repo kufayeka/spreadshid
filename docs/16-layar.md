@@ -9,7 +9,7 @@ bahasa Inggris.
 ![Bagian-bagian layar](img/bagian-layar.png)
 
 Dari atas ke bawah: **menubar**, **toolbar**, **kotak alamat** dan **formula bar**, **grid** dengan judul kolom dan nomor baris, dan **tab sheet** di
-bawah. Setiap bagian bisa disembunyikan per role atau per akun lewat aturan `ui.*` ([13.8](13-hak-akses.md#138-langkah-7-tampilan-layar)).
+bawah. Setiap bagian bisa disembunyikan per role atau per akun lewat aturan `ui.*` ([13.22](13-hak-akses.md#1322-bagian-layar)).
 
 ## 16.1 Menu
 

@@ -1,12 +1,11 @@
 import { ACTION_INFO, UI_ITEMS } from '@kufayeka/sheet/core';
 
 // Daftar semua isi kolom action, diambil dari library sendiri (jadi selalu sama dengan yang dikenal library).
-// Dipakai juga untuk dropdown di editor aturanmu sendiri.
-const perGrup = (list: Array<{ id: string; label: string; group: string }>, prefix: string) => {
+const perGrup = (list: Array<{ id: string; label: string; group: string }>, awalan: string) => {
     const g = new Map<string, string[]>();
     for (const x of list) {
         if (!g.has(x.group)) g.set(x.group, []);
-        g.get(x.group)?.push('`' + prefix + x.id + '`');
+        g.get(x.group)?.push('`' + awalan + x.id + '`');
     }
     return g;
 };

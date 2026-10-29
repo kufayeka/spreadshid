@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 250" font-family="Segoe UI, system-ui, sans-serif" font-size="15">
+  <rect width="760" height="250" fill="#ffffff"/>
+  <!-- the sentence -->
+  <text x="20" y="34" font-size="13" fill="#5f6368">Satu aturan sebagai kalimat:</text>
+  <g transform="translate(20,48)">
+    <rect width="720" height="46" rx="6" fill="#f8f9fa" stroke="#dadce0"/>
+    <text x="16" y="29">
+      <tspan fill="#1a73e8" font-weight="600">Semua kasir</tspan>
+      <tspan fill="#202124"> </tspan>
+      <tspan fill="#188038" font-weight="600">boleh</tspan>
+      <tspan fill="#202124"> </tspan>
+      <tspan fill="#9334e6" font-weight="600">mengubah</tspan>
+      <tspan fill="#202124"> </tspan>
+      <tspan fill="#e37400" font-weight="600">kolom Stok di sheet Produk</tspan>
+    </text>
+  </g>
+  <!-- arrows -->
+  <g stroke="#9aa0a6" stroke-width="1.5" fill="none">
+    <path d="M85 98 L85 150"/><path d="M180 98 L250 150"/><path d="M262 98 L400 150"/><path d="M450 98 L570 150"/>
+  </g>
+  <!-- the row -->
+  <text x="20" y="140" font-size="13" fill="#5f6368">Aturan yang sama sebagai satu baris tabel:</text>
+  <g transform="translate(20,154)">
+    <rect width="720" height="74" rx="6" fill="#ffffff" stroke="#dadce0"/>
+    <line x1="0" y1="32" x2="720" y2="32" stroke="#dadce0"/>
+    <g font-size="13" font-weight="600" fill="#5f6368">
+      <text x="16" y="22">who</text><text x="200" y="22">effect</text><text x="340" y="22">action</text><text x="500" y="22">where</text>
+    </g>
+    <g font-family="Consolas, monospace" font-size="15">
+      <text x="16" y="58" fill="#1a73e8">role:kasir</text>
+      <text x="200" y="58" fill="#188038">allow</text>
+      <text x="340" y="58" fill="#9334e6">edit</text>
+      <text x="500" y="58" fill="#e37400">Produk!col:Stok</text>
+    </g>
+  </g>
+</svg>

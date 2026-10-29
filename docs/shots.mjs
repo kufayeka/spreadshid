@@ -55,10 +55,26 @@ export const SHOTS = [
         const p = await cellAt(js, 3, 7); await click(p.x, p.y); await wait(600);
     }, clip: { x: 0, y: 0, width: 1366, height: 600 } },
     { name: 'dua-tampilan', page: '11-dua-tampilan.page.js', clip: { x: 0, y: 0, width: 1366, height: 520 } },
-    { name: 'akses-kasir', page: '13-08-kasir.page.tsx', act: async ({ js, click, wait }) => {
-        const p = await cellAt(js, 1, 5); await click(p.x, p.y); await wait(200); await click(p.x, p.y); await wait(100);
-    }, clip: { x: 0, y: 0, width: 1100, height: 400 } },
-    { name: 'akses-tanda', page: '13-12-tanda.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 420 } },
+    { name: 'akses-sheet', page: '13-22-sheet.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    { name: 'akses-gembok', page: '13-22-sheet.page.tsx', clip: { x: 0, y: 140, width: 760, height: 110 } },
+    { name: 'akses-tanda-bawaan', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 0, width: 760, height: 130 } },
+    { name: 'akses-tanda-tint', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 144, width: 760, height: 130 } },
+    { name: 'akses-tanda-stripes', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 288, width: 760, height: 130 } },
+    { name: 'akses-tanda-tanpa-gembok', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 432, width: 760, height: 130 } },
+    { name: 'akses-tanda-tanpa-tanda', page: '13-24-tanda.page.tsx', clip: { x: 0, y: 576, width: 760, height: 130 } },
+    { name: 'akses-pesan', page: '13-25-pesan.page.tsx', act: async ({ js, click, type, wait }) => {
+        const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(200); await type('x'); await wait(300);
+    }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'akses-setup', page: '13-26-setup.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    { name: 'akses-pilih', page: '13-27-pilih.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 330 } },
+    { name: 'akses-tambah', page: '13-28-tambah.page.tsx', act: async ({ js, click, mouse, wait }) => {
+        const a = await cellAt(js, 1, 5), b = await cellAt(js, 4, 5);
+        await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(200);
+        const t = await js('(function(){ var e = document.querySelector(".tambah").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
+        await click(t.x, t.y); await wait(400);
+    }, clip: { x: 0, y: 0, width: 1366, height: 330 } },
+    { name: 'akses-keadaan', page: 'gambar/13-keadaan.page.tsx', clip: { x: 0, y: 0, width: 540, height: 86 } },
+    { name: 'akses-mode', page: 'gambar/13-mode.page.tsx', clip: { x: 0, y: 0, width: 880, height: 190 } },
     { name: 'editor-akses-live', page: '04-13-editor-akses.page.tsx', act: async ({ js, click, mouse, wait }) => {
         // the same rule as the editor's picture (Harga beli hidden for kasir), then the sheet as Rina sees it
         const a = await cellAt(js, 1, 2), b = await cellAt(js, 4, 2);
@@ -69,9 +85,6 @@ export const SHOTS = [
         await js(`(function(){ var e = document.querySelector('.lihat-sebagai'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'rina'); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
         await wait(400);
     }, clip: { x: 0, y: 0, width: 1366, height: 520 } },
-    { name: 'akses-pesan', page: '13-11-pesan.page.tsx', act: async ({ js, click, type, wait }) => {
-        const p = await cellAt(js, 2, 1); await click(p.x, p.y); await wait(200); await type('x'); await wait(300);
-    }, clip: { x: 0, y: 0, width: 1000, height: 300 } },
     { name: 'komentar', page: '14-komentar.page.js', act: async ({ js, click, mouse, wait }) => {
         const at = (expr) => js(`(function(){ var e = ${expr}; var b = e.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
         let p = await at(`Array.from(document.querySelectorAll('.ks-menubar-item')).find(function(x){ return x.textContent === 'View'; })`); await click(p.x, p.y); await wait(300);

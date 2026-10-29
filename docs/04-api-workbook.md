@@ -812,7 +812,7 @@ Contoh yang menggabungkan isi bab ini dengan `<Sheet>`. Aplikasimu punya panel s
 4. `<Sheet access={{ rows, who, view: 'setup', selected, onSelect }}>` menggambar kotak warna who di setiap sel yang kena aturan, dan memberi
    garis pada aturan yang dipilih. Mode "Lihat sebagai" mengganti `view` ke `'live'` dan `who` ke orang itu, supaya hasilnya bisa dicoba.
 
-Semua bagian layar pengaturan ini dijelaskan langkah demi langkah di [13.11](13-hak-akses.md#1311-langkah-10-membuat-layar-pengaturan-aturan).
+Semua bagian layar pengaturan ini dijelaskan langkah demi langkah di [bagian F bab 13](13-hak-akses.md#1328-menyalakan-mode-pengaturan).
 
 ![Editor hak akses: mode pengaturan](img/editor-akses.png)
 

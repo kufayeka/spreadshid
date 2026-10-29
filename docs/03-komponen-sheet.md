@@ -22,13 +22,13 @@ Semua props boleh tidak diisi.
 | `onSheetChange` | `(sheetId) => void` | | sheet aktif berganti: tab diklik, sheet ditambah atau diduplikat, hasil pencarian di sheet lain |
 | `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (dari orang, kode, atau undo). Sama dengan `wb.on('op', ...)` |
 | `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak. Sheet sudah menampilkan `reason` sebagai pemberitahuan; prop ini buat log atau tampilanmu sendiri |
-| `onNotice` | `(n: SheetNotice) => string \| null \| undefined` | | setiap pesan sheet sebelum tampil (`refused`, `error`, `info`, dengan `address` dan `action`). Kembalikan teks untuk menggantinya, `null` supaya sheet tidak menampilkan apa pun, atau tidak ada untuk pesan bawaan ([13.9](13-hak-akses.md#139-langkah-8-di-react)) |
+| `onNotice` | `(n: SheetNotice) => string \| null \| undefined` | | setiap pesan sheet sebelum tampil (`refused`, `error`, `info`, dengan `address` dan `action`). Kembalikan teks untuk menggantinya, `null` supaya sheet tidak menampilkan apa pun, atau tidak ada untuk pesan bawaan ([13.27](13-hak-akses.md#1327-pesan-penolakan)) |
 | `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak sesuai tipe kolomnya ([bab 10](10-aturan.md)) |
 | `onSelectionChange` | `(sel: SheetSelection) => void` | | seleksi berubah. Saat orang men-drag, dipanggil **sekali saja** setelah mouse dilepas, bukan tiap sel yang dilewati. Klik, panah, dan `select()` langsung dipanggil. Isinya: `sel.address` (`'C2:C5'`), `sel.active` (`{ r, c, address }`), `sel.ranges`, `sel.sheet` ([4.13](04-api-workbook.md#413-editor-hak-akses-di-luar-sheet)) |
 | `fileName` | string | `'Spreadsheet'` | nama file (tanpa ekstensi) saat orang memilih File → Download |
 | `access` | `{ rows, who }` | tanpa batasan | baris-baris aturan akses dan orang yang membuka sheet ([bab 13](13-hak-akses.md)). Sheet hanya menerapkan; aturannya tetap milik aplikasimu |
 | `user` | `{ id, name }` | | orang yang membuka sheet: namanya tercatat di komentarnya ([bab 14](14-komentar.md)) |
-| `marks` | `false \| { lock, hidden, tint, stripes }` | `{ lock: true, hidden: true }` | tanda di sel yang tidak boleh diubah orang ini: gembok di sel hanya-baca, mata di sel tersembunyi, latar abu, garis-garis. Bebas dicampur; `false` = tanpa tanda ([13.9](13-hak-akses.md#139-langkah-8-di-react)) |
+| `marks` | `false \| { lock, hidden, tint, stripes }` | `{ lock: true, hidden: true }` | tanda di sel yang tidak boleh diubah orang ini: gembok di sel hanya-baca, mata di sel tersembunyi, latar abu, garis-garis. Bebas dicampur; `false` = tanpa tanda ([13.26](13-hak-akses.md#1326-variasi-tanda)) |
 | `className` | string | | class tambahan di elemen terluar |
 | `style` | objek style | | style elemen terluar. Tinggi bisa diatur di sini; variabel tema juga (3.5) |
 | `ref` | ref React | | handle untuk kodemu (3.3) |

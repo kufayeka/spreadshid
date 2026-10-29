@@ -98,7 +98,7 @@ Handle juga punya `id` dan `name`.
 | syarat conditional formatting | [6.4](06-format.md#64-conditional-formatting) |
 | jenis validasi | [7.4](07-data.md#74-validasi-data) |
 | spesifikasi pivot | [8.2](08-pivot.md#82-spesifikasi) |
-| semua isi `action` aturan akses | [13.12](13-hak-akses.md#1312-referensi) |
+| semua isi `action` aturan akses | [13.36](13-hak-akses.md#1336-referensi) |
 | yang ikut dan tidak ke Excel | [15](15-excel.md) |
 | menu dan toolbar | [16](16-layar.md) |
 

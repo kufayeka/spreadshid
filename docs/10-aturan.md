@@ -94,7 +94,7 @@ manajer       : Rp 64.000 | mode F2 null
 ```
 <!-- /hasil -->
 
-Di layar, kasir yang mengetik di kolom Harga jual mendapat pesan dari aturannya. Sel yang dilindungi diberi gembok kecil di pojok kanan atas (bawaan, bisa diganti dengan prop `marks`, lihat [13.9](13-hak-akses.md#139-langkah-8-di-react)):
+Di layar, kasir yang mengetik di kolom Harga jual mendapat pesan dari aturannya. Sel yang dilindungi diberi gembok kecil di pojok kanan atas (bawaan, bisa diganti dengan prop `marks`, lihat [13.26](13-hak-akses.md#1326-variasi-tanda)):
 
 ![Kolom terlindung dan pesan penolakan](img/aturan.png)
 

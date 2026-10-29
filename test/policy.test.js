@@ -94,6 +94,17 @@ check('deny edit over an allow edit of the same level: read only', capped.modeAt
 capped.setAccess([{ who: 'user:tamu', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
 check('a user\'s own allow edit beats a deny of edit for everyone', capped.modeAt('Stok', 1, 5) === null, capped.modeAt('Stok', 1, 5));
 
+// every way of writing a range, and one that cannot be read touches nothing (never the whole sheet)
+const shapes = stok();
+const at = (where, a) => { shapes.setAccess([{ who: '*', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'read', where }], 'x'); const m = shapes.modeAt('Stok', ...cellOf(a)); return m ? m.mode : 'edit'; };
+check('one cell "C2": C2 hidden, C3 not', at('Stok!C2', 'C2') === 'hidden' && at('Stok!C2', 'C3') === 'edit');
+check('with $: "$C$2"', at('Stok!$C$2', 'C2') === 'hidden');
+check('whole columns "C:D": C3 and D3 hidden, E3 not', at('Stok!C:D', 'C3') === 'hidden' && at('Stok!C:D', 'D3') === 'hidden' && at('Stok!C:D', 'E3') === 'edit');
+check('whole rows "2:3": A2 hidden, A4 not', at('Stok!2:3', 'A2') === 'hidden' && at('Stok!2:3', 'A4') === 'edit');
+check('rows without a sheet are a range, not a sheet named "2:3"', parseWhere('2:3').range === '2:3' && parseWhere('2:3').sheet === null);
+check('a range that cannot be read touches no cell', at('Stok!C2:', 'A1') === 'edit' && at('Stok!C2:', 'C2') === 'edit');
+check('and the validator says so', validateAccess([{ who: '*', effect: 'deny', action: 'read', where: 'Stok!C2:' }]).length === 1);
+
 // the validator
 check('right rows: no problems', validateAccess(ROWS).length === 0, validateAccess(ROWS));
 const bad = validateAccess([{ who: 'kasir', effect: 'maybe', action: 'format.blod', where: 'Stok!A1:ZZZZ9' }]);
