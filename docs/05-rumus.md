@@ -60,7 +60,7 @@ dengan **fungsi** `SUM`:
 ![D5 berisi =SUM(D2:D4)](img/rumus-sum.png)
 
 Fungsi adalah rumus siap pakai yang punya nama. Bentuknya selalu `NAMA(isi)`. Isinya bisa range, sel, angka, atau teks, dipisahkan koma:
-`=SUM(D2:D4, 50000)` menjumlahkan D2 sampai D4, lalu ditambah 50.000. Ada 124 fungsi; semuanya ada di [5.13](#513-semua-fungsi-buat-apa-cara-pakai-hasilnya).
+`=SUM(D2:D4, 50000)` menjumlahkan D2 sampai D4, lalu ditambah 50.000. Ada 189 fungsi; semuanya ada di [5.13](#513-semua-fungsi-buat-apa-cara-pakai-hasilnya).
 
 Bentuk range lain: `D:D` (seluruh kolom D), `2:2` (seluruh baris 2), dan `A1:D4` (kotak empat kolom kali empat baris).
 
@@ -842,6 +842,11 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `FLOOR` | membulatkan ke bawah ke kelipatan | `=FLOOR(1157320, 5000)` | 1.155.000 |
 | `INT` | bilangan bulat ke bawah | `=INT(7.9)` | 7 |
 | `TRUNC` | membuang desimal | `=TRUNC(-7.9)` | -7 |
+| `QUOTIENT` | hasil bagi tanpa sisa: berapa batang besi 12 m utuh dari 100 m | `=QUOTIENT(100, 12)` | 8 |
+| `EVEN` | ke atas ke bilangan genap (bahan yang dijual berpasangan) | `=EVEN(7.2)` | 8 |
+| `ODD` | ke atas ke bilangan ganjil | `=ODD(6)` | 7 |
+| `CEILING.MATH` | ke atas ke kelipatan; angka negatif menuju nol | `=CEILING.MATH(-8.1, 2)` | -8 |
+| `FLOOR.MATH` | ke bawah ke kelipatan; angka negatif menjauhi nol | `=FLOOR.MATH(-8.1, 2)` | -10 |
 
 **Matematika**
 
@@ -857,6 +862,17 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `LOG` | logaritma dengan basis tertentu | `=LOG(1000, 10)` | 3 |
 | `LOG10` | logaritma basis 10 | `=LOG10(1000)` | 3 |
 | `PI` | bilangan π | `=ROUND(PI(), 4)` | 3,1416 |
+| `SUMSQ` | jumlah kuadrat (3² + 4²) | `=SUMSQ(3, 4)` | 25 |
+| `RADIANS` | derajat menjadi radian (fungsi sudut memakai radian) | `=ROUND(RADIANS(30), 6)` | 0,523599 |
+| `DEGREES` | radian menjadi derajat | `=DEGREES(PI())` | 180 |
+| `SIN` | sinus: tinggi kuda-kuda atap 30° dengan sisi miring 4 m | `=ROUND(4 * SIN(RADIANS(30)), 2)` | 2 |
+| `COS` | kosinus: jarak datar sisi miring 4 m pada 30° | `=ROUND(4 * COS(RADIANS(30)), 2)` | 3,46 |
+| `TAN` | tangen: kenaikan per meter pada kemiringan 30° | `=ROUND(TAN(RADIANS(30)), 4)` | 0,5774 |
+| `ASIN` | sudut dari sinus | `=DEGREES(ASIN(0.5))` | 30 |
+| `ACOS` | sudut dari kosinus | `=DEGREES(ACOS(0.5))` | 60 |
+| `ATAN` | sudut tangga: naik 3, maju 4 | `=ROUND(DEGREES(ATAN(3/4)), 2)` | 36,87 |
+| `ATAN2` | sudut titik (x, y), x dulu | `=DEGREES(ATAN2(1, 1))` | 45 |
+| `CONVERT` | mengubah satuan: kaki persegi ke meter persegi | `=ROUND(CONVERT(1000, "ft2", "m2"), 2)` | 92,9 |
 
 **Logika**
 
@@ -919,6 +935,13 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `EXACT` | apakah dua teks sama persis | `=EXACT("Semen", "semen")` | FALSE |
 | `N` | nilai jadi angka (TRUE = 1, teks = 0) | `=N(TRUE)` | 1 |
 | `HYPERLINK` | teks yang menunjuk alamat web | `=HYPERLINK("https://contoh.id", "buka")` | buka |
+| `TEXTBEFORE` | teks sebelum pemisah: awalan nomor PO | `=TEXTBEFORE(F3, "-")` | PO |
+| `TEXTAFTER` | teks sesudah pemisah: nomor di belakang | `=TEXTAFTER(F3, "-")` | 2611 |
+| `NUMBERVALUE` | angka tulisan Indonesia ("1.250,50") menjadi angka | `=NUMBERVALUE("1.250,50", ",", ".")` | 1.250,5 |
+| `FIXED` | angka dibulatkan lalu ditulis sebagai teks | `=FIXED(1234.567, 1)` | 1,234.6 |
+| `CHAR` | huruf dari kodenya (10 = ganti baris) | `=CHAR(65)` | A |
+| `CODE` | kode huruf pertama | `=CODE("A")` | 65 |
+| `CLEAN` | membuang karakter tak terlihat dari teks tempelan | `=LEN(CLEAN("PO" & CHAR(10) & "2611"))` | 6 |
 
 **Memeriksa isi**
 
@@ -930,6 +953,12 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `ISLOGICAL` | apakah TRUE atau FALSE | `=ISLOGICAL(C2>5)` | TRUE |
 | `ISERROR` | apakah error | `=ISERROR(B2/0)` | TRUE |
 | `ISNA` | apakah #N/A | `=ISNA(MATCH("Kayu", A2:A5, 0))` | TRUE |
+| `ISERR` | apakah error selain #N/A | `=ISERR(MATCH("Kayu", A2:A5, 0))` | FALSE |
+| `ISEVEN` | apakah genap | `=ISEVEN(C2)` | TRUE |
+| `ISODD` | apakah ganjil | `=ISODD(C3)` | TRUE |
+| `ISFORMULA` | apakah sel berisi rumus | `=ISFORMULA(B2)` | FALSE |
+| `NA` | menulis #N/A dengan sengaja ("belum ada data") | `=NA()` | #N/A |
+| `ERROR.TYPE` | nomor jenis error (2 = #DIV/0!) | `=ERROR.TYPE(B2/0)` | 2 |
 
 **Tanggal dan jam**
 
@@ -954,6 +983,12 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `DATEDIF` | selisih dalam hari ("d"), bulan ("m"), atau tahun ("y") | `=DATEDIF(E2, TODAY(), "d")` | 26 |
 | `WORKDAY` | tanggal setelah sekian hari kerja (tanpa Sabtu-Minggu) | `=WORKDAY(E2, 10)` | 15/10/2026 |
 | `NETWORKDAYS` | banyaknya hari kerja di antara dua tanggal | `=NETWORKDAYS(E2, E5)` | 16 |
+| `WORKDAY.INTL` | seperti WORKDAY, dengan libur pilihan: "0000001" = hanya Minggu libur (proyek 6 hari) | `=WORKDAY.INTL(E2, 10, "0000001")` | 13/10/2026 |
+| `NETWORKDAYS.INTL` | hari kerja dengan libur pilihan (11 = hanya Minggu) | `=NETWORKDAYS.INTL(E2, E5, 11)` | 19 |
+| `DAYS360` | selisih hari dengan tahun 360 hari (bunga, sewa) | `=DAYS360(E2, E5)` | 21 |
+| `YEARFRAC` | bagian tahun di antara dua tanggal (3 = hari sebenarnya / 365) | `=ROUND(YEARFRAC(E2, E5, 3), 4)` | 0,0575 |
+| `DATEVALUE` | tanggal yang tertulis sebagai teks menjadi tanggal | `=DATEVALUE("27/10/2026")` | 27/10/2026 |
+| `TIMEVALUE` | jam yang tertulis sebagai teks menjadi jam | `=TIMEVALUE("13:45")` | 13:45 |
 
 **Keuangan**
 
@@ -964,6 +999,21 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `PV` | nilai sekarang dari cicilan rutin | `=ROUND(PV(1%, 12, -1000000), 0)` | 11.255.077 |
 | `NPV` | nilai sekarang arus kas (mulai periode 1) | `=ROUND(NPV(10%, G3:G5) + G2, 0)` | -21.037 |
 | `IRR` | tingkat pengembalian arus kas | `=ROUND(IRR(G2:G5), 4)` | 0,089 |
+| `NPER` | berapa bulan sampai lunas: utang 12 juta, cicilan 1,1 juta, bunga 1% | `=ROUND(NPER(1%, -1100000, 12000000), 2)` | 11,61 |
+| `RATE` | bunga per bulan sebenarnya: pinjam 12 juta, cicil 1,1 juta × 12 | `=ROUND(RATE(12, -1100000, 12000000), 4)` | 0,015 |
+| `IPMT` | bagian bunga di cicilan ke-1 | `=ROUND(IPMT(1%, 1, 12, -12000000), 0)` | 120.000 |
+| `PPMT` | bagian pokok di cicilan ke-1 | `=ROUND(PPMT(1%, 1, 12, -12000000), 0)` | 946.185 |
+| `CUMIPMT` | total bunga cicilan ke-1 sampai ke-6 | `=ROUND(CUMIPMT(1%, 12, 12000000, 1, 6, 0), 0)` | -576.166 |
+| `CUMPRINC` | total pokok cicilan ke-1 sampai ke-6 | `=ROUND(CUMPRINC(1%, 12, 12000000, 1, 6, 0), 0)` | -5.820.947 |
+| `XNPV` | nilai sekarang arus kas dengan tanggalnya sendiri (termin proyek) | `=ROUND(XNPV(10%, G2:G5, E2:E5), 0)` | 195.493 |
+| `XIRR` | tingkat pengembalian per tahun dari arus kas bertanggal. Di tabel contoh uangnya kembali dalam 3 minggu, jadi setahunnya sangat besar (110 = 11.000%) | `=ROUND(XIRR(G2:G5, E2:E5), 4)` | 110,3748 |
+| `MIRR` | IRR dengan bunga pinjaman 10% dan bunga simpanan 6% | `=ROUND(MIRR(G2:G5, 10%, 6%), 4)` | 0,0804 |
+| `EFFECT` | bunga efektif setahun dari bunga 12% yang dihitung bulanan | `=ROUND(EFFECT(12%, 12), 4)` | 0,1268 |
+| `NOMINAL` | bunga nominal dari bunga efektif | `=ROUND(NOMINAL(12.68%, 12), 4)` | 0,12 |
+| `SLN` | penyusutan garis lurus per tahun: excavator 900 juta, sisa 100 juta, 8 tahun | `=SLN(900000000, 100000000, 8)` | 100.000.000 |
+| `SYD` | penyusutan jumlah angka tahun, tahun ke-1 | `=ROUND(SYD(900000000, 100000000, 8, 1), 0)` | 177.777.778 |
+| `DDB` | penyusutan saldo menurun ganda, tahun ke-1 | `=DDB(900000000, 100000000, 8, 1)` | 225.000.000 |
+| `DB` | penyusutan saldo menurun tetap, tahun ke-1 | `=DB(900000000, 100000000, 8, 1)` | 216.000.000 |
 
 **Statistik**
 
@@ -975,6 +1025,21 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `VAR` | varians sampel | `=ROUND(VAR(C2:C5), 2)` | 12,67 |
 | `VAR.S` | sama dengan VAR | `=ROUND(VAR.S(C2:C5), 2)` | 12,67 |
 | `VAR.P` | varians populasi | `=ROUND(VAR.P(C2:C5), 2)` | 9,5 |
+| `MODE` | angka yang paling sering muncul | `=MODE(3, 5, 5, 2)` | 5 |
+| `MODE.SNGL` | sama dengan MODE | `=MODE.SNGL(3, 5, 5, 2)` | 5 |
+| `PERCENTILE` | persentil: 90% harga ada di bawah angka ini | `=PERCENTILE(B2:B5, 0.9)` | 246.500 |
+| `PERCENTILE.INC` | sama dengan PERCENTILE | `=PERCENTILE.INC(B2:B5, 0.5)` | 112.250 |
+| `PERCENTILE.EXC` | persentil tanpa ujung 0 dan 1 | `=PERCENTILE.EXC(B2:B5, 0.4)` | 79.500 |
+| `QUARTILE` | kuartil (1 = 25%, 2 = tengah, 3 = 75%) | `=QUARTILE(B2:B5, 1)` | 77.625 |
+| `QUARTILE.INC` | sama dengan QUARTILE | `=QUARTILE.INC(B2:B5, 3)` | 181.250 |
+| `QUARTILE.EXC` | kuartil tanpa ujung | `=QUARTILE.EXC(B2:B5, 1)` | 73.875 |
+| `SLOPE` | kemiringan garis: harga naik berapa per qty | `=ROUND(SLOPE(B2:B5, C2:C5), 2)` | -17.236,84 |
+| `INTERCEPT` | titik potong garis di x = 0 | `=ROUND(INTERCEPT(B2:B5, C2:C5), 2)` | 232.809,21 |
+| `FORECAST` | perkiraan y pada x tertentu dari garis lurus data lama | `=ROUND(FORECAST(4, B2:B5, C2:C5), 0)` | 163.862 |
+| `FORECAST.LINEAR` | sama dengan FORECAST | `=ROUND(FORECAST.LINEAR(4, B2:B5, C2:C5), 0)` | 163.862 |
+| `TREND` | nilai garis lurus di x baru (satu sel: nilai pertama) | `=ROUND(TREND(B2:B5, C2:C5, 4), 0)` | 163.862 |
+| `CORREL` | seberapa searah dua deret (1 = searah, -1 = berlawanan) | `=ROUND(CORREL(B2:B5, C2:C5), 4)` | -0,6071 |
+| `AGGREGATE` | total yang bisa melewati error dan baris tersembunyi (9 = SUM, 6 = lewati error) | `=AGGREGATE(9, 6, B2:B5, B2/0)` | 586.500 |
 <!-- /tabel -->
 
 Fungsi yang belum tersedia antara lain `NA`, `WORKDAY.INTL`, `FILTER`, `SORT`, `UNIQUE` (fungsi yang hasilnya tumpah ke banyak sel), konstanta array

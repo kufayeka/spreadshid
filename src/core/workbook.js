@@ -190,6 +190,8 @@ export function createWorkbook(doc, options) {
             return fmt && fmt.type === 'money' ? (fmt.decimals === undefined ? 2 : fmt.decimals) : null;
         },
         now: clockNow,
+        // the workbook's locale, for the functions that read a date or a number written as text (DATEVALUE)
+        locale: () => settings.locale,
         // is row r hidden by the filter, or (byHand) also hidden by hand or in a folded group (for SUBTOTAL)
         rowHidden(s, r, byHand) {
             const sheet = sheets.get(s);

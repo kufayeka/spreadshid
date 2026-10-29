@@ -274,6 +274,7 @@ export function createEngine(host) {
             cell: () => ERR.REF,
             range: () => ERR.REF,
             get now() { return host.now(); },
+            get locale() { return host.locale ? host.locale() : undefined; },
             get at() { mark(e.s); return { s: e.s, r: host.rowIndexOf(e.s, e.row), c: host.colIndexOf(e.s, e.col) }; },
             volatile() { volatile.add(e); },
             // is row r of sheet s hidden: by a filter, or (byHand) also by hand or in a folded group; the formula is worked out again when that changes
@@ -283,6 +284,12 @@ export function createEngine(host) {
                 const row = host.rowOrder(s)[r], col = host.colOrder(s)[c];
                 const x = row !== undefined && col !== undefined ? entryAt(row, col) : null;
                 return !!x && /SUBTOTAL\s*\(/i.test(x.formula.f);
+            },
+            // the formula text of the cell (s, r, c), or null when it holds a plain value (ISFORMULA, and AGGREGATE leaving out other totals)
+            formulaOf(s, r, c) {
+                const row = host.rowOrder(s)[r], col = host.colOrder(s)[c];
+                const x = row !== undefined && col !== undefined ? entryAt(row, col) : null;
+                return x ? x.formula.f : null;
             }
         };
         return e.env;

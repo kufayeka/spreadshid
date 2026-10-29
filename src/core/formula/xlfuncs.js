@@ -4,6 +4,7 @@
 // empty cell, an XlError, or an XlRange); an error among the plain arguments is the result at once unless the function is one that deals with errors (`errors`).
 // A `lazy` function (IF, IFERROR ...) gets each argument as a function to call, so what it does not need is never worked out. `ctx` is { now, at, volatile() }.
 import { ERR, XlError, XlRange, isError, isRange, toNumber, toText, toBool, compare, roundSig, dateToSerial, serialToDate, criterion, wildcardRegex } from "./xlvalue.js";
+import { registerExtra } from "./xlfuncs-extra.js";
 
 const NAMES = { months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] };
 
@@ -460,3 +461,4 @@ def("N", 1, 1, (a) => (typeof a[0] === "number" ? a[0] : typeof a[0] === "boolea
 
 import { registerMore } from "./xlfuncs-more.js";
 registerMore(def);
+registerExtra(def, FUNCTIONS);

@@ -54,7 +54,12 @@ const GRUP = {
         ['CEILING', 'membulatkan ke atas ke kelipatan', '=CEILING(1157320, 5000)'],
         ['FLOOR', 'membulatkan ke bawah ke kelipatan', '=FLOOR(1157320, 5000)'],
         ['INT', 'bilangan bulat ke bawah', '=INT(7.9)'],
-        ['TRUNC', 'membuang desimal', '=TRUNC(-7.9)']
+        ['TRUNC', 'membuang desimal', '=TRUNC(-7.9)'],
+        ['QUOTIENT', 'hasil bagi tanpa sisa: berapa batang besi 12 m utuh dari 100 m', '=QUOTIENT(100, 12)'],
+        ['EVEN', 'ke atas ke bilangan genap (bahan yang dijual berpasangan)', '=EVEN(7.2)'],
+        ['ODD', 'ke atas ke bilangan ganjil', '=ODD(6)'],
+        ['CEILING.MATH', 'ke atas ke kelipatan; angka negatif menuju nol', '=CEILING.MATH(-8.1, 2)'],
+        ['FLOOR.MATH', 'ke bawah ke kelipatan; angka negatif menjauhi nol', '=FLOOR.MATH(-8.1, 2)']
     ],
     'Matematika': [
         ['ABS', 'nilai tanpa tanda minus', '=ABS(-1500)'],
@@ -66,7 +71,18 @@ const GRUP = {
         ['LN', 'logaritma natural', '=ROUND(LN(10), 4)'],
         ['LOG', 'logaritma dengan basis tertentu', '=LOG(1000, 10)'],
         ['LOG10', 'logaritma basis 10', '=LOG10(1000)'],
-        ['PI', 'bilangan π', '=ROUND(PI(), 4)']
+        ['PI', 'bilangan π', '=ROUND(PI(), 4)'],
+        ['SUMSQ', 'jumlah kuadrat (3² + 4²)', '=SUMSQ(3, 4)'],
+        ['RADIANS', 'derajat menjadi radian (fungsi sudut memakai radian)', '=ROUND(RADIANS(30), 6)'],
+        ['DEGREES', 'radian menjadi derajat', '=DEGREES(PI())'],
+        ['SIN', 'sinus: tinggi kuda-kuda atap 30° dengan sisi miring 4 m', '=ROUND(4 * SIN(RADIANS(30)), 2)'],
+        ['COS', 'kosinus: jarak datar sisi miring 4 m pada 30°', '=ROUND(4 * COS(RADIANS(30)), 2)'],
+        ['TAN', 'tangen: kenaikan per meter pada kemiringan 30°', '=ROUND(TAN(RADIANS(30)), 4)'],
+        ['ASIN', 'sudut dari sinus', '=DEGREES(ASIN(0.5))'],
+        ['ACOS', 'sudut dari kosinus', '=DEGREES(ACOS(0.5))'],
+        ['ATAN', 'sudut tangga: naik 3, maju 4', '=ROUND(DEGREES(ATAN(3/4)), 2)'],
+        ['ATAN2', 'sudut titik (x, y), x dulu', '=DEGREES(ATAN2(1, 1))'],
+        ['CONVERT', 'mengubah satuan: kaki persegi ke meter persegi', '=ROUND(CONVERT(1000, "ft2", "m2"), 2)']
     ],
     'Logika': [
         ['IF', 'satu nilai kalau syarat benar, nilai lain kalau salah', '=IF(C2>5, "Banyak", "Sedikit")'],
@@ -119,7 +135,14 @@ const GRUP = {
         ['VALUE', 'teks angka jadi angka', '=VALUE("1250") + 1'],
         ['EXACT', 'apakah dua teks sama persis', '=EXACT("Semen", "semen")'],
         ['N', 'nilai jadi angka (TRUE = 1, teks = 0)', '=N(TRUE)'],
-        ['HYPERLINK', 'teks yang menunjuk alamat web', '=HYPERLINK("https://contoh.id", "buka")']
+        ['HYPERLINK', 'teks yang menunjuk alamat web', '=HYPERLINK("https://contoh.id", "buka")'],
+        ['TEXTBEFORE', 'teks sebelum pemisah: awalan nomor PO', '=TEXTBEFORE(F3, "-")'],
+        ['TEXTAFTER', 'teks sesudah pemisah: nomor di belakang', '=TEXTAFTER(F3, "-")'],
+        ['NUMBERVALUE', 'angka tulisan Indonesia ("1.250,50") menjadi angka', '=NUMBERVALUE("1.250,50", ",", ".")'],
+        ['FIXED', 'angka dibulatkan lalu ditulis sebagai teks', '=FIXED(1234.567, 1)'],
+        ['CHAR', 'huruf dari kodenya (10 = ganti baris)', '=CHAR(65)'],
+        ['CODE', 'kode huruf pertama', '=CODE("A")'],
+        ['CLEAN', 'membuang karakter tak terlihat dari teks tempelan', '=LEN(CLEAN("PO" & CHAR(10) & "2611"))']
     ],
     'Memeriksa isi': [
         ['ISBLANK', 'apakah sel kosong', '=ISBLANK(F4)'],
@@ -127,7 +150,13 @@ const GRUP = {
         ['ISTEXT', 'apakah teks', '=ISTEXT(B2)'],
         ['ISLOGICAL', 'apakah TRUE atau FALSE', '=ISLOGICAL(C2>5)'],
         ['ISERROR', 'apakah error', '=ISERROR(B2/0)'],
-        ['ISNA', 'apakah #N/A', '=ISNA(MATCH("Kayu", A2:A5, 0))']
+        ['ISNA', 'apakah #N/A', '=ISNA(MATCH("Kayu", A2:A5, 0))'],
+        ['ISERR', 'apakah error selain #N/A', '=ISERR(MATCH("Kayu", A2:A5, 0))'],
+        ['ISEVEN', 'apakah genap', '=ISEVEN(C2)'],
+        ['ISODD', 'apakah ganjil', '=ISODD(C3)'],
+        ['ISFORMULA', 'apakah sel berisi rumus', '=ISFORMULA(B2)'],
+        ['NA', 'menulis #N/A dengan sengaja ("belum ada data")', '=NA()'],
+        ['ERROR.TYPE', 'nomor jenis error (2 = #DIV/0!)', '=ERROR.TYPE(B2/0)']
     ],
     'Tanggal dan jam': [
         ['TODAY', 'tanggal hari ini', '=TODAY()', TANGGAL],
@@ -148,14 +177,35 @@ const GRUP = {
         ['DAYS', 'selisih hari', '=DAYS(E5, E2)'],
         ['DATEDIF', 'selisih dalam hari ("d"), bulan ("m"), atau tahun ("y")', '=DATEDIF(E2, TODAY(), "d")'],
         ['WORKDAY', 'tanggal setelah sekian hari kerja (tanpa Sabtu-Minggu)', '=WORKDAY(E2, 10)', TANGGAL],
-        ['NETWORKDAYS', 'banyaknya hari kerja di antara dua tanggal', '=NETWORKDAYS(E2, E5)']
+        ['NETWORKDAYS', 'banyaknya hari kerja di antara dua tanggal', '=NETWORKDAYS(E2, E5)'],
+        ['WORKDAY.INTL', 'seperti WORKDAY, dengan libur pilihan: "0000001" = hanya Minggu libur (proyek 6 hari)', '=WORKDAY.INTL(E2, 10, "0000001")', TANGGAL],
+        ['NETWORKDAYS.INTL', 'hari kerja dengan libur pilihan (11 = hanya Minggu)', '=NETWORKDAYS.INTL(E2, E5, 11)'],
+        ['DAYS360', 'selisih hari dengan tahun 360 hari (bunga, sewa)', '=DAYS360(E2, E5)'],
+        ['YEARFRAC', 'bagian tahun di antara dua tanggal (3 = hari sebenarnya / 365)', '=ROUND(YEARFRAC(E2, E5, 3), 4)'],
+        ['DATEVALUE', 'tanggal yang tertulis sebagai teks menjadi tanggal', '=DATEVALUE("27/10/2026")', TANGGAL],
+        ['TIMEVALUE', 'jam yang tertulis sebagai teks menjadi jam', '=TIMEVALUE("13:45")', JAM]
     ],
     'Keuangan': [
         ['PMT', 'cicilan per bulan (pokok ditulis negatif)', '=ROUND(PMT(1%, 12, -12000000), 0)'],
         ['FV', 'nilai akhir tabungan rutin', '=ROUND(FV(1%, 12, -1000000), 0)'],
         ['PV', 'nilai sekarang dari cicilan rutin', '=ROUND(PV(1%, 12, -1000000), 0)'],
         ['NPV', 'nilai sekarang arus kas (mulai periode 1)', '=ROUND(NPV(10%, G3:G5) + G2, 0)'],
-        ['IRR', 'tingkat pengembalian arus kas', '=ROUND(IRR(G2:G5), 4)']
+        ['IRR', 'tingkat pengembalian arus kas', '=ROUND(IRR(G2:G5), 4)'],
+        ['NPER', 'berapa bulan sampai lunas: utang 12 juta, cicilan 1,1 juta, bunga 1%', '=ROUND(NPER(1%, -1100000, 12000000), 2)'],
+        ['RATE', 'bunga per bulan sebenarnya: pinjam 12 juta, cicil 1,1 juta × 12', '=ROUND(RATE(12, -1100000, 12000000), 4)'],
+        ['IPMT', 'bagian bunga di cicilan ke-1', '=ROUND(IPMT(1%, 1, 12, -12000000), 0)'],
+        ['PPMT', 'bagian pokok di cicilan ke-1', '=ROUND(PPMT(1%, 1, 12, -12000000), 0)'],
+        ['CUMIPMT', 'total bunga cicilan ke-1 sampai ke-6', '=ROUND(CUMIPMT(1%, 12, 12000000, 1, 6, 0), 0)'],
+        ['CUMPRINC', 'total pokok cicilan ke-1 sampai ke-6', '=ROUND(CUMPRINC(1%, 12, 12000000, 1, 6, 0), 0)'],
+        ['XNPV', 'nilai sekarang arus kas dengan tanggalnya sendiri (termin proyek)', '=ROUND(XNPV(10%, G2:G5, E2:E5), 0)'],
+        ['XIRR', 'tingkat pengembalian per tahun dari arus kas bertanggal. Di tabel contoh uangnya kembali dalam 3 minggu, jadi setahunnya sangat besar (110 = 11.000%)', '=ROUND(XIRR(G2:G5, E2:E5), 4)'],
+        ['MIRR', 'IRR dengan bunga pinjaman 10% dan bunga simpanan 6%', '=ROUND(MIRR(G2:G5, 10%, 6%), 4)'],
+        ['EFFECT', 'bunga efektif setahun dari bunga 12% yang dihitung bulanan', '=ROUND(EFFECT(12%, 12), 4)'],
+        ['NOMINAL', 'bunga nominal dari bunga efektif', '=ROUND(NOMINAL(12.68%, 12), 4)'],
+        ['SLN', 'penyusutan garis lurus per tahun: excavator 900 juta, sisa 100 juta, 8 tahun', '=SLN(900000000, 100000000, 8)'],
+        ['SYD', 'penyusutan jumlah angka tahun, tahun ke-1', '=ROUND(SYD(900000000, 100000000, 8, 1), 0)'],
+        ['DDB', 'penyusutan saldo menurun ganda, tahun ke-1', '=DDB(900000000, 100000000, 8, 1)'],
+        ['DB', 'penyusutan saldo menurun tetap, tahun ke-1', '=DB(900000000, 100000000, 8, 1)']
     ],
     'Statistik': [
         ['STDEV', 'simpangan baku sampel', '=ROUND(STDEV(C2:C5), 2)'],
@@ -163,7 +213,22 @@ const GRUP = {
         ['STDEV.P', 'simpangan baku populasi', '=ROUND(STDEV.P(C2:C5), 2)'],
         ['VAR', 'varians sampel', '=ROUND(VAR(C2:C5), 2)'],
         ['VAR.S', 'sama dengan VAR', '=ROUND(VAR.S(C2:C5), 2)'],
-        ['VAR.P', 'varians populasi', '=ROUND(VAR.P(C2:C5), 2)']
+        ['VAR.P', 'varians populasi', '=ROUND(VAR.P(C2:C5), 2)'],
+        ['MODE', 'angka yang paling sering muncul', '=MODE(3, 5, 5, 2)'],
+        ['MODE.SNGL', 'sama dengan MODE', '=MODE.SNGL(3, 5, 5, 2)'],
+        ['PERCENTILE', 'persentil: 90% harga ada di bawah angka ini', '=PERCENTILE(B2:B5, 0.9)'],
+        ['PERCENTILE.INC', 'sama dengan PERCENTILE', '=PERCENTILE.INC(B2:B5, 0.5)'],
+        ['PERCENTILE.EXC', 'persentil tanpa ujung 0 dan 1', '=PERCENTILE.EXC(B2:B5, 0.4)'],
+        ['QUARTILE', 'kuartil (1 = 25%, 2 = tengah, 3 = 75%)', '=QUARTILE(B2:B5, 1)'],
+        ['QUARTILE.INC', 'sama dengan QUARTILE', '=QUARTILE.INC(B2:B5, 3)'],
+        ['QUARTILE.EXC', 'kuartil tanpa ujung', '=QUARTILE.EXC(B2:B5, 1)'],
+        ['SLOPE', 'kemiringan garis: harga naik berapa per qty', '=ROUND(SLOPE(B2:B5, C2:C5), 2)'],
+        ['INTERCEPT', 'titik potong garis di x = 0', '=ROUND(INTERCEPT(B2:B5, C2:C5), 2)'],
+        ['FORECAST', 'perkiraan y pada x tertentu dari garis lurus data lama', '=ROUND(FORECAST(4, B2:B5, C2:C5), 0)'],
+        ['FORECAST.LINEAR', 'sama dengan FORECAST', '=ROUND(FORECAST.LINEAR(4, B2:B5, C2:C5), 0)'],
+        ['TREND', 'nilai garis lurus di x baru (satu sel: nilai pertama)', '=ROUND(TREND(B2:B5, C2:C5, 4), 0)'],
+        ['CORREL', 'seberapa searah dua deret (1 = searah, -1 = berlawanan)', '=ROUND(CORREL(B2:B5, C2:C5), 4)'],
+        ['AGGREGATE', 'total yang bisa melewati error dan baris tersembunyi (9 = SUM, 6 = lewati error)', '=AGGREGATE(9, 6, B2:B5, B2/0)']
     ]
 };
 

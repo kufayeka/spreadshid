@@ -128,6 +128,7 @@ Tanpa React dan tanpa browser: berjalan di browser, Node.js, Deno, Bun, dan work
 | `fromApiMakerType`, `fieldType`, `checkValue` | tipe kolom dari Type Nexa API Maker, tipe satu field, dan pemeriksaan satu nilai | [8.5](08-menjaga-isi.md#85-tipe-kolom) |
 | `mergePatch`, `checkPatch`, `viewFor` | menggabungkan patch, memeriksanya, dan menyiapkan workbook untuk satu orang | [9](09-menyimpan.md) |
 | `resolveAccess`, `validateAccess`, `parseWhere`, `ACTIONS`, `ACTION_INFO`, `UI_ITEMS` | access control | [10](10-hak-akses.md) |
+| `accessColor`, `accessPlaces` | warna untuk sebuah `who`, dan sel mana saja yang disentuh setiap baris akses (editor aturan, `access.view: 'setup'`) | [10](10-hak-akses.md) |
 | `exportXlsx`, `importXlsx`, `importXlsxInto` | file `.xlsx` | [11](11-komentar-excel.md) |
 | `exportCsv`, `importCsvInto`, `parseCsv`, `codeOfFormat` | CSV, dan kode format Excel | [11](11-komentar-excel.md) |
 
@@ -147,7 +148,7 @@ Fungsi yang hanya ada di `wb`, bukan di handle sheet:
 | `toJSON`, `pendingPatch`, `saved`, `unsaved`, `version` | menyimpan | [9.2](09-menyimpan.md#92-tombol-simpan), [9](09-menyimpan.md) |
 | `setRules` | aturan per sel untuk orang yang membuka | [8.6](08-menjaga-isi.md#86-sel-yang-tidak-boleh-diubah) |
 | `setAccess`, `access`, `can`, `shows` | access control | [10](10-hak-akses.md) |
-| `setUser` | ganti orang yang membuka (penulis komentar dan op) | [11](11-komentar-excel.md) |
+| `setUser`, `user` | ganti orang yang membuka (penulis komentar dan op), dan baca siapa dia sekarang `{ id, name }` | [11](11-komentar-excel.md) |
 | `id` | id workbook | [9.11](09-menyimpan.md#911-isi-content) |
 
 ## 12.7 Handle sheet
@@ -169,7 +170,7 @@ Handle juga punya `id` dan `name`.
 | validasi | `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt` | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
 | pivot | `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt` | [7.6](07-data.md#76-pivot-table) |
 | aturan dan tipe | `modeAt`, `setTypes`, `typeAt` | [8](08-menjaga-isi.md) |
-| komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
+| komentar | `addComment`, `replyComment`, `editComment`, `deleteComment`, `mayChangeComment`, `comments`, `commentAt`, `hasComment` | [11](11-komentar-excel.md) |
 
 ## 12.8 Daftar lain
 

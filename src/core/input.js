@@ -61,7 +61,7 @@ function moneyPattern(sym) {
 
 const MONTH_WORDS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-function readTime(t) {
+export function readTime(t) {
     const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?$/.exec(t);
     if (!m) return null;
     let h = Number(m[1]);
@@ -71,7 +71,7 @@ function readTime(t) {
     return { fraction: (h * 3600 + mi * 60 + s) / 86400, seconds: m[3] !== undefined };
 }
 
-function readDate(t, info) {
+export function readDate(t, info) {
     let y, mo, d;
     // a date that starts with a four-digit year is year, month, day in every locale: 2026-10-27, and 2026/10/27 as Japan and China write it
     let m = /^(\d{4})([/.-])(\d{1,2})\2(\d{1,2})$/.exec(t);

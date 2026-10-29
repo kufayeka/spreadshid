@@ -1,11 +1,11 @@
-// The reference chapter (docs/18-referensi.md) names everything the library gives: every export of the two entries, every function of a workbook and
+// The reference chapter (docs/12-referensi.md) names everything the library gives: every export of the two entries, every function of a workbook and
 // of a sheet handle. A name added to the library and not to the reference fails here.
 //   node test/reference.test.js
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import * as core from '../src/core/index.js';
 
-const text = readFileSync(new URL('../docs/18-referensi.md', import.meta.url), 'utf8');
+const text = readFileSync(new URL('../docs/12-referensi.md', import.meta.url), 'utf8');
 const named = new Set([...text.matchAll(/`([A-Za-z_][\w.]*)`/g)].map((m) => m[1]));
 const missing = (list) => list.filter((n) => !named.has(n));
 
