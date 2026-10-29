@@ -482,7 +482,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     toGrid();
                 }} /> : null}
             <div className={'ks-body' + (panel ? ' ks-with-panel' : '')} ref={setBodyEl} onMouseOver={onBodyOver} onMouseLeave={() => { if (hoverAt) leave(); }}>
-                <Grid key={sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!cellMarks} setup={setup} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
+                <Grid key={'grid' + sheetId} scrollMemory={scrollMemory} sinkRef={sinkRef} zoom={zoom} showProtected={!!cellMarks} setup={setup} painting={!!paint} onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} onLink={() => setLinking(true)} workbook={wb} sheetId={sheetId} revision={revision} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing}
                     marks={marks} revealTick={revealTick} container={root} onFind={onFind} onError={tellError} onFilterMenu={setFilterMenu} ui={ui} onComment={writeComment} chartSel={chartSel} onChartSel={selectChart} />
                 {find.open ? (
                     <FindBar query={find.query} count={marks.length} index={current ? marks.indexOf(current) : -1}
@@ -493,7 +493,7 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                 ) : null}
                 {notice ? <div className="ks-notice" role="status">{notice}</div> : null}
                 {panel && panel.kind === 'conditional' && wb.shows('panel.conditional') ? <ConditionalPanel workbook={wb} sheetId={sheetId} range={panel.range} revision={revision} container={root}
-                    key={sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
+                    key={'conditional' + sheetId} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'comments' && wb.can('comment.read') && wb.shows('panel.comments') ? <CommentsPanel workbook={wb} sheetId={sheetId} active={sel.active} revision={revision}
                     onOpen={(id, r, c) => { goToRange(id, { r1: r, c1: c, r2: r, c2: c }); setHoverAt(null); setCard({ s: id, r, c, start: 0 }); }} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {shownCard && wb.can('comment.read') ? <CommentCard workbook={wb} sheetId={sheetId} at={shownCard} revision={revision} frame={bodyEl} drafts={drafts.current}
