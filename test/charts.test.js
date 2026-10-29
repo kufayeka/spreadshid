@@ -3,7 +3,8 @@
 // away as one change each, refused without the access row `chart`, and saved with the workbook.
 //   node test/charts.test.js
 import assert from 'node:assert';
-import { createWorkbook, chartSeries } from '../src/core/index.js';
+import { createWorkbook, chartSeries, exportXlsx, importXlsx } from '../src/core/index.js';
+import { unzip } from '../src/core/excel/read-base.js';
 
 let passed = 0;
 const ok = (label) => { passed++; console.log('ok   ' + label); };
@@ -122,6 +123,38 @@ const cells = (rows) => rows.map((r) => r.map((v) => ({ value: v, text: v === nu
     assert.deepStrictEqual([s.shownStyle(0, 9).dataBar, s.shownStyle(1, 9), s.shownStyle(3, 9) || null],
         [{ pct: 0.5, color: '#1192e8' }, { bold: true, dataBar: { pct: 1, color: '#1192e8' } }, null], 'a data bar from 0 to the largest, together with another rule\'s style; text has none');
     ok('data bars: as long as the number among the range, together with other rules');
+}
+
+// ---- in an .xlsx file: real Excel charts (a drawing on the cells, each series naming its own cells), sparklines and data bars; and back
+{
+    const wb = createWorkbook();
+    const s = wb.sheet('Sheet1');
+    s.setValues('A1', [['Bulan', 'Semen', 'Besi'], ['Mei', 182, 96], ['Jun', 205, 110]]);
+    s.addChart({ at: 'E2:J14', data: 'A1:C3', type: 'combo', title: 'Jual', series: [{ color: '#1192e8' }, { type: 'line', axis: 'right', dash: true }] });
+    s.addChart({ at: 'E16:J28', data: 'A1:B3', type: 'donut', legend: 'right' });
+    s.addChart({ at: 'L2:Q14', data: 'B2:C3', type: 'line', seriesIn: 'rows', background: 'none' });
+    s.addSparkline({ at: 'D2:D3', data: 'B2:C3', type: 'column' });
+    s.addConditional('B2:B3', { kind: 'bar', color: '#1192e8' });
+    const bytes = exportXlsx(wb);
+    const files = await unzip(bytes);
+    const text = (name) => new TextDecoder().decode(files.get(name));
+    assert.ok(/<drawing r:id="rId3"\/>/.test(text('xl/worksheets/sheet1.xml')), 'the sheet links its drawing');
+    assert.ok(text('xl/drawings/drawing1.xml').includes('<xdr:from><xdr:col>4</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row>'), 'the chart is anchored on its cells (E2)');
+    const combo = text('xl/charts/chart1.xml');
+    assert.ok(combo.includes('<c:barChart>') && combo.includes('<c:lineChart>') && combo.includes('<c:axPos val="r"/>'), 'a combo: columns, a line, and a second axis on the right');
+    assert.ok(combo.includes("<c:f>'Sheet1'!$B$2:$B$3</c:f>") && combo.includes("<c:f>'Sheet1'!$A$2:$A$3</c:f>") && combo.includes("<c:f>'Sheet1'!$B$1</c:f>"), 'each series names its values, categories and name');
+    assert.ok(text('xl/charts/chart2.xml').includes('<c:doughnutChart>') && text('xl/charts/chart3.xml').includes('<a:noFill/>'), 'a donut; a transparent chart has no fill');
+    assert.ok(text('[Content_Types].xml').includes('/xl/charts/chart3.xml') && text('[Content_Types].xml').includes('/xl/drawings/drawing1.xml'));
+    assert.ok(/<x14:sparkline><xm:f>'Sheet1'!B2:C2<\/xm:f><xm:sqref>D2<\/xm:sqref>/.test(text('xl/worksheets/sheet1.xml')), 'sparklines: each cell with its own range');
+    assert.ok(/<cfRule type="dataBar"/.test(text('xl/worksheets/sheet1.xml')), 'a data bar');
+    const back = await importXlsx(bytes);
+    const t2 = back.workbook.sheet('Sheet1');
+    assert.deepStrictEqual(back.warnings, []);
+    assert.deepStrictEqual(t2.charts().map((c) => [c.type, c.atText, c.dataText, c.title || '', c.legend, c.background, c.seriesIn]),
+        [['combo', 'E2:J14', 'A1:C3', 'Jual', 'top', 'white', 'cols'], ['donut', 'E16:J28', 'A1:B3', '', 'right', 'white', 'cols'], ['line', 'L2:Q14', 'B2:C3', '', 'top', 'none', 'rows']]);
+    assert.deepStrictEqual(t2.charts()[0].series[1], { color: '#1192e8', type: 'line', axis: 'right', dash: true }, 'a series keeps its kind, axis and dashes');
+    assert.deepStrictEqual([t2.sparklines().map((g) => [g.type, g.atText, g.dataText]), t2.conditionals().map((r) => [r.kind, r.color])], [[['column', 'D2:D3', 'B2:C3']], [['bar', '#1192e8']]]);
+    ok('in an .xlsx file: Excel charts on their cells, sparklines and data bars, and back');
 }
 
 console.log('\n' + passed + ' passed');

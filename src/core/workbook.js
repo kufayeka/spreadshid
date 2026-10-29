@@ -1078,7 +1078,7 @@ export function createWorkbook(doc, options) {
             const at = rectOfIds(s, x.at);
             const d = x.data && rectOfIds(x.data.s, x.data);
             const sheetName = x.data && x.data.s !== s && sheets.has(x.data.s) ? quoteSheet(api.sheetProps(x.data.s).name) + '!' : '';
-            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? sheetName + rectText(d) : null };
+            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? sheetName + rectText(d) : null, dataAt: d ? { s: x.data.s, ...d } : null };
         });
     }
     /**
@@ -1156,7 +1156,7 @@ export function createWorkbook(doc, options) {
                     cells.push({ r: down ? at.r1 + i : at.r1, c: down ? at.c1 : at.c1 + i, values });
                 }
             }
-            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? rectText(d) : null, cells };
+            return { ...clone(x), at, atText: at ? rectText(at) : null, dataText: d ? rectText(d) : null, dataAt: d ? { s: x.data.s, ...d } : null, cells };
         });
     }
     const numberOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);

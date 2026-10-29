@@ -2,7 +2,8 @@
 // dates as the numbers they are, with a date format); the formulas (those whose functions the sheet has; for any other, the value Excel worked out is
 // kept and a warning says so); number formats (as the sheet's formats, and any other code as a custom format, which the sheet reads as Excel does);
 // fonts, colours, fills, alignment, wrapping, rotation and borders; merged cells; widths and heights; hidden rows and columns; frozen panes.
-// What the sheet does not take from a file (charts, pictures, comments, conditional formats, data validation, named ranges) is said in the warnings.
+// Charts (one block of data each), sparklines, notes, conditional formats, data validation and named ranges come in too; what the sheet does not take
+// from a file (pictures, shapes, icon sets ...) is said in the warnings.
 
 import { unzip, parseXml, kid, kids, BUILTIN_FORMATS } from './read-base.js';
 import { colIndex } from '../formula/address.js';
@@ -10,6 +11,7 @@ import { shiftFormula, formulaProblem } from '../formula/formula.js';
 import { fromExcelRule } from './conditional.js';
 import { readExcelFilter } from './filter.js';
 import { readValidations, readNotes } from './notes.js';
+import { readChart, readAnchors, readRef } from './charts.js';
 import { colName } from '../formula/address.js';
 
 const MAX_SHEETS = 100;
@@ -244,7 +246,6 @@ function readSheet(root, shared, styles, info, warnings) {
     const pane = kid(kid(kid(sheet, 'sheetViews'), 'sheetView'), 'pane');
     const freeze = pane && pane.attrs.state === 'frozen' ? { rows: Number(pane.attrs.ySplit) || 0, cols: Number(pane.attrs.xSplit) || 0 } : null;
     if (unknown.size) warnings.push('"' + info.name + '": formulas with ' + [...unknown].slice(0, 6).join(', ') + (unknown.size > 6 ? ' …' : '') + ' are not in the sheet: the values Excel worked out were kept');
-    if (kid(sheet, 'drawing')) warnings.push('"' + info.name + '": pictures and charts were not imported');
     // the rules of conditional formatting, in Excel's order (its priority); what the sheet has no rule for is said
     const conditionals = [], skipped = new Set();
     const cfRules = [];
@@ -305,18 +306,46 @@ export async function readXlsx(bytes) {
         const path = target ? (target[0] === '/' ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '')) : '';
         const part = files.get(path);
         if (!part) { warnings.push('the sheet "' + s.attrs.name + '" is not in the file (a chart sheet?)'); continue; }
-        const read = readSheet(parseXml(new TextDecoder().decode(part)), shared, styles, { name: s.attrs.name, hidden: !!s.attrs.state && s.attrs.state !== 'visible', knownNames }, warnings);
-        // the sheet's notes (comments): found through the sheet's own relationships
+        const sheetXml = parseXml(new TextDecoder().decode(part));
+        const read = readSheet(sheetXml, shared, styles, { name: s.attrs.name, hidden: !!s.attrs.state && s.attrs.state !== 'visible', knownNames }, warnings);
+        // the parts a sheet links to, through its own relationships: its notes (comments) and its drawing (charts, pictures)
         read.notes = [];
-        const relsPart = files.get(path.replace(/([^/]+)$/, '_rels/$1.rels'));
-        if (relsPart) {
-            for (const rel of kids(kid(parseXml(new TextDecoder().decode(relsPart)), 'Relationships'), 'Relationship')) {
-                if (!/\/comments$/.test(rel.attrs.Type || '')) continue;
-                const target = rel.attrs.Target || '';
-                const at = target[0] === '/' ? target.slice(1) : path.replace(/[^/]+$/, '') + target;
-                const clean = at.split('/').reduce((acc, seg) => (seg === '..' ? acc.slice(0, -1) : seg === '.' ? acc : acc.concat(seg)), []).join('/');
-                const notesPart = files.get(clean);
+        read.charts = [];
+        const partNear = (from, target) => {
+            const at = target[0] === '/' ? target.slice(1) : from.replace(/[^/]+$/, '') + target;
+            return at.split('/').reduce((acc, seg) => (seg === '..' ? acc.slice(0, -1) : seg === '.' ? acc : acc.concat(seg)), []).join('/');
+        };
+        const relsOf = (from) => { const p = files.get(from.replace(/([^/]+)$/, '_rels/$1.rels')); return p ? kids(kid(parseXml(new TextDecoder().decode(p)), 'Relationships'), 'Relationship') : []; };
+        for (const rel of relsOf(path)) {
+            const type = rel.attrs.Type || '', where = partNear(path, rel.attrs.Target || '');
+            if (/\/comments$/.test(type)) {
+                const notesPart = files.get(where);
                 if (notesPart) read.notes = readNotes(kid(parseXml(new TextDecoder().decode(notesPart)), 'comments'), kid, kids, addressOf);
+            } else if (/\/drawing$/.test(type)) {
+                const drawing = files.get(where);
+                if (!drawing) continue;
+                const wsDr = kid(parseXml(new TextDecoder().decode(drawing)), 'wsDr');
+                const chartRels = {};
+                for (const r of relsOf(where)) chartRels[r.attrs.Id] = partNear(where, r.attrs.Target || '');
+                let others = 0;
+                for (const a of (wsDr && wsDr.children) || []) if (/Anchor$/.test(a.name) && !kid(a, 'graphicFrame')) others++;
+                for (const anchor of readAnchors(wsDr)) {
+                    const chartPart = files.get(chartRels[anchor.rid]);
+                    const chart = chartPart ? readChart(kid(parseXml(new TextDecoder().decode(chartPart)), 'chartSpace')) : null;
+                    if (chart) read.charts.push({ ...chart, at: anchor.at });
+                    else warnings.push('"' + s.attrs.name + '": a chart whose data is not one block of one sheet was not imported');
+                }
+                if (others) warnings.push('"' + s.attrs.name + '": pictures and shapes were not imported');
+            }
+        }
+        // the sparklines: an extension of the sheet, one group of cells and the range each cell reads
+        read.sparklines = [];
+        for (const ext of kids(kid(kid(sheetXml, 'worksheet'), 'extLst'), 'ext')) {
+            for (const g of kids(kid(ext, 'sparklineGroups'), 'sparklineGroup')) {
+                const color = kid(g, 'colorSeries'), rgb = color && color.attrs.rgb;
+                const cells = kids(kid(g, 'sparklines'), 'sparkline').map((x) => ({ data: readRef((kid(x, 'f') || {}).text), at: addressOf((kid(x, 'sqref') || {}).text) })).filter((x) => x.data && x.at);
+                if (!cells.length) continue;
+                read.sparklines.push({ type: g.attrs.type === 'column' ? 'column' : g.attrs.type === 'stacked' ? 'winloss' : 'line', color: rgb && /^[0-9a-f]{8}$/i.test(rgb) ? '#' + rgb.slice(2).toLowerCase() : undefined, cells });
             }
         }
         // a workbook of the 1904 system counts its dates from 1904: moved to the sheet's count

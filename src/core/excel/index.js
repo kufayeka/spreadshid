@@ -25,6 +25,7 @@ import { formulaProblem } from '../formula/formula.js';
 import { colName } from '../formula/address.js';
 import { ruleRect } from '../validation.js';
 import { noteText, threadsFor } from './notes.js';
+import { seriesRefs } from './charts.js';
 
 // ---- out ------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -98,6 +99,8 @@ function cellModel(wb, s, r, c, settings) {
 export function exportXlsx(wb) {
     const settings = wb.settings();
     const ids = wb.sheetIds();
+    // the name a sheet has in the file (Excel takes a sheet name of 31 characters at most, without \ / ? * [ ] :)
+    const fileName = (s) => String(wb.sheetProps(s).name || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet1';
     const sheets = ids.map((s) => {
         const props = wb.sheetProps(s);
         const size = wb.size(s);
@@ -126,11 +129,23 @@ export function exportXlsx(wb) {
             conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean),
             validations: (props.validations || []).map((rule) => ({ rule, rect: ruleRect(wb, s, rule) })).filter((x) => x.rect),
             // every thread, as one note on its cell
-            notes: wb.comments(s).filter((t) => t.at && t.items.length).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) }))
+            notes: wb.comments(s).filter((t) => t.at && t.items.length).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) })),
+            // the charts, each naming the cells of its series in the file (a chart whose data is gone is left out), and the sparklines
+            charts: wb.charts(s).filter((c) => c.at && c.dataAt).map((c) => {
+                const model = wb.chartData(s, c.id);
+                if (!model.layout || !model.series.length) return null;
+                const series = model.series.map((x) => ({ ...x, kind: x.type }));
+                const percent = !!(model.series[0].format && model.series[0].format.type === 'percent');
+                return { ...c, percent, refs: seriesRefs({ sheet: fileName(c.dataAt.s), rect: c.dataAt, layout: model.layout, series }) };
+            }).filter(Boolean),
+            sparklines: wb.sparklines(s).filter((g) => g.at && g.dataAt).map((g) => ({ ...g, cells: g.cells.map((x, i) => {
+                const d = g.dataAt, down = g.at.c1 === g.at.c2;
+                const r1 = down ? d.r1 + i : d.r1, r2 = down ? d.r1 + i : d.r2, c1 = down ? d.c1 : d.c1 + i, c2 = down ? d.c2 : d.c1 + i;
+                return { r: x.r, c: x.c, ref: "'" + fileName(d.s).replace(/'/g, "''") + "'!" + colName(c1) + (r1 + 1) + ':' + colName(c2) + (r2 + 1) };
+            }) }))
         };
     });
-    // the named ranges, by the names the sheets have in the file (Excel takes a sheet name of 31 characters at most, without \ / ? * [ ] :)
-    const fileName = (s) => String(wb.sheetProps(s).name || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet1';
+    // the named ranges, by the names the sheets have in the file
     const names = wb.names().filter((n) => n.range).map((n) => ({
         name: n.name,
         ref: "'" + fileName(n.sheetId).replace(/'/g, "''") + "'!$" + colName(n.range.c1) + '$' + (n.range.r1 + 1) + (n.range.r2 > n.range.r1 || n.range.c2 > n.range.c1 ? ':$' + colName(n.range.c2) + '$' + (n.range.r2 + 1) : '')
@@ -171,6 +186,29 @@ function addValidationsAndNotes(wb, docs, read) {
         }
         const threads = threadsFor(wb, docs[i].id, sh.notes || []);
         if (threads.length) wb.setSheetProps(docs[i].id, { comments: threads }, { source: 'remote' });
+    });
+}
+
+// the charts and sparklines of a file, put on the sheets once their cells stand: each chart on its block of cells, reading its one block of data
+function addCharts(wb, docs, read) {
+    const idOfName = new Map(read.sheets.map((sh, i) => [String(sh.name).toLowerCase(), docs[i] && docs[i].id]));
+    const rect = (b) => colName(b.c1) + (b.r1 + 1) + ':' + colName(b.c2) + (b.r2 + 1);
+    const quoted = (name) => "'" + String(name).replace(/'/g, "''") + "'";
+    read.sheets.forEach((sh, i) => {
+        for (const c of sh.charts || []) {
+            if (!idOfName.get(String(c.sheet).toLowerCase())) { read.warnings.push('"' + sh.name + '": a chart of a sheet that was not read was left out'); continue; }
+            const spec = { type: c.type, at: rect(c.at), data: quoted(c.sheet) + '!' + rect(c.box), seriesIn: c.seriesIn, stacked: c.stacked, legend: c.legend, series: c.series };
+            if (c.title) spec.title = c.title;
+            if (c.background) spec.background = c.background;
+            try { wb.addChart(docs[i].id, spec, { source: 'remote' }); } catch (err) { read.warnings.push('"' + sh.name + '": a chart was not imported (' + err.message + ')'); }
+        }
+        for (const g of sh.sparklines || []) {
+            // a group: its cells in one column (or row), each reading one row (or column) of one block of data
+            const at = g.cells.map((x) => x.at), d = g.cells.map((x) => x.data);
+            const box = (list) => list.reduce((b, x) => ({ r1: Math.min(b.r1, x.r1 ?? x.r), c1: Math.min(b.c1, x.c1 ?? x.c), r2: Math.max(b.r2, x.r2 ?? x.r), c2: Math.max(b.c2, x.c2 ?? x.c) }), { r1: Infinity, c1: Infinity, r2: -1, c2: -1 });
+            try { wb.addSparkline(docs[i].id, { at: rect(box(at)), data: quoted(d[0].sheet) + '!' + rect(box(d)), type: g.type, ...(g.color ? { color: g.color } : {}) }, { source: 'remote' }); }
+            catch (err) { read.warnings.push('"' + sh.name + '": sparklines were not imported (' + err.message + ')'); }
+        }
     });
 }
 
@@ -261,6 +299,7 @@ export async function importXlsx(bytes, options) {
     addRules(wb, docs, read);
     addFilters(wb, docs, read);
     addValidationsAndNotes(wb, docs, read);
+    addCharts(wb, docs, read);
     return { workbook: wb, warnings: read.warnings, active: docs[read.active] ? docs[read.active].id : docs[0].id };
 }
 
@@ -280,6 +319,7 @@ export async function importXlsxInto(wb, bytes, how) {
     addRules(temp, docs, read);
     addFilters(temp, docs, read);
     addValidationsAndNotes(temp, docs, read);
+    addCharts(temp, docs, read);
     // a name the workbook has already stays the workbook's (the file's formulas that use it then read the workbook's range), and it is said
     const fileNames = (temp.settings().names || []).filter((n) => {
         if (!wb.nameRange(n.name)) return true;

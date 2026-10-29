@@ -1,7 +1,7 @@
 // Conditional formatting to Excel and back. A rule of the sheet becomes the rule Excel has for it: a text condition the type Excel's own menu makes
 // (containsText, beginsWith ...), a number one a cellIs, a date one a formula with TODAY() (so it keeps moving with the day, as in the sheet), a custom
 // formula an expression, a colour scale a colorScale. Every rule but a scale stops the ones after it (stopIfTrue), so the first rule wins in Excel too.
-// Back from a file, what the sheet has no rule for (data bars, icon sets, top 10, above average, duplicates) is said in a warning.
+// Back from a file, what the sheet has no rule for (icon sets, top 10, above average, duplicates) is said in a warning.
 
 import { colName } from '../formula/address.js';
 
@@ -19,6 +19,7 @@ const PERIOD = { today: 'today', yesterday: 'yesterday', tomorrow: 'tomorrow', l
 export function toExcelRule(rule, rects, formulaText) {
     if (!rects.length) return null;
     const A = colName(rects[0].c1) + (rects[0].r1 + 1);
+    if (rule.kind === 'bar') return { rects, type: 'dataBar', color: rule.color || '#6929c4' };
     if (rule.kind === 'scale') {
         const point = (p, end) => ({ type: p.type === 'number' ? 'num' : p.type || end, value: p.type === 'min' || p.type === 'max' ? undefined : p.value, color: p.color });
         return { rects, type: 'colorScale', scale: [point(rule.min, 'min'), rule.mid ? point(rule.mid, 'percentile') : null, point(rule.max, 'max')].filter(Boolean) };
@@ -82,6 +83,11 @@ export function fromExcelRule(node, dxf, A, kid, kids) {
             if (points.length < 2) return { skip: 'a colour scale with no points' };
             return { spec: { kind: 'scale', min: point(0), mid: points.length === 3 ? point(1) : null, max: point(points.length - 1) } };
         }
+        case 'dataBar': {
+            const color = kid(kid(node, 'dataBar'), 'color');
+            const rgb = color && color.attrs.rgb;
+            return { spec: { kind: 'bar', color: rgb && /^[0-9a-f]{8}$/i.test(rgb) ? '#' + rgb.slice(2).toLowerCase() : '#6929c4' } };
+        }
         case 'containsBlanks': return single({ op: 'empty' });
         case 'notContainsBlanks': return single({ op: 'notEmpty' });
         case 'containsText': return single({ op: 'textContains', a: at.text || '' });
@@ -100,7 +106,6 @@ export function fromExcelRule(node, dxf, A, kid, kids) {
             if (two) return single({ op: 'formula', formula: (op === 'between' ? '=AND(' : '=OR(') + A + (op === 'between' ? '>=' : '<') + formulas[0] + ',' + A + (op === 'between' ? '<=' : '>') + formulas[1] + ')' });
             return single({ op: 'formula', formula: '=' + A + SIGN[op] + formulas[0] });
         }
-        case 'dataBar': return { skip: 'data bars' };
         case 'iconSet': return { skip: 'icon sets' };
         case 'top10': return { skip: 'top / bottom rules' };
         case 'aboveAverage': return { skip: 'above / below average rules' };

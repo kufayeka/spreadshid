@@ -52,7 +52,8 @@ export function chartSeries(block, spec = {}) {
         const first = body.find((row) => isNum(row[c].value));
         series.push({ name, values: body.map((row) => (isNum(row[c].value) ? row[c].value : null)), index: c - from, format: (first && first[c].format) || null });
     }
-    return { categories, series, seriesIn: by };
+    // how the block was read, for whoever needs the cells of each part (the Excel file names each series' own range)
+    return { categories, series, seriesIn: by, layout: { by, catCol, headerRow } };
 }
 
 /** "Sheet1!A1:D7" or "A1:D7" (the chart's own sheet) as { sheet, range } parts; null when it is not a range. */

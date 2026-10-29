@@ -181,13 +181,16 @@ function excelPackage(files) {
     };
     const { workbook: wb, warnings } = await importXlsx(excelPackage(files));
     const s = wb.sheetIds()[0];
-    assert.deepStrictEqual(wb.conditionals(s).map((x) => x.op), ['lt', 'formula', 'dateIs'], 'in Excel\'s priority, not the order in the file');
-    assert.deepStrictEqual(wb.conditionalStyleAt(s, 0, 0), { italic: true }, 'a style of the rule (dxf)');
+    assert.deepStrictEqual(wb.conditionals(s).map((x) => x.op || x.kind), ['lt', 'formula', 'dateIs', 'bar'], 'in Excel\'s priority, not the order in the file; a data bar comes in too');
+    assert.strictEqual(wb.conditionals(s)[3].color, '#638ec6', 'with its colour');
+    assert.deepStrictEqual(wb.conditionalStyleAt(s, 0, 0), { italic: true, dataBar: { pct: 0.2, color: '#638ec6' } }, 'a style of the rule (dxf), with the data bar of the cell');
     wb.setValues(s, 0, 3, 20);
-    assert.deepStrictEqual([wb.conditionalStyleAt(s, 1, 0), wb.conditionalStyleAt(s, 2, 0)], [null, { bold: true, color: '#9c0006', fill: '#ffc7ce' }], 'greater than a cell: a custom formula that reads it');
+    // (the data bar of A1:A3 is left out here: what is checked is the colour of the rules)
+    const colours = (x) => { if (!x) return null; const { dataBar, ...rest } = x; void dataBar; return Object.keys(rest).length ? rest : null; };
+    assert.deepStrictEqual([colours(wb.conditionalStyleAt(s, 1, 0)), colours(wb.conditionalStyleAt(s, 2, 0))], [null, { bold: true, color: '#9c0006', fill: '#ffc7ce' }], 'greater than a cell: a custom formula that reads it');
     assert.strictEqual(wb.conditionals(s)[2].a, 'pastWeek', 'the last 7 days of Excel is the past week');
-    assert.ok(warnings.some((w) => /data bars, icon sets/.test(w)), 'what the sheet has not is said: ' + warnings.join(' | '));
-    ok('conditional formatting from Excel: priority, its styles, a bound that is a cell, a time period; data bars and icon sets said');
+    assert.ok(warnings.some((w) => /icon sets/.test(w)), 'what the sheet has not is said: ' + warnings.join(' | '));
+    ok('conditional formatting from Excel: priority, its styles, a bound that is a cell, a time period, a data bar; icon sets said');
 }
 
 // ---- sheets added to a workbook ---------------------------------------------------------------------------------------------------------------------

@@ -175,7 +175,7 @@ export interface ChartSpec {
     [key: string]: unknown;
 }
 /** A chart as wb.charts() gives it: its settings, and where its cells and data are now. */
-export interface ChartInfo extends Omit<ChartSpec, 'at' | 'data'> { id: string; type: ChartType; at: Rect | null; atText: string | null; dataText: string | null }
+export interface ChartInfo extends Omit<ChartSpec, 'at' | 'data'> { id: string; type: ChartType; at: Rect | null; atText: string | null; dataText: string | null; dataAt: (Rect & { s: string }) | null }
 /** A group of sparklines: where they stand, what they read, how they look. */
 export interface SparklineSpec {
     at?: string; data?: string; type?: 'line' | 'column' | 'winloss'; color?: string; negColor?: string;
@@ -184,7 +184,7 @@ export interface SparklineSpec {
     min?: number; max?: number;
 }
 export interface SparklineInfo extends Omit<SparklineSpec, 'at' | 'data'> {
-    id: string; at: Rect | null; atText: string | null; dataText: string | null;
+    id: string; at: Rect | null; atText: string | null; dataText: string | null; dataAt: (Rect & { s: string }) | null;
     cells: Array<{ r: number; c: number; values: Array<number | null> }>;
 }
 /** What a chart draws, read from its data now. */
@@ -192,6 +192,8 @@ export interface ChartModel {
     categories: string[];
     series: Array<ChartSeriesSpec & { name: string; values: Array<number | null>; index: number; format: object | null }>;
     seriesIn: 'cols' | 'rows';
+    /** How the range was read: series down the columns or along the rows, its first column the categories, its first row the names. */
+    layout?: { by: 'cols' | 'rows'; catCol: boolean; headerRow: boolean };
 }
 export interface PivotResult {
     cells: CellResult[][];
