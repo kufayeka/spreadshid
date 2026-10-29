@@ -1,15 +1,17 @@
 import { createWorkbook } from '@kufayeka/sheet/core';
 import type { Op } from '@kufayeka/sheet/core';
 
-// Pelajaran 12: seperti apa sebuah op. Setiap perubahan dicetak dengan id diganti nama pendek supaya mudah dibaca.
+// Seperti apa sebuah op. Setiap perubahan dicetak dengan id diganti nama pendek supaya mudah dibaca.
 const wb = createWorkbook(null, { user: { id: 'u1', name: 'Rina' }, now: () => new Date(Date.UTC(2026, 9, 27, 9, 0)) });
 const s = wb.sheet('Sheet1');
 const pendek = new Map<string, string>();
 const nama = (id: string) => { if (!pendek.has(id)) pendek.set(id, 'id' + (pendek.size + 1)); return pendek.get(id) ?? id; };
+// isi sel sebagai JSON, dengan id di dalamnya (rumus menyimpan referensinya sebagai id) juga diganti nama pendek
+const teks = (v: unknown) => JSON.stringify(v ?? null).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, (id) => nama(id));
 const ringkas = (op: Op): string => {
     switch (op.t) {
         case 'cells': case 'styles':
-            return op.t + ' ' + op.changes.map((ch) => nama(ch.row) + '/' + nama(ch.col) + ': ' + JSON.stringify(ch.before) + ' -> ' + JSON.stringify(ch.after)).join(', ');
+            return op.t + ' ' + op.changes.map((ch) => nama(ch.row) + '/' + nama(ch.col) + ': ' + teks(ch.before) + ' -> ' + teks(ch.after)).join(', ');
         case 'insertRows': case 'deleteRows':
             return op.t + ' ' + op.rows.map((r) => nama(r.id) + ' key ' + r.key).join(', ');
         case 'rowProps': case 'colProps':

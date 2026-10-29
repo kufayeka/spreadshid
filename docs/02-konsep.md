@@ -568,7 +568,7 @@ fungsi untuk mengisi dan mengubah dibahas di bab 4.
 | Pilihan | Isinya | Artinya |
 |---|---|---|
 | `user` | `{ id, name }` | siapa yang sedang bekerja: dicatat di setiap op, dan menjadi nama penulis komentar |
-| `beforeOp` | fungsi | memeriksa setiap op sebelum diterapkan, dan bisa mengubah, membuang, atau menolaknya ([4.10](04-api-workbook.md#410-beforeop-memeriksa-setiap-perubahan)) |
+| `beforeOp` | fungsi | memeriksa setiap op sebelum diterapkan, dan bisa mengubah, membuang, atau menolaknya ([10.3](10-aturan.md#103-beforeop-memeriksa-setiap-perubahan)) |
 | `now` | `() => Date` | jam untuk `NOW()` dan `TODAY()`; berguna untuk tes |
 | `undoLimit` | angka | berapa perubahan yang diingat undo (bawaan 200) |
 

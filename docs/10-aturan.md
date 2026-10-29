@@ -1,6 +1,6 @@
 # 10. Aturan dan tipe kolom
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [9. Mengisi sheet dari data](09-populate.md) · Berikutnya: [11. Memakai di React](11-react.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [8. Pivot table](08-pivot.md) · Berikutnya: [11. Memakai di React](11-react.md)
 
 Dua cara aplikasimu menjaga isi sheet:
 
@@ -18,6 +18,7 @@ Untuk mengatur **siapa boleh melakukan apa** secara lengkap (menghapus baris, me
 
 - [10.1 Aturan: hanya baca dan tersembunyi](#101-aturan-hanya-baca-dan-tersembunyi)
 - [10.2 Tipe kolom](#102-tipe-kolom)
+- [10.3 `beforeOp`: memeriksa setiap perubahan](#103-beforeop-memeriksa-setiap-perubahan)
 
 ## 10.1 Aturan: hanya baca dan tersembunyi
 
@@ -249,4 +250,80 @@ Yang perlu diketahui:
 - `typeAt(alamat)` memberi tipe sebuah sel, termasuk nama field-nya.
 - `checkValue(tipe, nilai)` menjalankan pemeriksaan yang sama tanpa sheet, misalnya di server. Hasilnya `null` kalau cocok, atau teks yang diharapkan.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [9. Mengisi sheet dari data](09-populate.md) · Berikutnya: [11. Memakai di React](11-react.md)
+## 10.3 `beforeOp`: memeriksa setiap perubahan
+
+`beforeOp` adalah pintu yang dilewati **setiap** op sebelum diterapkan. Dipasang sekali saat membuat workbook:
+
+<!-- contoh: 04-10-beforeop.ts -->
+```ts
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { Op, OpContext } from '@kufayeka/sheet/core';
+
+// Pelajaran 10: beforeOp, pintu yang dilewati setiap perubahan. Bisa meloloskan, mengubah, membuang, atau menolak.
+function periksa(op: Op, ctx: OpContext): Op | null | { reject: string } {
+    // hanya perubahan isi sel dari orang yang diperiksa; kode aplikasi dibiarkan
+    if (op.t !== 'cells' || ctx.source !== 'user') return op;
+    const kolom = (col: string) => ctx.workbook.colIndex(op.sheet ?? '', col);
+    // menolak: Qty (kolom B) lebih dari stok di D1
+    const stok = ctx.workbook.value(op.sheet ?? '', 0, 3);
+    if (op.changes.some((ch) => kolom(ch.col) === 1 && typeof ch.after === 'number' && typeof stok === 'number' && ch.after > stok)) {
+        return { reject: 'Qty melebihi stok (' + stok + ')' };
+    }
+    // membuang diam-diam: isi kolom E (catatan internal) tidak boleh diubah orang
+    const changes = op.changes.filter((ch) => kolom(ch.col) !== 4);
+    if (!changes.length) return null;
+    // mengubah: kode produk (kolom A) selalu huruf besar
+    return { ...op, changes: changes.map((ch) => (kolom(ch.col) === 0 && typeof ch.after === 'string' ? { ...ch, after: ch.after.toUpperCase() } : ch)) };
+}
+
+const wb = createWorkbook(null, { beforeOp: periksa });
+const s = wb.sheet('Sheet1');
+s.setValues('C1', [['Stok', 50]]);
+const ditolak: string[] = [];
+wb.on('reject', (e) => ditolak.push(e.reason));
+
+const orang = { source: 'user' } as const;
+s.setValues('A2', 'smn-01', orang);
+s.setValues('B2', 40, orang);
+s.setValues('B2', 80, orang);
+s.setValues('E2', 'catatan', orang);
+console.log('A2 diubah jadi huruf besar :', s.value('A2'));
+console.log('B2: 80 ditolak, 40 tetap   :', s.value('B2'));
+console.log('E2 dibuang diam-diam       :', s.value('E2'));
+console.log('ditolak                    :', ditolak.join(' / '));
+s.setValues('B2', 999);                                  // kode aplikasi: source 'code', dibiarkan
+console.log('dari kode                  :', s.value('B2'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 04-10-beforeop.ts -->
+```text
+A2 diubah jadi huruf besar : SMN-01
+B2: 80 ditolak, 40 tetap   : 40
+E2 dibuang diam-diam       : null
+ditolak                    : Qty melebihi stok (50)
+dari kode                  : 999
+```
+<!-- /hasil -->
+
+`beforeOp(op, ctx)` menerima op (4.12) dan `ctx` berisi `{ source, user, workbook }`. Kembalikan salah satu dari empat:
+
+| Dikembalikan | Akibatnya |
+|---|---|
+| `op` | diloloskan apa adanya |
+| salinan op yang diubah | yang diterapkan adalah salinan itu (contoh: kode produk jadi huruf besar) |
+| `null` atau `false` | op itu dibuang diam-diam, op lain di perubahan yang sama tetap jalan |
+| `{ reject: 'alasan' }` | **seluruh** perubahan ditolak, event `reject` membawa alasannya, dan alasannya tampil di layar |
+
+Kapan memakai `beforeOp` dan kapan memakai fitur bawaan:
+
+| Kebutuhan | Pakai |
+|---|---|
+| angka harus di antara 1 dan 500, daftar pilihan | validasi data ([7.4](07-data.md#74-validasi-data)) |
+| kolom harus bilangan bulat, tanggal | tipe kolom ([10.2](10-aturan.md#102-tipe-kolom)) |
+| kolom tertentu hanya boleh dibaca, per orang | aturan dan hak akses ([bab 10](10-aturan.md), [bab 13](13-hak-akses.md)) |
+| syarat yang membaca sel lain ("qty tidak boleh melebihi stok"), atau mengubah isi | `beforeOp` |
+
+`beforeOp` hanya berjalan di browser itu. Pemeriksaan yang harus aman dari orang yang mengakali browser tetap dilakukan di server ([bab 12](12-server.md)).
+
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [8. Pivot table](08-pivot.md) · Berikutnya: [11. Memakai di React](11-react.md)

@@ -1,6 +1,6 @@
 # 3. Komponen `<Sheet>`
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md) · Berikutnya: [4. API workbook](04-api-workbook.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md) · Berikutnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md)
 
 Bab ini membahas `<Sheet>` itu sendiri: cara aplikasimu mendengar apa yang dilakukan orang di sheet, memberi perintah ke sheet, mengatur sheet
 mana yang tampil, menyederhanakan layarnya, dan mengganti warnanya. Setiap langkah adalah satu halaman React dengan foto hasilnya.
@@ -548,4 +548,4 @@ Panel muncul di kanan grid, satu panel pada satu waktu:
 - **Tab sheet**: klik kanan untuk Rename, Duplicate, Delete, Hide, serta Move left dan Move right. Tombol `+` menambah sheet, dan tombol ☰ menampilkan semua sheet
   termasuk yang tersembunyi.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md) · Berikutnya: [4. API workbook](04-api-workbook.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md) · Berikutnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md)

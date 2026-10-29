@@ -460,4 +460,151 @@ Dengan simpan utuh, yang menyimpan belakangan menimpa yang lebih dulu. Dengan pa
 orang yang mengedit bersamaan dan saling melihat perubahannya, perubahan dikirim satu per satu (`wb.on('op')`) dan diterapkan di browser lain dengan
 `wb.apply(ops, { source: 'remote' })`. Bagian ini akan dibahas sendiri.
 
+## 12.6 Undo, redo, `source`, dan `apply`
+
+Setiap perubahan adalah daftar op. Daftar itu bisa dicatat, dikirim, dan diterapkan di workbook lain:
+
+<!-- contoh: 04-11-undo.ts -->
+```ts
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { Op, WorkbookEvents } from '@kufayeka/sheet/core';
+
+// Pelajaran 11: undo dan redo, source, dan apply: perubahan sebagai daftar op yang bisa dicatat, dikirim, dan diterapkan di workbook lain.
+const kasir = createWorkbook(null, { user: { id: 'k1', name: 'Kasir 1' }, now: () => new Date(Date.UTC(2026, 9, 27, 9, 0)) });
+const log: Array<WorkbookEvents['op']> = [];
+kasir.on('op', (e) => log.push(e));
+const s = kasir.sheet('Sheet1');
+
+s.setValues('A1', [['Barang', 'Qty'], ['Semen', 10]]);   // perubahan 1
+s.setStyle('A1:B1', { bold: true });                     // perubahan 2
+s.insertRows('2');                                       // perubahan 3
+console.log('perubahan  :', log.map((e) => e.ops.map((o) => o.t).join('+')).join(', '));
+console.log('bisa undo  :', kasir.canUndo(), '| bisa redo:', kasir.canRedo(), '| revision', kasir.revision);
+
+kasir.undo(); kasir.undo();
+console.log('dua undo   :', s.value('A1'), '| gaya A1:', s.style('A1') ?? 'tidak ada', '| bisa redo:', kasir.canRedo());
+kasir.redo();
+console.log('redo       :', JSON.stringify(s.style('A1')));
+console.log('op dicatat :', log[0].ops[0].at, 'oleh', JSON.stringify(log[0].ops[0].user));
+
+// op yang sama diterapkan di workbook lain yang isinya sama (server, atau komputer lain)
+const server = createWorkbook(kasir.toJSON());
+const ops: Op[] = log[0].ops;
+const sesudah: Op[] | null = server.apply([{ t: 'cells', sheet: server.sheetIds()[0], changes: [{ row: server.rowId('Sheet1', 1), col: server.colId('Sheet1', 1), before: 10, after: 25 }] }], { source: 'remote' });
+console.log('apply      :', server.value('Sheet1', 'B2'), '| diterapkan', sesudah?.length, 'op | masuk undo server:', server.canUndo(), '| op kasir pertama:', ops[0].t);
+```
+<!-- /contoh -->
+
+<!-- hasil: 04-11-undo.ts -->
+```text
+perubahan  : cells, styles, insertRows
+bisa undo  : true | bisa redo: false | revision 3
+dua undo   : Barang | gaya A1: tidak ada | bisa redo: true
+redo       : {"bold":true}
+op dicatat : 2026-10-27T09:00:00.000Z oleh {"id":"k1","name":"Kasir 1"}
+apply      : 25 | diterapkan 1 op | masuk undo server: false | op kasir pertama: cells
+```
+<!-- /hasil -->
+
+**`source`** mengatakan dari mana sebuah perubahan datang. Ini menentukan apa yang memeriksanya dan apakah perubahan itu masuk undo:
+
+| `source` | Artinya | Diperiksa validasi, tipe, hak akses | `beforeOp` | Masuk undo |
+|---|---|---|---|---|
+| `'user'` | orang mengetik, paste, fill, atau kodemu menulis atas nama orang | ya | ya | ya |
+| `'code'` (bawaan) | kode aplikasimu | tidak | ya | ya |
+| `'undo'`, `'redo'` | undo dan redo | tidak | ya | (pindah tumpukan) |
+| `'remote'` | perubahan dari komputer lain atau server | tidak | tidak | tidak |
+
+| Fungsi | Artinya |
+|---|---|
+| `wb.undo()`, `wb.redo()` | mundur atau maju satu perubahan. `false` kalau tidak ada |
+| `wb.canUndo()`, `wb.canRedo()` | apakah ada yang bisa di-undo atau di-redo |
+| `wb.apply(ops, { source })` | terapkan daftar op sebagai satu perubahan. Mengembalikan op yang diterapkan, atau `null` kalau ditolak. Semua fungsi bab ini akhirnya memanggil ini |
+| `wb.revision` | angka yang naik setiap ada perubahan |
+| `wb.tick()` | hitung ulang `NOW()` dan `TODAY()` |
+
+Opsi `createWorkbook(doc, opsi)`:
+
+| Opsi | Artinya |
+|---|---|
+| `user` | `{ id, name }` orang yang sedang bekerja. Tercatat di setiap op dan di komentar |
+| `beforeOp` | 4.10 |
+| `now` | jam workbook: `() => new Date(...)`. Untuk `TODAY()`, `NOW()`, waktu op dan komentar. Berguna untuk test |
+| `undoLimit` | berapa langkah undo diingat. Bawaan 200 |
+
+## 12.7 Jenis op
+
+Isi `ops` di event `op` dan yang dilihat `beforeOp`. `sheet` adalah id sheet; baris dan kolom selalu id, jadi op yang sama tetap benar walaupun
+diterapkan di workbook yang barisnya sudah bergeser.
+
+| `op.t` | Isinya |
+|---|---|
+| `cells` | `changes: [{ row, col, before, after }]`: isi sel. Rumus berbentuk `{ f, refs }` |
+| `styles` | `changes: [{ row, col, before, after }]`: gaya sel |
+| `insertRows`, `deleteRows` | `rows: [{ id, key, cells, style, props }]`. `key` menentukan urutan |
+| `insertCols`, `deleteCols` | `cols: [{ id, key, props }]` |
+| `moveRows`, `moveCols` | `moves: [{ id, before, after }]`: key lama dan baru |
+| `rowProps`, `colProps` | `changes: [{ id, before, after }]` |
+| `sheetProps` | `before`, `after`: props sheet |
+| `addSheet`, `removeSheet` | `sheet`: isi sheet lengkap |
+| `moveSheet` | `before`, `after`: key urutan sheet |
+| `settings` | `before`, `after`: pengaturan workbook |
+
+Setiap op juga membawa `user` (dari opsi `user`) dan `at` (waktu ISO). Menghapus baris di ujung sebuah range menghasilkan dua op dalam satu perubahan:
+`cells` (rumus yang range-nya menyusut) lalu `deleteRows`.
+
+Seperti apa op-op itu untuk perubahan sehari-hari, dengan id diganti nama pendek supaya mudah dibaca:
+
+<!-- contoh: 04-12-op.ts -->
+```ts
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { Op } from '@kufayeka/sheet/core';
+
+// Seperti apa sebuah op. Setiap perubahan dicetak dengan id diganti nama pendek supaya mudah dibaca.
+const wb = createWorkbook(null, { user: { id: 'u1', name: 'Rina' }, now: () => new Date(Date.UTC(2026, 9, 27, 9, 0)) });
+const s = wb.sheet('Sheet1');
+const pendek = new Map<string, string>();
+const nama = (id: string) => { if (!pendek.has(id)) pendek.set(id, 'id' + (pendek.size + 1)); return pendek.get(id) ?? id; };
+// isi sel sebagai JSON, dengan id di dalamnya (rumus menyimpan referensinya sebagai id) juga diganti nama pendek
+const teks = (v: unknown) => JSON.stringify(v ?? null).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, (id) => nama(id));
+const ringkas = (op: Op): string => {
+    switch (op.t) {
+        case 'cells': case 'styles':
+            return op.t + ' ' + op.changes.map((ch) => nama(ch.row) + '/' + nama(ch.col) + ': ' + teks(ch.before) + ' -> ' + teks(ch.after)).join(', ');
+        case 'insertRows': case 'deleteRows':
+            return op.t + ' ' + op.rows.map((r) => nama(r.id) + ' key ' + r.key).join(', ');
+        case 'rowProps': case 'colProps':
+            return op.t + ' ' + op.changes.map((ch) => nama(ch.id) + ': ' + JSON.stringify(ch.before) + ' -> ' + JSON.stringify(ch.after)).join(', ');
+        case 'sheetProps': case 'settings':
+            return op.t + ' ' + JSON.stringify(op.before) + ' -> ' + JSON.stringify(op.after);
+        default:
+            return op.t;
+    }
+};
+wb.on('op', (e) => e.ops.forEach((op) => console.log(e.source.padEnd(5), '|', ringkas(op), '| oleh', JSON.stringify(op.user), 'pada', op.at)));
+
+s.setValues('A1', 'Semen');
+s.setStyle('A1', { bold: true });
+s.setValues('B1', '=A1');
+s.insertRows('1');
+s.setColProps('A', { width: 140 });
+s.setSheetProps({ freezeRows: 1 });
+wb.setSettings({ locale: 'id-ID' });
+wb.undo();
+```
+<!-- /contoh -->
+
+<!-- hasil: 04-12-op.ts -->
+```text
+code  | cells id1/id2: null -> "Semen" | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+code  | styles id1/id2: null -> {"bold":true} | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+code  | cells id1/id3: null -> {"f":"=⟦0⟧","refs":[{"k":"cell","r1":"id1","c1":"id2","r2":null,"c2":null,"ra1":false,"ca1":false}]} | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+code  | insertRows id4 key 02 | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+code  | colProps id2: {} -> {"width":140} | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+code  | sheetProps {"name":"Sheet1"} -> {"name":"Sheet1","freezeRows":1} | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+code  | settings {} -> {"locale":"id-ID"} | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+undo  | settings {"locale":"id-ID"} -> {} | oleh {"id":"u1","name":"Rina"} pada 2026-10-27T09:00:00.000Z
+```
+<!-- /hasil -->
+
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Memakai di React](11-react.md) · Berikutnya: [13. Access control](13-hak-akses.md)

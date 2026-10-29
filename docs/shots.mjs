@@ -65,6 +65,12 @@ export const SHOTS = [
     proyek('proyek-harian', 'Harian 27-10'),
     proyek('proyek-cashflow', 'Cash Flow', null, { x: 0, y: 0, width: 1300, height: 440 }),
     proyek('proyek-ncr', 'NCR', null, { x: 0, y: 0, width: 1300, height: 420 }),
+    // chapter 4: filling and reading from code
+    { name: 'isi-tambah', page: '04-03-tambah.page.tsx', act: press('.tambah'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'isi-baca-data', page: '04-04-baca-data.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 300 } },
+    { name: 'isi-populate', page: '04-05-populate.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 300 } },
+    { name: 'isi-baris-kolom', page: '04-07-baris-kolom.page.tsx', act: press('.sembunyikan', '.lebarkan', '.tinggikan'), clip: { x: 0, y: 0, width: 1000, height: 340 } },
+    { name: 'isi-sheet', page: '04-08-sheet.page.tsx', act: press('.tambah-sheet'), clip: { x: 0, y: 0, width: 1000, height: 380 } },
     // chapter 3: the sheet on the screen
     { name: 'layar-perubahan', page: '03-04-perubahan.page.tsx', act: async (p) => { await enter(1, 3, '400')(p); await enter(2, 3, '250')(p); }, clip: { x: 0, y: 0, width: 1366, height: 300 } },
     { name: 'layar-seleksi', page: '03-05-seleksi.page.tsx', act: dragFrom(1, 4, 3, 4), clip: { x: 0, y: 0, width: 1000, height: 340 } },

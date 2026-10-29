@@ -1,6 +1,6 @@
 # 8. Pivot table
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Mengisi sheet dari data](09-populate.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [10. Aturan dan tipe kolom](10-aturan.md)
 
 Pivot table meringkas tabel data per kelompok: omzet per kategori dan cabang, transaksi per minggu, penjualan per sales. Cara kerjanya sama dengan pivot
 table di Excel. Pivot disimpan di sheet, ditulis sebagai nilai biasa, dan dihitung ulang setiap kali datanya berubah. Fungsi yang sama
@@ -277,4 +277,4 @@ kosong dilewati. Range boleh berupa kolom utuh (`'A:K'`, sampai baris terakhir y
 
 `PIVOT_FUNCTIONS` berisi fungsi-fungsi value, misalnya untuk mengisi pilihan di form buatanmu sendiri.
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Mengisi sheet dari data](09-populate.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [10. Aturan dan tipe kolom](10-aturan.md)
