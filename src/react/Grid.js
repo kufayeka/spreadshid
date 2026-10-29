@@ -256,13 +256,13 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
 
     // A press on a chart (its body, its edge or a handle): it is selected, and the drag moves it (or moves the side or corner of the handle) by whole
     // cells, as the cells under the mouse say; letting go is one change (setChart). Someone who may not change charts only sees the tooltip.
-    function onChartPointer(e, id, mode) {
+    function onChartPointer(e, id, mode, node) {
         if (e.button !== 0) return;
         e.stopPropagation();
         if (!wb.can('chart')) return;
         e.preventDefault();
         if (editing) commit(null);
-        if (onChartSel) onChartSel(id);
+        if (onChartSel) onChartSel(id, node);
         if (sinkRef && sinkRef.current) sinkRef.current.focus({ preventScroll: true });
         const chart = chartList.find((c) => c.id === id);
         if (!chart) return;

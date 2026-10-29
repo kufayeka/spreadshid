@@ -18,7 +18,8 @@ const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
  * @param {{ left: number, top: number, width: number, height: number }} props.box  Where its block of cells is, in the pane.
  * @param {number[]} props.xs  The centre of each column of the block, from its left (for a chart laid over its cells).
  * @param {boolean} props.selected
- * @param {(e: MouseEvent, id: string, mode: string) => void} props.onPointer  A press on it ('move') or on a handle ('nw' ... 'w').
+ * @param {(e: MouseEvent, id: string, mode: string, node?: string) => void} props.onPointer  A press on it ('move') or on a handle ('nw' ... 'w'),
+ *   with the node of the chart editor the press was on: a series ('series:2'), the slices, the title or legend, the axes, or the chart.
  */
 export const ChartObject = memo(function ChartObject({ workbook: wb, sheetId, chart, revision, box, xs, selected, onPointer }) {
     const canvas = useRef(null);
@@ -53,18 +54,30 @@ export const ChartObject = memo(function ChartObject({ workbook: wb, sheetId, ch
         const h = hits.current.find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
         if (!h) { if (tip) setTip(null); return; }
         const m = hits.current.model;
-        const s = m.series.filter((x) => !x.hidden)[h.series];
+        const s = m.series[h.series];
         const name = chart.type === 'pie' || chart.type === 'donut' ? m.categories[h.category] : (s ? s.name : '') + ' · ' + (h.category < 0 ? h.xValue : m.categories[h.category]);
         let value;
         try { value = new Intl.NumberFormat(wb.settings().locale || undefined, { maximumFractionDigits: 2 }).format(h.value); } catch (err) { value = String(h.value); }
         setTip({ x: x + 12, y: y + 12, name, value });
     }
 
+    // the node of the editor under a press: what was drawn there (a series, a slice), else the part (title, legend, axes), else the chart
+    function nodeAt(e) {
+        const c = canvas.current;
+        if (!c) return 'chart';
+        const r = c.getBoundingClientRect();
+        const x = e.clientX - r.left, y = e.clientY - r.top;
+        const inside = (b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + Math.max(b.h, 4);
+        const h = hits.current.find(inside);
+        if (h) return chart.type === 'pie' || chart.type === 'donut' ? 'slices' : chart.type === 'waterfall' ? 'steps' : 'series:' + h.series;
+        const p = (hits.current.parts || []).find(inside);
+        return p ? p.node : 'chart';
+    }
     const through = chart.background === 'none';
     return (
         <div className={'ks-chart' + (through ? ' ks-chart-over' : '') + (selected ? ' ks-chart-selected' : '')} data-chart={chart.id}
             style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-            onMouseDown={through ? undefined : (e) => onPointer(e, chart.id, 'move')}>
+            onMouseDown={through ? undefined : (e) => onPointer(e, chart.id, 'move', nodeAt(e))}>
             <canvas ref={canvas} className="ks-chart-canvas" aria-label={chart.title ? 'Chart: ' + chart.title : 'Chart'} role="img"
                 style={{ left: -room.left, top: -room.top, width: W, height: H }}
                 onMouseMove={through ? undefined : onMove} onMouseLeave={() => setTip(null)} />

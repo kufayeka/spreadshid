@@ -1155,7 +1155,10 @@ export function createWorkbook(doc, options) {
         const fromBlock = out.series.length;
         out.series = out.series.map((one, i) => ({ ...publicSeries(s, own[i]), ...one }));
         own.forEach((one, i) => {
-            if (i < fromBlock || !(one.values || one.x)) return;
+            // (one with no range yet is there, empty: just added in the editor, waiting for its range; but when the block itself was deleted, what is
+            // left of the settings of its series is not a series)
+            if (i < fromBlock) return;
+            if (!(one.values || one.x) && x.data && !rectOfIds(x.data.s, x.data)) return;
             const ys = cellsOfRef(one.values) || [];
             const xs = one.x ? cellsOfRef(one.x) || [] : null;
             const head = one.nameFrom ? cellsOfRef(one.nameFrom) : null;

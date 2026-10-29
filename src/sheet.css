@@ -435,3 +435,42 @@
 .ks-databar { position: absolute; left: 1px; top: 3px; bottom: 3px; border-radius: 0 2px 2px 0; opacity: 0.28; pointer-events: none; }
 .ks-cell .ks-text { position: relative; }
 .ks-spark { position: absolute; z-index: 2; pointer-events: none; }
+/* the chart editor: a tree of the chart's parts, and the settings of the part picked */
+.ks-ins-tree, .ks-ins-tree ul { list-style: none; margin: 0; padding: 0; }
+.ks-ins-tree { margin: 0 -16px; padding: 4px 0; background: #fafafa; border-top: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; }
+.ks-ins-node { display: flex; align-items: center; gap: 6px; padding: 4px 16px; cursor: pointer; font-size: 13px; color: #393939; }
+.ks-ins-node:hover { background: #f0f0f0; }
+.ks-ins-node.ks-on { background: #ede4fc; color: #491d8b; font-weight: 600; box-shadow: inset 3px 0 var(--ks-chart, #6929c4); }
+.ks-ins-group { cursor: default; color: #6f6f6f; }
+.ks-ins-group:hover { background: none; }
+.ks-ins-leaf { padding-left: 30px; }
+.ks-ins-hint { margin-left: auto; color: #8d8d8d; font-size: 11px; font-weight: 400; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ks-ins-dot { flex: none; width: 10px; height: 10px; border-radius: 2px; }
+.ks-ins-off { color: #a8a8a8; text-decoration: line-through; }
+.ks-ins-eye { margin-left: auto; border: 0; background: none; cursor: pointer; color: #8d8d8d; font-size: 11px; padding: 0 2px; }
+.ks-ins-body { display: flex; flex-direction: column; gap: 2px; }
+.ks-ins-head { display: flex; align-items: center; gap: 6px; font-weight: 600; margin: 2px 0 4px; }
+.ks-ins-row { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 6px; min-height: 30px; }
+.ks-ins-row > label { color: #525252; font-size: 12px; }
+.ks-ins-note { grid-column: 2; color: #8d8d8d; font-size: 11px; margin-top: -2px; }
+.ks-ins-input { display: flex; align-items: center; background: #f4f4f4; border-bottom: 1px solid #8d8d8d; min-width: 0; }
+.ks-ins-input:focus-within { outline: 2px solid var(--ks-chart, #6929c4); outline-offset: -2px; }
+.ks-ins-input input { flex: 1; min-width: 0; border: 0; background: none; padding: 5px 8px; font: inherit; outline: none; }
+.ks-ins-input input[readonly] { color: #8d8d8d; }
+.ks-ins-unit { color: #8d8d8d; font-size: 11px; padding-right: 8px; }
+.ks-ins-pick { border: 0; background: none; color: var(--ks-chart, #6929c4); cursor: pointer; padding: 2px 8px; font-size: 14px; }
+.ks-ins-colors { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ks-ins-swatch { width: 20px; height: 20px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.15); cursor: pointer; padding: 0; }
+.ks-ins-swatch.ks-on { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ks-chart, #6929c4); }
+.ks-ins-more { position: relative; font-size: 12px; color: var(--ks-chart, #6929c4); cursor: pointer; margin-left: 2px; }
+.ks-ins-more input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.ks-ins-clear { border: 0; background: none; cursor: pointer; color: #8d8d8d; }
+.ks-ins-seg { display: flex; border: 1px solid #c6c6c6; border-radius: 4px; overflow: hidden; }
+.ks-ins-seg button { flex: 1; border: 0; border-right: 1px solid #c6c6c6; background: #fff; padding: 4px 6px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.ks-ins-seg button:last-child { border-right: 0; }
+.ks-ins-seg button.ks-on { background: var(--ks-chart, #6929c4); color: #fff; }
+.ks-ins-switch { justify-self: start; width: 30px; height: 16px; appearance: none; border-radius: 8px; background: #c6c6c6; position: relative; cursor: pointer; margin: 0; }
+.ks-ins-switch::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left 0.1s; }
+.ks-ins-switch:checked { background: var(--ks-chart, #6929c4); }
+.ks-ins-switch:checked::after { left: 16px; }
+.ks-ins-actions { display: flex; gap: 8px; margin-top: 8px; }

@@ -114,14 +114,15 @@ function frame(ctx, o, legendItems) {
     const pad = 14;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    if (spec.title) { ctx.font = '600 14px ' + FONT; ctx.fillStyle = INK.text; ctx.fillText(spec.title, pad, top + 14); top += 20; }
-    if (spec.subtitle) { ctx.font = '12px ' + FONT; ctx.fillStyle = INK.muted; ctx.fillText(spec.subtitle, pad, top + 12); top += 18; }
+    const part = (node, x, y, w, h) => { if (o.parts) o.parts.push({ node, x, y, w, h }); };
+    if (spec.title) { ctx.font = '600 14px ' + FONT; ctx.fillStyle = INK.text; ctx.fillText(spec.title, pad, top + 14); part('title', pad, top, ctx.measureText(spec.title).width, 18); top += 20; }
+    if (spec.subtitle) { ctx.font = '12px ' + FONT; ctx.fillStyle = INK.muted; ctx.fillText(spec.subtitle, pad, top + 12); part('title', pad, top, ctx.measureText(spec.subtitle).width, 16); top += 18; }
     let right = width - pad, bottom = height - 10;
     const legend = spec.legend || 'top';
     if (legend !== 'none' && legendItems.length) {
-        if (legend === 'right') { const w = legendWidth(ctx, legendItems); drawLegendColumn(ctx, legendItems, width - pad - w, top + 6); right -= w + 12; }
-        else if (legend === 'bottom') { bottom -= 20; drawLegend(ctx, legendItems, pad, bottom + 6, width - 2 * pad, halo); }
-        else { top += 4; const h = drawLegend(ctx, legendItems, pad, top, width - 2 * pad, halo); top += h + 6; }
+        if (legend === 'right') { const w = legendWidth(ctx, legendItems); drawLegendColumn(ctx, legendItems, width - pad - w, top + 6); part('title', width - pad - w, top + 6, w, legendItems.length * 18); right -= w + 12; }
+        else if (legend === 'bottom') { bottom -= 20; drawLegend(ctx, legendItems, pad, bottom + 6, width - 2 * pad, halo); part('title', pad, bottom + 4, width - 2 * pad, 16); }
+        else { top += 4; const h = drawLegend(ctx, legendItems, pad, top, width - 2 * pad, halo); part('title', pad, top - 2, width - 2 * pad, h + 4); top += h + 6; }
     }
     return { x: pad, y: top + 6, w: right - pad, h: bottom - top - 6 };
 }
@@ -162,8 +163,10 @@ export function drawChart(ctx, o) {
     const { spec, model } = o;
     ctx.save();
     ctx.clearRect(0, 0, o.width, o.height);
-    const series = model.series.filter((s) => !s.hidden);
+    const series = model.series.map((s, pos) => ({ ...s, pos })).filter((s) => !s.hidden);
     const hits = [];
+    const parts = [];
+    o = { ...o, parts };
     if (!series.length || (!model.categories.length && spec.type !== 'scatter')) {
         const p = frame(ctx, o, []);
         ctx.font = '12px ' + FONT; ctx.fillStyle = INK.muted; ctx.textAlign = 'center';
@@ -177,6 +180,9 @@ export function drawChart(ctx, o) {
     else if (spec.type === 'scatter') drawScatter(ctx, o, series, hits);
     else drawAxes(ctx, o, series, hits);
     ctx.restore();
+    // a hit names its series by its place among the drawn ones: given back by its place in the model, the editor's numbering
+    for (const h of hits) if (h.series >= 0 && series[h.series]) h.series = series[h.series].pos;
+    hits.parts = parts;
     return hits;
 }
 
@@ -232,6 +238,11 @@ function drawAxes(ctx, o, series, hits) {
         P = { x: plot.x + (horizontal ? catW : wL), y: plot.y + 6, w: plot.w - (horizontal ? catW : wL) - wR, h: plot.h - 6 - (showX && !horizontal ? 18 : horizontal && showY ? 16 : 0) };
     }
     if (P.w < 10 || P.h < 10) return;
+    if (o.parts) {
+        o.parts.push({ node: 'axes', x: P.x - (horizontal ? 0 : wL), y: P.y, w: horizontal ? P.w : wL, h: horizontal ? 0 : P.h });
+        if (wR) o.parts.push({ node: 'axes', x: P.x + P.w, y: P.y, w: wR, h: P.h });
+        o.parts.push({ node: 'axes', x: P.x, y: P.y + P.h, w: P.w, h: 20 });
+    }
 
     // where things stand: categories along x (y when the bars lie down), values up (right)
     const band = (horizontal ? P.h : P.w) / n;

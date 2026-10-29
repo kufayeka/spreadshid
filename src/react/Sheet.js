@@ -17,7 +17,7 @@ import { ConditionalPanel } from './ConditionalPanel.js';
 import { NamesPanel } from './NamesPanel.js';
 import { CommentsPanel } from './CommentsPanel.js';
 import { CommentCard } from './CommentCard.js';
-import { ChartPanel } from './chart/ChartPanel.js';
+import { ChartPanel, SparklinePanel } from './chart/ChartPanel.js';
 import { PivotPanel, PivotDialog } from './PivotPanel.js';
 import { FilterMenu } from './FilterMenu.js';
 import { sortRange } from '../core/search.js';
@@ -164,6 +164,14 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const onSelectStart = () => { dragging.current = true; };
     const onSelectEnd = (picked) => {
         dragging.current = false;
+        if (picking) {
+            const b = rectsOf(picked)[rectsOf(picked).length - 1];
+            const name = wb.sheetProps(sheetId).name;
+            const prefix = picking.from === sheetId ? '' : (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'") + '!';
+            picking.apply(prefix + rectText(b));
+            setPicking(null);
+            return;
+        }
         if (props.onSelectionChange) props.onSelectionChange(selectionOf(wb, sheetId, picked));
         // a click on a cell with a discussion opens its card (it stays until another cell is picked, Escape or its close button)
         const a = picked.active;
@@ -188,11 +196,18 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
     const [card, setCard] = useState(null); // { s, r, c, start }
     // The chart selected on the grid (its frame and handles show, Delete takes it away); someone who may change charts gets its editor on the right.
     const [chartSel, setChartSelState] = useState(null);
-    const selectChart = (id) => {
+    // a press on a part of a chart picks that part's node in its editor (a column its series, the title its node ...)
+    const selectChart = (id, node) => {
+        // while a range is picked for a field, a press on the grid is the picking, not leaving the chart
+        if (!id && picking) return;
         setChartSelState(id);
-        if (id && wb.can('chart') && wb.shows('panel.chart')) setPanel({ kind: 'chart', id });
+        if (id && wb.can('chart') && wb.shows('panel.chart')) setPanel((p) => ({ kind: 'chart', id, node: node || (p && p.kind === 'chart' && p.id === id ? p.node : 'chart') }));
         else setPanel((p) => (p && p.kind === 'chart' ? null : p));
     };
+    // Picking a range for a field of an editor ("⊞"): the next selection made in the grid is given to the field, with its sheet's name when the
+    // field's chart stands on another sheet; Escape or a click on the button again gives up.
+    const [picking, setPicking] = useState(null); // { apply, from }
+    const pickRange = (apply) => { setPicking({ apply, from: sheetId }); tell({ kind: 'info', reason: 'Select the cells for the field in the grid' }); };
     useEffect(() => { setChartSelState(null); setPanel((p) => (p && p.kind === 'chart' ? null : p)); }, [sheetId]);
     // Insert > Chart: a column chart of the selection (or of the filled block around the active cell), on the cells to the right of it, selected
     function insertChart() {
@@ -264,6 +279,10 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
         const pv = wb.pivotAt(sheetId, sel.active.r, sel.active.c);
         if (pv && wb.can('pivot') && wb.shows('panel.pivot')) setPanel((now) => (now && now.kind === 'pivot' && now.id === pv.id ? now : { kind: 'pivot', id: pv.id }));
         else setPanel((now) => (now && now.kind === 'pivot' ? null : now));
+        // a cell of a group of sparklines opens the group's editor (and leaving the group closes it), as a pivot table's cell does
+        const spark = wb.sparklines(sheetId).find((g) => g.cells.some((x) => x.r === sel.active.r && x.c === sel.active.c));
+        if (spark && wb.can('chart') && wb.shows('panel.chart')) setPanel((now) => (now && now.kind === 'sparkline' && now.id === spark.id ? now : { kind: 'sparkline', id: spark.id }));
+        else setPanel((now) => (now && now.kind === 'sparkline' ? null : now));
     }, [sheetId, sel.active.r, sel.active.c]);
     // the menu of a column of the filter: { c, x, y } (the column, and where its button is)
     const [filterMenu, setFilterMenu] = useState(null);
@@ -466,8 +485,11 @@ export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetP
                     start={shownCard === card ? card.start : 0} onError={tellError} onEnter={stay} onLeave={() => { if (hoverAt) leave(); }}
                     onPin={() => { if (shownCard === hoverAt) { stay(); setHoverAt(null); setCard({ s: sheetId, r: hoverAt.r, c: hoverAt.c, start: 0 }); } }}
                     onClose={() => { stay(); setHoverAt(null); setCard(null); toGrid(); }} /> : null}
-                {panel && panel.kind === 'chart' && wb.shows('panel.chart') ? <ChartPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
-                    onError={tellError} onClose={() => { setPanel(null); setChartSelState(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'chart' && wb.shows('panel.chart') ? <ChartPanel workbook={wb} sheetId={sheetId} id={panel.id} node={panel.node} revision={revision}
+                    onNode={(node) => setPanel((p) => (p && p.kind === 'chart' ? { ...p, node } : p))} onPick={pickRange}
+                    onError={tellError} onClose={() => { setPanel(null); setChartSelState(null); setPicking(null); toGrid(); }} /> : null}
+                {panel && panel.kind === 'sparkline' && wb.shows('panel.chart') ? <SparklinePanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
+                    onPick={pickRange} onError={tellError} onClose={() => { setPanel(null); setPicking(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'pivot' && wb.shows('panel.pivot') ? <PivotPanel workbook={wb} sheetId={sheetId} id={panel.id} revision={revision}
                     key={panel.id} onError={tellError} onClose={() => { setPanel(null); toGrid(); }} /> : null}
                 {panel && panel.kind === 'names' && wb.shows('panel.names') ? <NamesPanel workbook={wb} sheetId={sheetId} range={rectText(rectsOf(sel)[rectsOf(sel).length - 1])} revision={revision}
