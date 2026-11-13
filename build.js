@@ -6,7 +6,7 @@
 
 import { build, context } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +37,7 @@ const shared = {
 const reactEntry = { ...shared, entryPoints: [join(here, 'src', 'index.js')], outfile: join(here, 'dist', 'index.js'), banner: { js: '"use client";' } };
 const coreEntry = { ...shared, entryPoints: [join(here, 'src', 'core', 'index.js')], outfile: join(here, 'dist', 'core.js') };
 copyFileSync(join(here, 'src', 'sheet.css'), join(here, 'dist', 'sheet.css'));
+writeFileSync(join(here, 'dist', 'sheet.css.d.ts'), 'export {};\n');
 
 if (watch) {
     // In watch mode the types are left out (tsc is slow, and the hand-written ones are already in dist from the last full build). The stylesheet is copied

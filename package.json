@@ -14,7 +14,10 @@
       "types": "./dist/types/core/index.d.ts",
       "import": "./dist/core.js"
     },
-    "./style.css": "./dist/sheet.css"
+    "./style.css": {
+      "types": "./dist/sheet.css.d.ts",
+      "default": "./dist/sheet.css"
+    }
   },
   "files": [
     "dist",
