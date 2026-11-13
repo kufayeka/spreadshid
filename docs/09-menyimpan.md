@@ -1041,13 +1041,104 @@ console.log(JSON.stringify(maskId(patch), null, 2));
 
 ---
 
-### 3.2 Siklus Lengkap Sistem Template + API + Database
+### 3.2 Siklus Lengkap Sistem Template + API + Database (Per Bagian)
 
-Untuk membangun sistem template spreadsheet (memiliki styling, pre-rumus, pre-data, validasi, serta built-in ACL/RBAC/column types):
-1. **Simpan Paket Template di DB**: Simpan `doc` (`wb.toJSON()`) bersama `access` (`AccessRow[]`), `rules`, dan `types` di kolom/tabel terpisah (karena `access`, `rules`, dan `types` tidak pernah ikut ke `wb.toJSON()`).
-2. **Instantiate per Transaksi/Proyek**: Clone `template.doc` menjadi dokumen baru dengan `id` baru dan `version: 1`.
-3. **Load (`GET`)**: Server menjalankan `viewFor(doc, { access, who })` untuk menyensor sel/kolom/komentar rahasia, lalu client memanggil `createWorkbook(payload)` + `setAccess()` / `setTypes()`.
-4. **Save (`PATCH`)**: Client mengirim `wb.pendingPatch()`. Server mengecek `patch.workbook.version === dbRow.version`, memvalidasi dengan `checkPatch(dbRow.doc, patch, { access, who, types })`, menggabungkan dengan `mergePatch()`, menaikkan `version`, lalu client memanggil `wb.saved(patch, { version })`.
+Dalam sistem template terhubung backend, ada **4 komponen terpisah** yang harus disimpan dan di-load dengan cara masing-masing karena `access`, `rules`, dan `types` **tidak pernah ikut ke dalam `wb.toJSON()`** (`src/core/workbook.js:625`):
+
+#### 1) `doc` (`WorkbookDoc` — Isi, Rumus, Styling, Pivot, Chart, Komentar)
+- **Bentuk data**: Objek JSON dari `wb.toJSON()` (`{ id, version, settings, sheets: [{ id, key, props, rowCount, columns, rows }] }`).
+  - `props` sheet menyimpan `name`, `freezeRows`, `merges`, `names`, `validations`, `conditionals`, `filters`, `pivots`, `charts`, dan `comments`.
+  - Sel rumus disimpan sebagai `{ f, refs, v }`.
+- **Cara Store**:
+  - Simpan utuh ke kolom `JSONB` saat membuat template / *instantiate* dokumen baru.
+  - Untuk update harian dari user, client mengirim `const patch = wb.pendingPatch()`, lalu server menggabungkannya dengan `mergePatch(dbDoc, patch, { access, who, rules })` dan menaikkan `version`.
+- **Cara Load**:
+  - Server menyensor data rahasia dengan `const safeDoc = viewFor(dbDoc, { access, rules, who })`.
+  - Client membuka dengan `const wb = createWorkbook(safeDoc)`.
+
+#### 2) `access` (`AccessRow[]` — ACL / RBAC & Izin UI)
+- **Bentuk data**: Array of objects (`src/core/policy.js:5-36`):
+  ```json
+  [
+    { "who": "role:estimator", "effect": "allow", "action": "read", "where": "RAB!A1:F100" },
+    { "who": "role:estimator", "effect": "allow", "action": "edit", "where": "RAB!col:Qty", "when": "=$G2<>\"Approved\"", "message": "Sudah disetujui" },
+    { "who": "role:estimator", "effect": "deny",  "action": "read", "where": "RAB!col:HPP Rahasia" },
+    { "who": "role:estimator", "effect": "deny",  "action": "ui.toolbar" }
+  ]
+  ```
+  - `who`: `'*'` | `'role:<nama>'` | `'user:<id>'` (spesifisitas: `user` > `role` > `'*'`; di level sama, `deny` mengalahkan `allow`).
+- **Cara Store**: Simpan di kolom `JSONB` `access` atau tabel relasional `workbook_access(workbook_id, who, effect, action, where_target, when_formula, message)` (di-copy dari template saat dokumen dibuat).
+- **Cara Load & Pasang**:
+  - **Server**: oper ke `viewFor(doc, { access, who })` saat `GET`, dan ke `checkPatch(doc, patch, { access, who })` saat `PATCH`.
+  - **Client**: `wb.setAccess(accessRows, who)` (argumen pertama adalah **array** `AccessRow[]` langsung), atau via `<Sheet workbook={wb} access={{ rows: accessRows, who }} />`.
+
+#### 3) `rules` (Aturan Proteksi Sel Dinamis dari Backend)
+- **Bentuk data**: Array of objects tanpa `who` — berisi aturan sel yang sudah di-resolve server khusus untuk sesi/status saat itu (`src/core/access.js:5-15`):
+  ```json
+  [
+    {
+      "sheet": "RAB",
+      "range": "A2:F1000",
+      "columns": ["Harga Satuan", "E"],
+      "headerRow": 1,
+      "when": "=$G2=\"Approved\"",
+      "mode": "readonly",
+      "message": "Baris yang sudah disetujui terkunci"
+    },
+    { "sheet": "RAB", "columns": ["HPP Rahasia"], "mode": "hidden" }
+  ]
+  ```
+  - `mode`: `'readonly'` (tidak bisa diedit) | `'hidden'` (tampil `•••`, tidak bisa dibaca/copy).
+- **Cara Store**: Simpan di kolom `JSONB` `rules` milik template/dokumen, atau hasilkan secara dinamis di backend (misal mengunci seluruh sheet saat `status === 'APPROVED'`).
+- **Cara Load & Pasang**:
+  - **Server**: oper ke `viewFor(doc, { rules })` dan `checkPatch(doc, patch, { rules })`.
+  - **Client**: `wb.setRules(rulesList)`. (Otomatis digabung dengan `access.ranges`).
+
+#### 4) `types` (Skema Tipe Data Kolom)
+- **Bentuk data**: Object per nama/id sheet (`src/core/access.js:17-18`, `src/core/types.js:17-57`):
+  ```json
+  {
+    "RAB": {
+      "headerRow": 1,
+      "fields": {
+        "Kode": { "kind": "string" },
+        "Qty": { "kind": "int" },
+        "Harga Satuan": { "kind": "decimal", "scale": 2 },
+        "Status": { "kind": "string", "enum": ["Draft", "Approved"] },
+        "Tanggal": { "kind": "date" }
+      }
+    }
+  }
+  ```
+  *(Alternatif by-huruf kolom: `{ "RAB": { "columns": { "C": { "kind": "int" } } } }` atau konversi dari JSON API Maker via `fromApiMakerType()`).*
+- **Cara Store**: Simpan di kolom `JSONB` `types` milik template/dokumen.
+- **Cara Load & Pasang**:
+  - **Server**: oper ke `checkPatch(doc, patch, { types })` — server memvalidasi ulang tipe nilai (termasuk hasil evaluasi rumus) sebelum merge.
+  - **Client**: `for (const [sheet, spec] of Object.entries(types)) wb.setTypes(sheet, spec);`.
+
+#### 5) Contoh Skema Tabel & Siklus End-to-End
+
+```sql
+create table workbook_templates (
+    id      text primary key,
+    doc     jsonb not null,            -- hasil wb.toJSON()
+    access  jsonb not null default '[]',
+    rules   jsonb not null default '[]',
+    types   jsonb not null default '{}'
+);
+
+create table workbooks (
+    id          text primary key,
+    template_id text references workbook_templates(id),
+    version     int not null default 1,
+    doc         jsonb not null,        -- clone dari template.doc (diupdate via mergePatch)
+    access      jsonb not null default '[]',
+    rules       jsonb not null default '[]',
+    types       jsonb not null default '{}'
+);
+```
+
+Contoh eksekusi lengkap dari pembuatan template → instantiate → `GET` (`viewFor`) → edit client → `PATCH` (`checkPatch` + `mergePatch` + `version`):
 
 <!-- contoh: 09-02-template-api-db.js -->
 ```js
