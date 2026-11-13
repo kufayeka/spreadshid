@@ -532,6 +532,12 @@ dari kode                  : 999
 | `'boolean'` | Hanya menerima nilai boolean. | Valid: `true`, `false`, `'TRUE'`, `'FALSE'` |
 | `'date'` | Serial integer kalender atau format string tanggal locale. | Ditolak jika format string bukan tanggal valid. |
 
+### Persistensi dalam Sistem Template & Backend
+
+Perhatikan perbedaan penyimpanan keempat lapis pertahanan ini di database:
+- **Lapis 1 (`addValidation`)**: Disimpan di `sheet.props.validations` dan **ikut** ke dalam `wb.toJSON()` serta `wb.pendingPatch()`.
+- **Lapis 2 (`setTypes`), Lapis 3 (`setRules`/`setAccess`), & Lapis 4 (`beforeOp`)**: **Tidak ikut** ke `wb.toJSON()`. Untuk sistem template dengan *built-in rules* dan *column types*, simpan objek `types` dan `rules`/`access` di kolom/tabel terpisah pada database, lalu terapkan kembali saat load di client (`wb.setTypes()`, `wb.setRules()`) dan di server (`checkPatch(doc, patch, { rules, types, access, who })`). Lihat contoh lengkapnya di [Bab 09](09-menyimpan.md).
+
 ---
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [07. Operasi Data](07-data.md) · Berikutnya: [09. Persistensi State & Sinkronisasi Server](09-menyimpan.md)

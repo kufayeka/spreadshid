@@ -283,6 +283,8 @@ export default function Halaman() {
 
 ![Harga dan nama produk diambil dari sheet lain via XLOOKUP](img/rumus-antar-sheet.png)
 
+> **Batasan Lintas Sheet vs Lintas Workbook (Multi-File)**: Formula spreadsheet (`=Produk!A1`, `=XLOOKUP(..., Produk!$A$2:$A$4, ...)`, atau `NamedRange`) hanya mengevaluasi referensi **di dalam satu workbook yang sama**. Engine tidak memiliki fungsi lintas-file seperti `IMPORTRANGE`. Untuk menghubungkan beberapa file/workbook (Many-to-One Summary atau One-to-Many Master), gunakan `tableOf()` + `populate()` / `pivot()` di layer aplikasi atau backend (lihat [Bab 04](04-api-workbook.md#37-pola-template-api-pre-rumus-populate--relasi-antar-workbook) dan [Bab 09](09-menyimpan.md)).
+
 ---
 
 ## 8. Laporan Agregasi Bersyarat (`SUMIFS`, `COUNTIFS`)

@@ -22,6 +22,12 @@ Pada aplikasi frontend, terdapat dua konsumer utama dari instance workbook yang 
 
 Keduanya selalu sinkron secara deterministik karena mengacu pada *single source of truth* yang sama.
 
+### Pemisahan State Dokumen vs Otoritas Host (`access`, `rules`, `types`)
+
+Saat merancang sistem template terhubung backend, pahami batas tegas di dalam engine (`src/core/workbook.js`):
+- **State Dokumen (`wb.toJSON()`)**: Menyimpan `id`, `version`, `settings`, seluruh `sheets` (`columns`, `rows`, sel, nilai, rumus `{ f, refs, v }`, `style`, `merges`, `names`, `validations`, `conditionals`, `filters`, `pivots`, `charts`, dan `comments`).
+- **Otoritas Host (TIDAK disimpan di `toJSON()`)**: `access` (`setAccess`), `rules` (`setRules`), dan `types` (`setTypes`). Ketiganya sengaja dipisahkan agar tidak pernah bisa dimanipulasi atau terbawa dari payload client; host/backend wajib menyimpannya di kolom/tabel terpisah lalu meng-inject ulang setiap kali workbook dibuka dan memvalidasinya ulang saat save via `viewFor()` serta `checkPatch()`.
+
 ---
 
 ## 2. Sistem Koordinat Sel (Addressing System)

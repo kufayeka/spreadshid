@@ -1147,6 +1147,8 @@ nama produk ikut terkirim?             true
 ### B. Validasi Mutasi Patch Server-Side (`checkPatch`)
 Fungsi `checkPatch` memverifikasi integritas setiap operasi perubahan sebelum diterapkan ke database:
 
+> **Catatan Arsitektur Template**: Aturan ACL (`access`) tidak pernah disimpan di dalam `wb.toJSON()` (`src/core/workbook.js:625`). Simpan array `AccessRow[]` di kolom/tabel policy milik template/dokumen di database, lalu kirimkan ke client lewat `<Sheet access={{ rows, who }} />` atau `wb.setAccess(rows, who)` serta pasang ulang pada `viewFor()` dan `checkPatch()` di server (lihat alur lengkapnya di [Bab 09](09-menyimpan.md)).
+
 <!-- contoh: 13-33-checkpatch.ts -->
 ```ts
 import { createWorkbook, checkPatch } from '@kufayeka/sheet/core';

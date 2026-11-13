@@ -714,6 +714,471 @@ angka 64000 ada di JSON kasir: false | di JSON asli: true
 
 ---
 
+### 3.1 Bedah Skema JSON Lengkap (`wb.toJSON()` & `wb.pendingPatch()`)
+
+Agar backend dan database memahami kontrak data dengan presisi, berikut isi JSON mentah aktual yang dihasilkan `wb.toJSON()` dan `wb.pendingPatch()`:
+
+- **`WorkbookDoc` (`wb.toJSON()`)**:
+  - `id`, `version`, `settings` (`locale`, `currency`, dll.)
+  - `sheets[]`: `id`, `key` (urutan fraksional), `props` (`name`, `freezeRows`, `merges`, `names`, `validations`, `conditionals`, `filters`, `pivots`, `charts`, `comments`, `outlines`), `rowCount`, `columns[]` (`id`, `key`, `props`), `rows[]` (`id`, `key`, `cells`, `style`, `props`).
+  - Sel rumus disimpan sebagai `{ f: "=⟦0⟧*⟦1⟧", refs: [...], v: 720000 }` sehingga nilai hasil (`v`) bisa langsung dibaca oleh query SQL/JSONB tanpa menjalankan engine.
+- **`Patch` (`wb.pendingPatch()`)**:
+  - Mengirim hanya delta yang berubah (`sheets.upsert/delete`, `columns.upsert/delete`, `rows.upsert/delete`) beserta `workbook.version` untuk *optimistic locking*.
+
+<!-- contoh: 09-01-json-shape.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+
+// Membedah bentuk JSON mentah dari wb.toJSON() dan wb.pendingPatch()
+const wb = createWorkbook();
+wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+const sh = wb.sheet('Sheet1');
+sh.setSheetProps({ name: 'Order' });
+sh.setValues('A1', [
+    ['Item', 'Qty', 'Harga', 'Total'],
+    ['Semen', 10, 72000, '=B2*C2'],
+]);
+sh.setStyle('A1:D1', { bold: true, fill: '#eef2f7' });
+
+// 1. Struktur wb.toJSON() (ID diganti pendek agar mudah dibaca)
+const doc = wb.toJSON();
+const shortMap = new Map();
+const sid = (id, p) => { if (!shortMap.has(id)) shortMap.set(id, p + (shortMap.size + 1)); return shortMap.get(id); };
+const maskId = (obj) => JSON.parse(JSON.stringify(obj).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, (m) => sid(m, 'id_')));
+
+console.log('=== 1. STRUKTUR wb.toJSON() ===');
+console.log(JSON.stringify(maskId(doc), null, 2));
+
+// 2. Tandai tersimpan, lalu ubah satu sel dan lihat bentuk wb.pendingPatch()
+wb.saved();
+sh.setValues('B2', 15, { source: 'user' });
+const patch = wb.pendingPatch();
+console.log('\n=== 2. STRUKTUR wb.pendingPatch() ===');
+console.log(JSON.stringify(maskId(patch), null, 2));
+```
+<!-- /contoh -->
+
+<!-- hasil: 09-01-json-shape.js -->
+```text
+=== 1. STRUKTUR wb.toJSON() ===
+{
+  "id": "id_1",
+  "version": 0,
+  "settings": {
+    "locale": "id-ID",
+    "currency": "IDR"
+  },
+  "sheets": [
+    {
+      "id": "id_2",
+      "key": "V",
+      "props": {
+        "name": "Order"
+      },
+      "rowCount": 1000,
+      "columns": [
+        {
+          "id": "id_3",
+          "key": "2",
+          "props": {}
+        },
+        {
+          "id": "id_4",
+          "key": "4",
+          "props": {}
+        },
+        {
+          "id": "id_5",
+          "key": "6",
+          "props": {}
+        },
+        {
+          "id": "id_6",
+          "key": "8",
+          "props": {}
+        },
+        {
+          "id": "id_7",
+          "key": "A",
+          "props": {}
+        },
+        {
+          "id": "id_8",
+          "key": "C",
+          "props": {}
+        },
+        {
+          "id": "id_9",
+          "key": "G",
+          "props": {}
+        },
+        {
+          "id": "id_10",
+          "key": "I",
+          "props": {}
+        },
+        {
+          "id": "id_11",
+          "key": "K",
+          "props": {}
+        },
+        {
+          "id": "id_12",
+          "key": "M",
+          "props": {}
+        },
+        {
+          "id": "id_13",
+          "key": "O",
+          "props": {}
+        },
+        {
+          "id": "id_14",
+          "key": "Q",
+          "props": {}
+        },
+        {
+          "id": "id_15",
+          "key": "S",
+          "props": {}
+        },
+        {
+          "id": "id_16",
+          "key": "V",
+          "props": {}
+        },
+        {
+          "id": "id_17",
+          "key": "X",
+          "props": {}
+        },
+        {
+          "id": "id_18",
+          "key": "Z",
+          "props": {}
+        },
+        {
+          "id": "id_19",
+          "key": "b",
+          "props": {}
+        },
+        {
+          "id": "id_20",
+          "key": "d",
+          "props": {}
+        },
+        {
+          "id": "id_21",
+          "key": "f",
+          "props": {}
+        },
+        {
+          "id": "id_22",
+          "key": "h",
+          "props": {}
+        },
+        {
+          "id": "id_23",
+          "key": "l",
+          "props": {}
+        },
+        {
+          "id": "id_24",
+          "key": "n",
+          "props": {}
+        },
+        {
+          "id": "id_25",
+          "key": "p",
+          "props": {}
+        },
+        {
+          "id": "id_26",
+          "key": "t",
+          "props": {}
+        },
+        {
+          "id": "id_27",
+          "key": "v",
+          "props": {}
+        },
+        {
+          "id": "id_28",
+          "key": "x",
+          "props": {}
+        }
+      ],
+      "rows": [
+        {
+          "id": "id_29",
+          "key": "04",
+          "cells": {
+            "id_3": "Item",
+            "id_4": "Qty",
+            "id_5": "Harga",
+            "id_6": "Total"
+          },
+          "style": {
+            "id_3": {
+              "bold": true,
+              "fill": "#eef2f7"
+            },
+            "id_4": {
+              "bold": true,
+              "fill": "#eef2f7"
+            },
+            "id_5": {
+              "bold": true,
+              "fill": "#eef2f7"
+            },
+            "id_6": {
+              "bold": true,
+              "fill": "#eef2f7"
+            }
+          },
+          "props": {}
+        },
+        {
+          "id": "id_30",
+          "key": "08",
+          "cells": {
+            "id_3": "Semen",
+            "id_4": 10,
+            "id_5": 72000,
+            "id_6": {
+              "f": "=⟦0⟧*⟦1⟧",
+              "refs": [
+                {
+                  "k": "cell",
+                  "r1": "id_30",
+                  "c1": "id_4",
+                  "r2": null,
+                  "c2": null,
+                  "ra1": false,
+                  "ca1": false
+                },
+                {
+                  "k": "cell",
+                  "r1": "id_30",
+                  "c1": "id_5",
+                  "r2": null,
+                  "c2": null,
+                  "ra1": false,
+                  "ca1": false
+                }
+              ],
+              "v": 720000
+            }
+          },
+          "style": {},
+          "props": {}
+        }
+      ]
+    }
+  ]
+}
+
+=== 2. STRUKTUR wb.pendingPatch() ===
+{
+  "workbook": {
+    "id": "id_1",
+    "version": 0
+  },
+  "upTo": 6,
+  "sheets": {
+    "upsert": [],
+    "delete": []
+  },
+  "columns": {
+    "upsert": [],
+    "delete": []
+  },
+  "rows": {
+    "upsert": [
+      {
+        "sheetId": "id_2",
+        "id": "id_30",
+        "key": "08",
+        "cells": {
+          "id_3": "Semen",
+          "id_4": 15,
+          "id_5": 72000,
+          "id_6": {
+            "f": "=⟦0⟧*⟦1⟧",
+            "refs": [
+              {
+                "k": "cell",
+                "r1": "id_30",
+                "c1": "id_4",
+                "r2": null,
+                "c2": null,
+                "ra1": false,
+                "ca1": false
+              },
+              {
+                "k": "cell",
+                "r1": "id_30",
+                "c1": "id_5",
+                "r2": null,
+                "c2": null,
+                "ra1": false,
+                "ca1": false
+              }
+            ],
+            "v": 1080000
+          }
+        },
+        "style": {},
+        "props": {}
+      }
+    ],
+    "delete": []
+  },
+  "isEmpty": false
+}
+```
+<!-- /hasil -->
+
+---
+
+### 3.2 Siklus Lengkap Sistem Template + API + Database
+
+Untuk membangun sistem template spreadsheet (memiliki styling, pre-rumus, pre-data, validasi, serta built-in ACL/RBAC/column types):
+1. **Simpan Paket Template di DB**: Simpan `doc` (`wb.toJSON()`) bersama `access` (`AccessRow[]`), `rules`, dan `types` di kolom/tabel terpisah (karena `access`, `rules`, dan `types` tidak pernah ikut ke `wb.toJSON()`).
+2. **Instantiate per Transaksi/Proyek**: Clone `template.doc` menjadi dokumen baru dengan `id` baru dan `version: 1`.
+3. **Load (`GET`)**: Server menjalankan `viewFor(doc, { access, who })` untuk menyensor sel/kolom/komentar rahasia, lalu client memanggil `createWorkbook(payload)` + `setAccess()` / `setTypes()`.
+4. **Save (`PATCH`)**: Client mengirim `wb.pendingPatch()`. Server mengecek `patch.workbook.version === dbRow.version`, memvalidasi dengan `checkPatch(dbRow.doc, patch, { access, who, types })`, menggabungkan dengan `mergePatch()`, menaikkan `version`, lalu client memanggil `wb.saved(patch, { version })`.
+
+<!-- contoh: 09-02-template-api-db.js -->
+```js
+import { createWorkbook, viewFor, checkPatch, mergePatch } from '@kufayeka/sheet/core';
+
+// Simulasi lengkap: Template (styling + pre-rumus + ACL/rules/types terpisah) -> Instantiate -> Load -> Edit -> Save
+// 1. MASTER TEMPLATE DI DATABASE (disimpan sebagai paket: doc + access + types)
+function buatPaketTemplate() {
+    const wb = createWorkbook();
+    wb.setSettings({ locale: 'id-ID', currency: 'IDR' });
+    const sh = wb.sheet('Sheet1');
+    sh.setSheetProps({ name: 'RAB', freezeRows: 1 });
+    sh.setValues('A1', [
+        ['Kode', 'Uraian', 'Qty', 'Harga Satuan', 'Total', 'HPP Rahasia'],
+        ['P01', 'Pekerjaan Pondasi', 10, 500000, '=C2*D2', 400000],
+        ['', 'Grand Total', '', '', '=SUM(E2:E2)', ''],
+    ]);
+    sh.setStyle('A1:F1', { bold: true, fill: '#1a73e8', color: '#ffffff' });
+    sh.setStyle('D2:F3', { format: { type: 'money', decimals: 0 } });
+
+    return {
+        templateId: 'tpl-rab-v1',
+        doc: wb.toJSON(),
+        // access, rules, dan types TIDAK masuk ke wb.toJSON() -> disimpan di kolom/tabel terpisah
+        access: [
+            { who: 'role:estimator', effect: 'allow', action: 'read', where: 'RAB!A1:F3' },
+            { who: 'role:estimator', effect: 'allow', action: 'edit', where: 'RAB!C2:D2' },
+            { who: 'role:estimator', effect: 'deny', action: 'read', where: 'RAB!col:HPP Rahasia' },
+        ],
+        types: { RAB: { headerRow: 1, fields: { Qty: { kind: 'int' } } } },
+    };
+}
+
+// 2. INSTANTIATE DOKUMEN BARU DARI TEMPLATE (di backend saat proyek baru dibuat)
+const paket = buatPaketTemplate();
+let dbRow = {
+    id: 'rab-proyek-42',
+    version: 1,
+    doc: { ...structuredClone(paket.doc), id: 'rab-proyek-42', version: 1 },
+    access: paket.access,
+    types: paket.types,
+};
+
+// 3. LOAD DARI API (GET /api/workbooks/rab-proyek-42) -> sensor kolom rahasia via viewFor()
+const user = { user: 'andi', roles: ['estimator'] };
+const payloadUntukClient = viewFor(dbRow.doc, { access: dbRow.access, who: user });
+
+// Client membuka workbook + memasang access & types yang dikirim API
+const clientWb = createWorkbook(payloadUntukClient);
+clientWb.setAccess(dbRow.access, user);
+clientWb.setTypes('RAB', dbRow.types.RAB);
+console.log('Client melihat HPP Rahasia (F2):', JSON.stringify(clientWb.value('RAB', 'F2')));
+
+// 4. EDIT DI CLIENT & KIRIM PATCH (PATCH /api/workbooks/rab-proyek-42)
+clientWb.sheet('RAB').setValues('C2', 12, { source: 'user' });
+const patch = clientWb.pendingPatch();
+
+// 5. VALIDASI & SIMPAN DI SERVER (Optimistic Locking dengan version)
+if (patch.workbook.version !== dbRow.version) throw new Error('Conflict: versi usang');
+const cek = checkPatch(dbRow.doc, patch, { access: dbRow.access, who: user, types: dbRow.types });
+if (!cek.ok) throw new Error('Ditolak server: ' + cek.problems.map((p) => p.reason).join('; '));
+
+dbRow.doc = { ...mergePatch(dbRow.doc, patch, { access: dbRow.access, who: user }), version: dbRow.version + 1 };
+dbRow.version = dbRow.doc.version;
+clientWb.saved(patch, { version: dbRow.version });
+
+console.log('Total baru di DB (E2):', createWorkbook(dbRow.doc).value('RAB', 'E2'), '| versi:', dbRow.version);
+console.log('HPP Rahasia di DB tetap aman (F2):', createWorkbook(dbRow.doc).value('RAB', 'F2'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 09-02-template-api-db.js -->
+```text
+Client melihat HPP Rahasia (F2): null
+Total baru di DB (E2): 6000000 | versi: 2
+HPP Rahasia di DB tetap aman (F2): 400000
+```
+<!-- /hasil -->
+
+---
+
+### 3.3 Centralised Server Workbook & Kolaborasi Ringan (Realtime Server-Push)
+
+`@kufayeka/sheet/core` berjalan tanpa DOM di Node.js, sehingga Anda dapat menyimpan/mengelola workbook terpusat di server (untuk gatekeeper validasi, konsolidasi multi-file via `tableOf()` + `pivot()`, atau distribusi Master → Cabang via `populate()`).
+
+Untuk **kolaborasi ringan / server-push realtime** (misal backend mem-push pembaruan harga/stok dari API atau 1 editor ke banyak viewer FE lewat WebSocket/SSE):
+- Dengarkan mutasi di pengirim lewat `wb.on('op', ({ ops, source }) => ...)`.
+- Terapkan di client penerima dengan `wb.apply(ops, { source: 'remote' })` agar tidak masuk ke `undoStack` lokal, lalu panggil `wb.saved()` agar client penerima tidak menandai `unsaved() === true` untuk perubahan yang sudah disimpan server.
+
+<!-- contoh: 09-04-realtime-push.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+
+// Kolaborasi Ringan / Server-Push Realtime: 1 workbook pusat di server mem-push op ke banyak FE
+const serverWb = createWorkbook(null, { user: { id: 'server', name: 'Backend Sync' } });
+serverWb.sheet('Sheet1').setSheetProps({ name: 'Harga' });
+serverWb.sheet('Harga').setValues('A1', [['Produk', 'Harga'], ['Semen', 72000]]);
+
+const snapshot = serverWb.toJSON();
+const fe1 = createWorkbook(snapshot);
+const fe2 = createWorkbook(snapshot);
+
+// Simulasi transport WebSocket/SSE: setiap op dari server di-broadcast ke FE1 & FE2
+serverWb.on('op', ({ ops, source }) => {
+    if (source === 'remote') return;
+    for (const client of [fe1, fe2]) {
+        client.apply(ops, { source: 'remote' });
+        // Penting: apply() menandai dirty di client; tandai saved() agar client tidak mengirim balik patch yang sudah disimpan server
+        client.saved(undefined, { version: serverWb.version });
+    }
+});
+
+// Server menerima update harga dari sistem ERP/API
+serverWb.sheet('Harga').setValues('B2', 75000);
+
+console.log('FE1 B2:', fe1.value('Harga', 'B2'), '| unsaved:', fe1.unsaved(), '| canUndo:', fe1.canUndo());
+console.log('FE2 B2:', fe2.value('Harga', 'B2'), '| unsaved:', fe2.unsaved(), '| canUndo:', fe2.canUndo());
+```
+<!-- /contoh -->
+
+<!-- hasil: 09-04-realtime-push.js -->
+```text
+FE1 B2: 75000 | unsaved: false | canUndo: false
+FE2 B2: 75000 | unsaved: false | canUndo: false
+```
+<!-- /hasil -->
+
+> **Batasan Jujur untuk Multiplayer Penuh**: Engine saat ini **belum** menyediakan transport WebSocket bawaan, algoritma resolusi konflik OT/CRDT untuk edit serentak di sel/baris yang sama, ataupun live cursor kolaborator di UI `<Sheet />`. Pola di atas cocok untuk sinkronisasi ringan / server-push; untuk multiplayer serentak ala Google Sheets diperlukan layer antrean/OT dan penyaringan `op` per ACL di server.
+
+---
+
 ## 4. Undo, Redo, dan Taksonomi Operation Unit (`Op`)
 
 Manajemen histori undo dan redo internal:
@@ -829,6 +1294,73 @@ undo  | settings {"locale":"id-ID"} -> {} | oleh {"id":"u1","name":"Rina"} pada 
 | `'sheetProps'` | `before: any, after: any` | Perubahan nama sheet atau pembekuan baris/kolom. |
 | `'addSheet'`, `'removeSheet'` | `sheet: SheetDoc` | Penambahan atau penghapusan lembar sheet utuh. |
 | `'settings'` | `before: any, after: any` | Perubahan konfigurasi global workbook (locale/mata uang). |
+
+---
+
+## 6. Merekam History & Audit Trail (`wb.on('op')`)
+
+Untuk mencatat riwayat lengkap setiap aksi pengguna (*audit log*: siapa mengubah apa, kapan, dari nilai berapa ke berapa, termasuk undo/redo):
+- Pasang listener `wb.on('op', ({ ops, source }) => ...)` pada instance workbook.
+- Setiap `op` sudah membawa `op.t` (tipe aksi), `op.user` (dari `options.user`), dan `op.at` (timestamp ISO dari `options.now` atau jam sistem).
+- Untuk perubahan sel (`op.t === 'cells'`), terjemahkan `rowId` dan `colId` ke alamat layar dengan `wb.rowIndex()`, `wb.colIndex()`, dan `wb.address(r, c)` sebelum dikirim ke endpoint `/api/workbooks/:id/history` (atau disimpan bersama transaksi `mergePatch()` di tabel `spreadsheet_history(id, workbook_id, actor_id, source, action, payload, created_at)`).
+
+<!-- contoh: 09-03-history-audit.js -->
+```js
+import { createWorkbook } from '@kufayeka/sheet/core';
+
+// Merekam History / Audit Trail Excel dari event wb.on('op')
+const wb = createWorkbook(null, {
+    user: { id: 'u-andi', name: 'Andi' },
+    now: () => new Date(Date.UTC(2026, 10, 13, 4, 30)),
+});
+const sh = wb.sheet('Sheet1');
+sh.setSheetProps({ name: 'Stok' });
+sh.setValues('A1', [['Produk', 'Qty'], ['Semen', 100]]);
+
+// Buffer audit log untuk dikirim ke API (/api/workbooks/:id/history)
+const auditLogs = [];
+const namaSheet = (id) => wb.sheetProps(id)?.name ?? id;
+
+wb.on('op', ({ ops, source }) => {
+    for (const op of ops) {
+        const sheetName = op.sheet ? namaSheet(op.sheet) : null;
+        if (op.t === 'cells') {
+            for (const ch of op.changes) {
+                const r = wb.rowIndex(op.sheet, ch.row);
+                const c = wb.colIndex(op.sheet, ch.col);
+                auditLogs.push({
+                    at: op.at,
+                    user: op.user,
+                    source,
+                    action: 'edit_cell',
+                    sheet: sheetName,
+                    address: r >= 0 && c >= 0 ? wb.address(r, c) : `${ch.row}:${ch.col}`,
+                    before: ch.before,
+                    after: ch.after,
+                });
+            }
+        } else {
+            auditLogs.push({ at: op.at, user: op.user, source, action: op.t, sheet: sheetName });
+        }
+    }
+});
+
+// Simulasi aktivitas user: ubah Qty lalu undo
+sh.setValues('B2', 125, { source: 'user' });
+wb.undo();
+
+for (const log of auditLogs) {
+    console.log(`${log.at} | ${log.user?.name} | ${log.source.padEnd(4)} | ${log.action} ${log.sheet}!${log.address} (${log.before} -> ${log.after})`);
+}
+```
+<!-- /contoh -->
+
+<!-- hasil: 09-03-history-audit.js -->
+```text
+2026-11-13T04:30:00.000Z | Andi | user | edit_cell Stok!B2 (100 -> 125)
+2026-11-13T04:30:00.000Z | Andi | undo | edit_cell Stok!B2 (125 -> 100)
+```
+<!-- /hasil -->
 
 ---
 
