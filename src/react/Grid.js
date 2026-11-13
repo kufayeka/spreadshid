@@ -28,6 +28,23 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 // how far a text may run on into the empty cells on its right (as in Google Sheets), counted in cells
 const OVERFLOW_CELLS = 12;
 
+// The width a text needs, in CSS pixels at the zoom, measured with a canvas in the cell's font (the sheet's 10pt Arial unless its style says
+// otherwise). A text runs on into the cells on its right only when it is wider than its own cell, and only over as many cells as it needs:
+// a short text keeps the grid lines (and the borders) of its neighbours.
+const CELL_PADDING = 6; // .ks-cell has 3px on each side
+let measurer = null;
+function textWidth(text, style, zoom) {
+    if (typeof document === 'undefined') return 0;
+    if (!measurer) measurer = document.createElement('canvas').getContext('2d');
+    if (!measurer) return 0;
+    const s = style || {};
+    const px = (s.fontSize || 10) * (4 / 3) * (zoom || 1);
+    const family = s.font ? '"' + s.font + '", Arial, sans-serif' : 'Arial, "Helvetica Neue", Helvetica, sans-serif';
+    measurer.font = (s.italic ? 'italic ' : '') + (s.bold ? '700 ' : '400 ') + px + 'px ' + family;
+    // the widest line of the text (a text with a line break runs on as wide as its widest line)
+    return String(text).split('\n').reduce((m, line) => Math.max(m, measurer.measureText(line).width), 0);
+}
+
 /** The CSS of a cell's text from its kept style and what its value is. */
 export function cellCss(style, display) {
     const s = style || {};
@@ -64,6 +81,8 @@ function bordersCss(borders) {
 // which are drawn once per row and once per column under the cells; a cell that must hide the lines inside it (a merged block, a text that runs on over
 // empty cells) covers them with the sheet's colour, as Google Sheets does.
 function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guarded, rule, invalid, noted, whos }) {
+    // the borders are the cell's own: drawn round its own box, never round the empty cells its text runs on over
+    const borderBox = cover && style && style.borders ? { ...bordersCss(style.borders), right: 'auto', width: Math.max(0, ownWidth - 1) + 2 } : null;
     const css = cellCss(style, display);
     // A text that runs on over the empty cells on its right takes only its text there: the cell's own fill (and its stripes when protected) stay
     // inside the cell itself, as in Google Sheets; the rest of the run is the sheet's colour, which hides the grid lines under the text.
@@ -80,7 +99,7 @@ function Cell({ r, c, x, y, w, h, merged, cover, ownWidth, display, style, guard
                     style={{ ...css, background: undefined, alignItems: undefined, justifyContent: undefined }}>{display.text}</span>}
             {rule && (rule.kind === 'list' || rule.kind === 'listFrom') ? <span className="ks-drop" data-drop="" aria-label="Choices">&#9662;</span> : null}
             {invalid ? <span className="ks-invalid" title={'Invalid: must be ' + invalid} /> : null}
-            {style && style.borders ? <span className="ks-borders" style={bordersCss(style.borders)} /> : null}
+            {style && style.borders ? <span className="ks-borders" style={borderBox || bordersCss(style.borders)} /> : null}
             {whos && whos.length ? <WhoMarks whos={whos} /> : null}
         </div>
     );
@@ -104,7 +123,7 @@ function WhoMarks({ whos }) {
  * on screen while scrolling up or down keeps all its props and is not drawn again: a scroll only draws the rows that come in.
  * `revision` is the workbook's: a change anywhere draws the rows again (their values may have changed through formulas).
  */
-const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, colAxis, blocks, revision, showProtected, setup }) {
+const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, colAxis, blocks, revision, showProtected, setup, zoom }) {
     void revision;
     const cells = [];
     // the columns of this row that a merged block covers (the block itself is drawn by the pane)
@@ -132,8 +151,10 @@ const Row = memo(function Row({ wb, sheetId, r, top, height, from, to, xBase, co
         let width = w;
         const align = (style && style.align) || display.align;
         if (display.kind === 'text' && !(style && style.wrap) && align === 'left' && !rule) {
+            // how wide the text is, with the cell's padding: it runs on only past its own cell, and stops at the first cell that is wide enough
+            const need = textWidth(display.text, style, zoom) + CELL_PADDING;
             let next = c + 1;
-            while (next <= to && next - c <= OVERFLOW_CELLS && !covered.has(next) && wb.raw(sheetId, r, next) === undefined && !(showProtected && wb.modeAt(sheetId, r, next))) {
+            while (width < need && next <= to && next - c <= OVERFLOW_CELLS && !covered.has(next) && wb.raw(sheetId, r, next) === undefined && !(showProtected && wb.modeAt(sheetId, r, next))) {
                 width += colAxis.size(next);
                 covered.add(next);
                 next++;
@@ -862,7 +883,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
             const h = rowAxis.size(r);
             if (!h) continue;
             out.push(<Row key={r} wb={wb} sheetId={sheetId} r={r} top={rowAxis.start(r) - yBase} height={h} from={cols.from} to={cols.to} xBase={xBase}
-                colAxis={colAxis} blocks={blocks} revision={revision} showProtected={showProtected} setup={setup} />);
+                colAxis={colAxis} blocks={blocks} revision={revision} showProtected={showProtected} setup={setup} zoom={zoom} />);
         }
         // the merged blocks that reach into the pane, each drawn whole (the pane cuts what is outside it)
         for (const b of blocks) {

@@ -24,7 +24,11 @@ await withExample(async ({ js, mouse, wait }) => {
     check('a border from the style is drawn', await q(`(function(){ var b = document.querySelector('.ks-cell[data-r="2"][data-c="1"] .ks-borders'); return !!b && getComputedStyle(b).borderBottomWidth === '2px'; })()`));
     check('a merged block is one cell as wide as its columns (A to F, less the pixel of the grid line on its right)', await q(`(function(){ var m = document.querySelector('.ks-top .ks-merged[data-r="1"][data-c="0"]'); return !!m && Math.round(m.getBoundingClientRect().width) === 100 + 260 + 100 * 3 + 140 - 1; })()`));
     check('and the cells under it are not drawn', !(await q('!!document.querySelector(".ks-top .ks-cell[data-r=\\"1\\"][data-c=\\"2\\"]")')));
-    check('a text runs on into the empty cells on its right ("Total" in H1)', await q(`(function(){ var t = document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="7"]'); return !!t && Math.round(t.getBoundingClientRect().width) > 100 && !document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="8"]'); })()`));
+    // A short text stays in its own cell (Google Sheets): no cover over its neighbours, so their grid lines show, and its border is round its own
+    // box. A long text runs on only as far as it needs.
+    check('a short text stays in its own cell ("Total" in H1): no run on, the next cell empty', await q(`(function(){ var t = document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="7"]'); return !!t && !t.classList.contains('ks-cover') && Math.round(t.getBoundingClientRect().width) < 110 && !document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="8"]'); })()`));
+    check('its border is round its own box, not round the empty cells on its right', await q(`(function(){ var t = document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="7"]'); var b = t && t.querySelector('.ks-borders'); if (!b) return false; var w = b.getBoundingClientRect().width, cw = t.getBoundingClientRect().width; return Math.abs(w - (cw + 2)) <= 1; })()`));
+    check('a long text runs on into the empty cells on its right, only as far as it needs (the note in J1)', await q(`(function(){ var t = document.querySelector('.ks-top .ks-cell[data-r="0"][data-c="9"]'); if (!t || !t.classList.contains('ks-cover')) return false; var w = t.getBoundingClientRect().width, need = t.querySelector('.ks-text').scrollWidth; return w >= need && w < need + 160; })()`));
 
     // the real wheel, over the grid
     const before = await firstRowShown();
