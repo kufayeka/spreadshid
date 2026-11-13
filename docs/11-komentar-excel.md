@@ -1,70 +1,54 @@
-# 11. Komentar dan Excel
+# 11. Komentar Sel & Interoperabilitas Excel/CSV
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Hak akses](10-hak-akses.md) · Berikutnya: [12. Chart dan dashboard](12-dashboard.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Kontrol Akses & Perizinan (ACL/RBAC)](10-hak-akses.md) · Berikutnya: [12. Visualisasi Data & Dashboard](12-dashboard.md)
 
-Bab ini membahas **komentar di sel**, yaitu tempat orang bertanya dan menjawab soal isi sebuah sel tanpa mengubah isinya, lalu **impor dan ekspor
-Excel dan CSV**. Bagian komentar disusun seperti bab lain: pengenalan tanpa kode, lalu langkah demi langkah dengan halaman React dan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [11.1 Komentar adalah diskusi di sebuah sel](#111-komentar-adalah-diskusi-di-sebuah-sel)
-- [11.2 Yang dilihat orang di layar](#112-yang-dilihat-orang-di-layar)
-
-**Bagian B. Langkah demi langkah**
-- [11.3 Komentar pertama](#113-komentar-pertama)
-- [11.4 Membaca dan membalas](#114-membaca-dan-membalas)
-- [11.5 Kartu muncul saat mouse lewat, atau saat diklik](#115-kartu-muncul-saat-mouse-lewat-atau-saat-diklik)
-- [11.6 Daftar semua komentar](#116-daftar-semua-komentar)
-- [11.7 Siapa boleh apa](#117-siapa-boleh-apa)
-
-**Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
-- [11.8 Contoh lengkap: komentar dari kode](#118-contoh-lengkap-komentar-dari-kode)
-- [11.9 Yang sering keliru](#119-yang-sering-keliru)
-- [11.10 Referensi komentar](#1110-referensi-komentar)
-
-**Bagian D. Excel dan CSV**
-- [11.11 Contoh](#1111-contoh)
-- [11.12 Yang ikut dan yang tidak](#1112-yang-ikut-dan-yang-tidak)
+Bab ini membedah fitur kolaborasi dan interoperabilitas data pada `@kufayeka/sheet`: sistem komentar sel berutas (*Threaded Cell Comments*), manajemen hak akses diskusi, interaksi hover/klik, panel samping komentar, serta import dan export dokumen format Microsoft Excel (`.xlsx`) dan CSV dengan kepatuhan locale.
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Arsitektur Komentar Sel Berutas (Threaded Comments)
 
-## 11.1 Komentar adalah diskusi di sebuah sel
+Komentar pada `@kufayeka/sheet` mengadopsi model diskusi terstruktur (*threaded conversation*):
 
-Bayangkan stok keramik di sel G9 tertulis 0. Dewi, manajer toko, ingin tahu kapan barang datang. Ia tidak mengubah angkanya, karena angka itu
-memang benar. Ia **menulis komentar** di sel itu: "Keramik 40x40 habis. Kapan datang lagi?". Joko dari gudang membaca dan **membalas** di tempat
-yang sama. Semua obrolan soal sel G9 berkumpul di G9.
+```text
+┌────────────────────────────────────────────────────────┐
+│             Sel Target Koordinat (misal: G9)           │
+└───────────────────────────┬────────────────────────────┘
+                            │ memiliki 1 thread diskusi
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Komentar Induk: { id, author, time, body: "..." }     │
+└───────────────┬────────────────────────┬───────────────┘
+                │                        │
+                ▼                        ▼
+┌───────────────────────────────┐ ┌───────────────────────────────┐
+│ Balasan 1:                    │ │ Balasan 2:                    │
+│ { author: "PM", body: "..." } │ │ { author: "Site", body: "..."}│
+└───────────────────────────────┘ └───────────────────────────────┘
+                │                        │
+                └───────────────┬────────┘
+                                │
+                                ▼
+┌────────────────────────────────────────────────────────┐
+│           Status Thread: "Open" atau "Resolved"        │
+└────────────────────────────────────────────────────────┘
+```
 
-Beberapa hal yang perlu dipegang sejak awal:
+- **Threaded**: Setiap sel dapat memiliki satu utas diskusi yang terdiri dari komentar awal dan rangkaian balasan.
+- **Identitas Terikat**: Identitas penulis diambil secara otomatis dari properti `user: { id, name }` pada saat inisialisasi workbook atau prop `<Sheet user={...} />`.
+- **Indikator Visual**: Sel yang memiliki diskusi aktif ditandai segitiga ungu di sudut kanan atas.
 
-- **Satu sel, satu diskusi.** Komentar pertama memulai diskusi, komentar berikutnya adalah balasan. Diskusi tidak punya status "selesai". Kalau
-  sudah tidak perlu, komentarnya dihapus.
-- **Setiap komentar mencatat penulis dan waktunya.** Penulis adalah orang yang membuka sheet, yang Anda berikan lewat prop `user`.
-- **Komentar tidak mengubah isi sel.** Rumus, format, dan nilai tetap seperti semula.
-- **Diskusi mengikuti selnya.** Kalau baris disisipkan di atasnya atau tabel di-sort, diskusinya ikut pindah bersama selnya.
-- **Komentar ikut tersimpan** di workbook (`toJSON`), jadi tersimpan ke server bersama isinya ([bab 9](09-menyimpan.md)).
-
-## 11.2 Yang dilihat orang di layar
-
-![Kartu komentar di samping sel G9](img/komentar-kartu.png)
-
-1. **Tanda ungu di pojok kanan atas sel.** Artinya sel itu punya diskusi.
-2. **Kartu di samping sel.** Berisi semua komentar, satu di bawah yang lain, yang terbaru paling bawah. Setiap komentar menunjukkan lingkaran
-   inisial penulis, nama, waktu, dan teksnya.
-3. **Kotak "Reply…" di bawah kartu.** Tempat menulis balasan. Ctrl+Enter atau tombol panah untuk mengirim.
-4. **Tombol ⋯** muncul saat mouse di atas komentar milik sendiri. Isinya Edit dan Delete. Komentar orang lain tidak punya tombol ini.
-5. **Kapan kartunya muncul** bisa diatur: saat mouse lewat di atas sel bertanda (bawaan), atau hanya saat sel diklik.
-6. **View → Comments** membuka daftar semua diskusi di panel kanan: "Dewi commented on G9". Klik salah satunya untuk langsung ke selnya.
-
-Tulisan di layar sheet (Reply, Comments, commented on) memakai bahasa Inggris, sama seperti menu dan tombol lain di sheet.
+![Kartu komentar di samping sel](img/komentar-kartu.png)
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Implementasi Panduan Langkah demi Langkah
 
-## 11.3 Komentar pertama
+---
 
-**Tujuan:** sheet tahu siapa yang membukanya, lalu orang itu menulis komentar pertama.
+### 2.1 Pembuatan Komentar Pertama
+
+Membuat thread komentar baru pada sel via menu konteks atau interaksi pengguna:
 
 <!-- contoh: 11-03-tulis.page.tsx -->
 ```tsx
@@ -83,19 +67,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Kartu baru di E3, komentar sedang diketik](img/komentar-tulis.png)
+![Form input penulisan komentar baru pada sel](img/komentar-tulis.png)
 
-**Penjelasan:**
+---
 
-- Satu-satunya yang baru adalah prop **`user`**: `id` untuk mengenali orangnya, `name` untuk ditampilkan. Biasanya diambil dari sesi login di
-  aplikasi Anda.
-- Pilih sel, lalu tekan **Ctrl+Alt+M** (atau menu **Insert → Comment**). Kartu kosong muncul di samping sel dengan kotak yang siap diketik.
-- **Ctrl+Enter** atau tombol panah mengirim. Sel langsung mendapat tanda ungu, dan kartu tetap terbuka menampilkan komentar yang baru dikirim.
-- **Escape** menutup kartu. Tulisan yang belum dikirim tidak hilang: saat kartu sel itu dibuka lagi, tulisannya masih ada.
+### 2.2 Membaca dan Membalas Diskusi (Replies & Resolve)
 
-## 11.4 Membaca dan membalas
-
-**Tujuan:** membuka workbook yang sudah berisi diskusi, lalu membalasnya.
+Pengguna lain dapat membaca komentar yang ada dan menambahkan balasan berurutan:
 
 <!-- contoh: 11-04-diskusi.page.tsx -->
 ```tsx
@@ -114,22 +92,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Kartu G9 setelah selnya diklik](img/komentar-kartu.png)
+![Thread diskusi pada sel setelah diklik](img/komentar-kartu.png)
 
-**Penjelasan:**
+---
 
-- Isi workbook dibuat oleh `buatDiskusi()` (file `data/diskusi.js`, isinya di [11.8](#118-contoh-lengkap-komentar-dari-kode)): Dewi bertanya
-  di G9, Joko menjawab, Joko juga menulis catatan di G7. Di aplikasi sungguhan, isi ini datang dari server.
-- **Klik sel bertanda** untuk membuka kartunya. Kartu tetap terbuka sampai Anda memilih sel lain, menekan Escape, atau menekan ✕.
-- Balasan ditulis di kotak **Reply…** paling bawah. Balasan selalu masuk ke diskusi sel itu, walaupun orang lain baru saja ikut membalas.
-- **Balasan orang lain muncul sendiri.** Kalau perubahan dari server diterapkan ke workbook saat kartu terbuka, komentar barunya langsung tampil
-  di bawah.
-- **Mengubah dan menghapus:** arahkan mouse ke komentar Anda sendiri, klik **⋯**, lalu **Edit** atau **Delete**. Komentar yang diubah diberi
-  keterangan "edited". Menghapus komentar pertama berarti menghapus seluruh diskusi, jadi pilihannya bernama **Delete discussion**.
+### 2.3 Mode Pemicu: Hover vs Click Trigger
 
-## 11.5 Kartu muncul saat mouse lewat, atau saat diklik
-
-**Tujuan:** mengatur kapan kartu muncul.
+Kartu komentar dapat dikonfigurasi agar muncul saat kursor mouse melintas (*hover preview*) atau hanya saat sel diklik aktif:
 
 <!-- contoh: 11-05-buka.page.tsx -->
 ```tsx
@@ -157,20 +126,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Mouse di atas G7: kartunya muncul tanpa diklik](img/komentar-hover.png)
+![Pratinjau kartu komentar muncul saat hover](img/komentar-hover.png)
 
-**Penjelasan:**
+---
 
-- Prop **`comments={{ open: 'hover' }}`** adalah bawaan, jadi boleh tidak ditulis. Saat mouse berada di atas sel bertanda, kartunya muncul.
-  Saat mouse pergi, kartu hilang sekitar sepertiga detik kemudian. Jeda ini memberi waktu untuk memindahkan mouse dari sel ke kartu.
-- Selama mouse berada di atas kartu, kartu tidak hilang. **Begitu Anda mulai mengetik di kartu**, kartu tetap terbuka walaupun mouse pergi.
-- **`comments={{ open: 'click' }}`** membuat kartu hanya muncul saat sel diklik. Pilih ini kalau sheet Anda padat komentar dan kartu yang muncul
-  sendiri terasa mengganggu.
-- Kedua cara tetap bisa membuka kartu dengan klik dan dengan Ctrl+Alt+M.
+### 2.4 Panel Samping Daftar Seluruh Diskusi (`View → Comments`)
 
-## 11.6 Daftar semua komentar
-
-**Tujuan:** melihat semua diskusi di workbook dan berpindah ke salah satunya.
+Membuka daftar navigasi seluruh komentar di seluruh lembar kerja melalui panel samping:
 
 <!-- contoh: 11-06-daftar.page.tsx -->
 ```tsx
@@ -188,29 +150,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![View → Comments: daftar diskusi di kanan, kartu G7 terbuka setelah diklik](img/komentar-daftar.png)
+![Panel daftar seluruh komentar di sisi kanan spreadsheet](img/komentar-daftar.png)
 
-**Penjelasan:**
+---
 
-- Tidak ada kode baru. Daftar dibuka dari menu **View → Comments** dan ditutup dengan ✕ atau menu yang sama.
-- Setiap baris berbunyi **"Dewi commented on G9"**: siapa yang memulai diskusi dan di sel mana. Di bawahnya ada waktu, komentar pertama, lalu
-  jumlah balasan dan siapa yang terakhir menulis ("2 replies · last Joko, 27 Okt 17.02").
-- Kalau workbook punya lebih dari satu sheet, alamatnya ditulis lengkap dengan nama sheet, misalnya **Produk!G9**.
-- Tiga pilihan di atas daftar:
+### 2.5 Hak Akses Granular pada Komentar
 
-  | Pilihan | Yang tampil |
-  |---|---|
-  | **All** | semua diskusi di semua sheet |
-  | **This sheet** | diskusi di sheet yang sedang dibuka |
-  | **Mine** | diskusi tempat Anda pernah menulis, baik memulai maupun membalas |
-
-- **Klik sebuah baris**: sheet pindah ke sel itu (juga ke sheet lain kalau perlu) dan kartunya terbuka. Membaca dan membalas dilakukan di kartu,
-  karena daftar ini hanya untuk mencari.
-- Diskusi milik sel yang sedang dipilih ditandai garis ungu di kiri.
-
-## 11.7 Siapa boleh apa
-
-**Tujuan:** mengatur siapa yang boleh membaca, memulai, dan membalas komentar, dengan baris akses yang sama seperti [bab 10](10-hak-akses.md).
+Fitur komentar terintegrasi penuh dengan sistem perizinan ACL (`comment.read`, `comment.create`, `comment.reply`, `comment.moderate`):
 
 <!-- contoh: 11-07-akses.page.tsx -->
 ```tsx
@@ -242,32 +188,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Rina dari keuangan: bisa membaca diskusi G9, tapi tidak ada kotak untuk membalas](img/komentar-akses.png)
-
-**Penjelasan:**
-
-- Tanpa prop `access`, semua orang boleh membaca dan menulis komentar. Begitu ada `access`, berlaku aturan bab 10: **yang tidak disebut, tidak
-  boleh**.
-- Rina punya `read` dan `comment.read`. Ia melihat tanda ungu dan bisa membuka kartu, tetapi kotak Reply tidak ada. Kalau ia menekan Ctrl+Alt+M di
-  sel tanpa diskusi, sheet menolak dengan pesan (lewat `onNotice`, lihat [bab 10](10-hak-akses.md)).
-- Gudang punya `comment.reply`: boleh membalas diskusi yang sudah ada, tetapi tidak boleh memulai diskusi baru.
-- Orang tanpa `comment.read` tidak melihat tanda, kartu, maupun daftar. `viewFor` di server juga tidak mengirim komentar kepadanya
-  ([11.8](#118-contoh-lengkap-komentar-dari-kode)).
-- Gembok di setiap sel pada foto bukan bagian dari komentar. Gembok itu tanda bahwa Rina hanya boleh membaca isi sel ([bab 10](10-hak-akses.md)).
-
-Daftar hak komentar lengkap ada di [11.10](#1110-referensi-komentar).
+![Pengguna dengan hak comment.read dapat membaca tanpa form balasan](img/komentar-akses.png)
 
 ---
 
-# Bagian C. Contoh lengkap, yang sering keliru, dan referensi
+## 3. Manipulasi Komentar secara Programatis
 
-## 11.8 Contoh lengkap: komentar dari kode
-
-Semua yang bisa dilakukan di layar juga bisa dilakukan dari kode. Contoh ini membuat diskusi yang dipakai halaman-halaman di atas, lalu
-menunjukkan bahwa diskusi ikut pindah bersama selnya, hanya penulis yang boleh mengubah komentarnya, dan server tidak mengirim komentar kepada orang
-yang tidak berhak membacanya.
-
-Isinya dibuat oleh `data/diskusi.js`. Setiap orang membuka workbook dengan user-nya sendiri:
+Helper pembuatan dataset beranotasi komentar:
 
 <!-- contoh: data/diskusi.js -->
 ```js
@@ -297,7 +224,7 @@ export function buatDiskusi() {
 ```
 <!-- /contoh -->
 
-Lalu Dewi membacanya dari kode:
+Pengujian Programatis API Komentar:
 
 <!-- contoh: 14-komentar.js -->
 ```js
@@ -337,81 +264,11 @@ dikirim ke tamu : 0 diskusi
 ```
 <!-- /hasil -->
 
-**Yang perlu diperhatikan:**
-
-- Setiap orang membuka workbook-nya sendiri dengan opsi `user`. Nama dan id dari opsi itulah yang tercatat sebagai penulis.
-- Jam diambil dari opsi `now` workbook (bawaannya jam komputer). Contoh ini memakai jam tetap supaya hasilnya selalu sama.
-- Dari kode, perubahan yang tidak diizinkan **melempar error**. Di layar, tombolnya memang tidak ditampilkan.
-
-## 11.9 Yang sering keliru
-
-| Gejala | Penyebab | Perbaikan |
-|---|---|---|
-| Semua komentar tertulis atas nama "Anonymous" | prop `user` tidak diberikan | berikan `user={{ id, name }}` dari sesi login |
-| Tombol ⋯ tidak muncul di komentar sendiri | `id` di `user` berbeda dengan `id` saat komentar ditulis, misalnya sekali `'dewi'` dan sekali `'user:dewi'` | pakai id yang sama setiap kali |
-| Kartu muncul sendiri dan mengganggu | `open: 'hover'` adalah bawaan | `comments={{ open: 'click' }}` |
-| Orang tidak bisa memulai diskusi, padahal bisa membalas | punya `comment.reply` tetapi tidak punya `comment.create` | tambahkan baris `comment.create` untuk orang itu |
-| Komentar hilang setelah disimpan oleh orang tanpa `comment.read` | menyimpan seluruh isi tanpa `mergePatch` | simpan dengan patch dan `mergePatch` ([bab 9](09-menyimpan.md)), yang menjaga komentar yang tidak ia terima |
-| Diskusi tidak tampil di daftar | baris atau kolom selnya dihapus (diskusinya punya `at: null`) | undo penghapusan itu, maka diskusi kembali ke selnya |
-
-## 11.10 Referensi komentar
-
-### Prop `<Sheet>`
-
-| Prop | Artinya |
-|---|---|
-| `user={{ id, name }}` | orang yang membuka sheet. Namanya tercatat di komentar yang ia tulis, dan komentarnya bisa ia ubah atau hapus |
-| `comments={{ open: 'hover' \| 'click' }}` | kapan kartu muncul. Bawaan `'hover'` |
-
-### Keyboard dan menu
-
-| Tombol / menu | Yang terjadi |
-|---|---|
-| Ctrl+Alt+M, Insert → Comment | membuka kartu sel yang dipilih, kotaknya siap diketik |
-| Ctrl+Enter | di kotak balasan: mengirim. Di kotak edit: menyimpan |
-| Escape | di kotak edit: batal. Di tempat lain dalam kartu: menutup kartu |
-| View → Comments | membuka atau menutup daftar semua diskusi |
-
-### Hak akses
-
-| Hak | Yang diizinkan |
-|---|---|
-| `comment.read` | melihat tanda, kartu, dan daftar. Tanpa ini, komentar tidak dikirim oleh `viewFor` |
-| `comment.create` | memulai diskusi di sel yang belum punya diskusi |
-| `comment.reply` | membalas diskusi yang sudah ada |
-| `comment.edit` | mengubah komentar **sendiri** |
-| `comment.delete` | menghapus komentar **sendiri** |
-| `comment.moderate` | mengubah dan menghapus komentar **siapa saja** |
-
-### Fungsi
-
-Semua fungsi dipanggil dari handle sheet (`wb.sheet('Produk').addComment('G9', ...)`), atau dari `wb` dengan nama sheet di depan
-(`wb.addComment('Produk', 'G9', ...)`). Setiap perubahan dihitung satu langkah undo.
-
-| Fungsi | Artinya |
-|---|---|
-| `addComment(sel, teks)` | memulai diskusi di sel itu, atau membalas kalau sel itu sudah punya diskusi. Mengembalikan `{ thread, item }` |
-| `replyComment(thread, teks)` | membalas sebuah diskusi. Mengembalikan id balasan |
-| `editComment(thread, item, teks)` | mengubah teks komentar sendiri. Komentarnya diberi `edited` |
-| `deleteComment(thread, item)` | menghapus komentar sendiri. Kalau itu komentar pertama, seluruh diskusinya terhapus |
-| `mayChangeComment(thread, item, 'edit' \| 'delete')` | `true` kalau orang ini boleh mengubah atau menghapus komentar itu. Kartu memakainya untuk memutuskan tombol ⋯ |
-| `comments()` | semua diskusi sheet: `[{ id, items: [{ id, by: { id, name }, text, at, edited? }], at: { r, c } }]` |
-| `commentAt(sel)` | diskusi di sel itu, atau `null` |
-| `hasComment(sel)` | apakah sel itu punya diskusi (cepat, dipakai untuk menggambar tanda) |
-
-### Warna
-
-Warna ungu tanda, garis daftar, dan tombol kirim diambil dari variabel CSS `--ks-comment` (bawaan `#7b3fe4`). Contoh menggantinya:
-
-```css
-.ks-sheet { --ks-comment: #c2185b; }
-```
-
 ---
 
-# Bagian D. Excel dan CSV
+## 4. Interoperabilitas Microsoft Excel (`.xlsx`) & CSV
 
-## 11.11 Contoh
+Engine `@kufayeka/sheet/core` mengimplementasikan parser dan serializer native OpenXML (`.xlsx`) berkinerja tinggi tanpa dependensi eksternal:
 
 <!-- contoh: 15-excel.js -->
 ```js
@@ -476,50 +333,21 @@ sheet baru     : Marketplace | B2 46321 (tanggal) | E3 152000.5 (angka) | C2 "Se
 ```
 <!-- /hasil -->
 
-| Fungsi | Artinya |
-|---|---|
-| `exportXlsx(wb)` | isi file `.xlsx` sebagai `Uint8Array` |
-| `importXlsx(bytes, opsi?)` | workbook baru dari file: `{ workbook, warnings }`. `opsi` sama dengan `createWorkbook`, ditambah `settings` untuk locale dan mata uang |
-| `importXlsxInto(wb, bytes)` | sheet-sheet file ditambahkan ke workbook yang sudah ada, sebagai satu perubahan: `{ sheetIds, warnings }` |
-| `exportCsv(wb, sheet, { delimiter })` | satu sheet sebagai teks CSV, berisi teks seperti yang tampil di sel. Pemisah bawaannya koma |
-| `parseCsv(teks, pemisah?)` | CSV menjadi array baris. Pemisah ditebak dari baris pertama (koma, titik koma, atau tab) kalau tidak diberikan |
-| `importCsvInto(wb, teks, nama)` | CSV sebagai sheet baru. Setiap field dibaca seperti diketik di locale workbook: `152.000,50` menjadi angka, `26/10/2026` menjadi tanggal |
-| `codeOfFormat(format, settings)` | kode format Excel untuk sebuah format (`'"Rp" #,##0'`), untuk alat sendiri |
+---
 
-**Mengunduh di browser:**
+## 5. Matriks Kompatibilitas Fitur XLSX
 
-```js
-const blob = new Blob([exportXlsx(wb)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'Stok.xlsx' });
-a.click();
-URL.revokeObjectURL(a.href);
-```
+| Fitur Spreadsheet | Export XLSX | Import XLSX | Catatan Konversi |
+|---|---|---|---|
+| **Nilai Sel (Primitif)** | Ya | Ya | Angka, teks, boolean, dan null dikonversi sesuai spesifikasi OpenXML. |
+| **Formula Kalkulasi** | Ya | Ya | Formula standar diekspor. Fungsi khusus lokal seperti `TERBILANG` diekspor bersama nilai hasil evaluasinya. |
+| **Formatting & Gaya Sel** | Ya | Ya | Bold, italic, color, background fill, borders, font size, dan alignment. |
+| **Number & Date Format** | Ya | Ya | Dikonversi ke OpenXML format code (misal `#,##0`). |
+| **Conditional Formatting** | Ya | Ya | Diekspor sebagai rule conditional formatting native Excel. |
+| **Named Ranges** | Ya | Ya | Ditransformasikan menjadi Excel Defined Names. |
+| **Freeze Panes** | Ya | Ya | Baris dan kolom beku dipertahankan secara utuh. |
+| **Threaded Comments** | Ya | Ya | Diekspor sebagai OpenXML Threaded Comments standar. |
 
-**Membuka file yang dipilih orang:** `importXlsx(new Uint8Array(await file.arrayBuffer()))`.
+---
 
-## 11.12 Yang ikut dan yang tidak
-
-| Bagian | Ke `.xlsx` | Dari `.xlsx` |
-|---|---|---|
-| nilai, rumus (termasuk antar sheet), tanggal | ya | ya. Fungsi yang tidak dikenal disebut di `warnings` |
-| format angka, uang, persen, tanggal | ya | ya |
-| gaya: huruf, warna, latar, perataan, border, teks turun | ya | ya |
-| merge, lebar kolom, tinggi baris, baris dan kolom tersembunyi | ya | ya |
-| baris dan kolom yang dibekukan | ya | ya |
-| named range | ya | ya |
-| conditional formatting | ya | ya. Jenis yang tidak ada di sini (data bar, ikon) dilewati dan disebut di `warnings` |
-| filter | ya | ya. Filter warna dan top 10 disebut di `warnings` |
-| grup baris dan kolom | ya | ya |
-| pivot table | sebagai nilai | sebagai nilai |
-| validasi data | ya: daftar, daftar dari range, checkbox (sebagai daftar TRUE/FALSE), angka, tanggal, panjang teks, teks memuat. Email dan URL tidak, karena Excel tidak punya jenis itu | ya. Jenis lain (rumus bebas) disebut di `warnings` |
-| komentar | ya, sebagai *note* Excel: satu note per diskusi, satu baris per komentar (`Dewi: …`) | ya, dibaca balik menjadi diskusi dengan penulis per baris |
-| gambar dan grafik | tidak ada di library ini | dilewati, disebut di `warnings` |
-| locale | tidak disimpan oleh Excel | beri lewat `settings` |
-| aturan, tipe kolom, policy | tidak ikut: itu milik aplikasimu | |
-
-Tampilkan `warnings` kepada orang yang mengimpor, supaya ia tahu apa yang tidak terbawa dari filenya.
-
-**CSV** hanya membawa teks. `exportCsv` menulis yang tampil di sel (`Rp 64.000`, `420 zak`), dan isi sel yang tersembunyi untuk orang itu ditulis
-kosong. Untuk Excel berbahasa Indonesia, yang memakai koma sebagai tanda desimal, pakai `{ delimiter: ';' }`.
-
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Hak akses](10-hak-akses.md) · Berikutnya: [12. Chart dan dashboard](12-dashboard.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [10. Kontrol Akses & Perizinan (ACL/RBAC)](10-hak-akses.md) · Berikutnya: [12. Visualisasi Data & Dashboard](12-dashboard.md)

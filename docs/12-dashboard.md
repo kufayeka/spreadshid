@@ -1,92 +1,46 @@
-# 12. Chart dan dashboard
+# 12. Visualisasi Data & Dashboard Interaktif
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Komentar dan Excel](11-komentar-excel.md) · Berikutnya: [13. Performa dan referensi](13-referensi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Komentar Sel & Interoperabilitas Excel/CSV](11-komentar-excel.md) · Berikutnya: [13. Optimasi Performa & Referensi API](13-referensi.md)
 
-Bab ini membahas **chart** (kolom, batang, garis, area, pie, donut, kombinasi dua sumbu, scatter, bullet, waterfall), **kurva S di atas time
-schedule**, **sparkline dan data bar di sel**, lalu cara menyusunnya menjadi **dashboard**: form sebagai pintu input, tabel sebagai sumber
-data, dan sheet yang hanya dibaca sebagai tampilan. Setiap langkah adalah satu halaman React dengan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [12.1 Form, tabel, dashboard](#121-form-tabel-dashboard)
-- [12.2 Chart menempel di sel](#122-chart-menempel-di-sel)
-
-**Bagian B. Langkah demi langkah**
-- [12.3 Chart pertama](#123-chart-pertama)
-- [12.4 Mengatur chart dari layar](#124-mengatur-chart-dari-layar)
-- [12.5 Kolom dan garis, dua sumbu](#125-kolom-dan-garis-dua-sumbu)
-- [12.6 Pie dan donut](#126-pie-dan-donut)
-- [12.7 Bullet: aktual terhadap rencana](#127-bullet-aktual-terhadap-rencana)
-- [12.8 Waterfall: dari kontrak ke sisa tagih](#128-waterfall-dari-kontrak-ke-sisa-tagih)
-- [12.9 Kurva S di atas time schedule](#129-kurva-s-di-atas-time-schedule)
-- [12.10 Sparkline dan data bar](#1210-sparkline-dan-data-bar)
-- [12.11 Seri dari range sendiri, dan scatter](#1211-seri-dari-range-sendiri-dan-scatter)
-- [12.12 Form mengisi tabel, dashboard hanya dibaca](#1212-form-mengisi-tabel-dashboard-hanya-dibaca)
-
-**Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
-- [12.13 Contoh lengkap: dashboard proyek](#1213-contoh-lengkap-dashboard-proyek)
-- [12.14 Yang sering keliru](#1214-yang-sering-keliru)
-- [12.15 Referensi](#1215-referensi)
+Bab ini membedah engine visualisasi bawaan `@kufayeka/sheet`: floating chart interaktif yang menempel di atas koordinat sel, ragam tipe chart (Kolom, Bar, Garis, Area, Combo Dual-Axis, Pie, Donut, Bullet progress, Waterfall financial, Kurva S konstruksi, Scatter plot), in-cell sparklines, data bars, serta arsitektur perancangan dashboard analitik eksekutif.
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Arsitektur Floating Charts & Data Binding
 
-## 12.1 Form, tabel, dashboard
+Visualisasi pada spreadsheet didesain menggunakan paradigma **Floating Overlay yang Terikat Koordinat Sel**:
 
-![Dashboard proyek: angka di atas, bullet progres, termin dengan dua sumbu](img/dashboard.png)
+![Dashboard proyek terintegrasi](img/dashboard.png)
 
-Dashboard proyek seperti di atas disusun dari tiga lapis:
-
-1. **Form, pintu input.** Orang lapangan tidak mengetik di sheet. Mereka mengisi form di aplikasi Anda, misalnya "progres minggu ini 70,5%".
-   Form itu menulis ke tabel.
-2. **Tabel, sumber data.** Sheet biasa seperti `Progres`, `Termin`, `PEKTAM`: satu baris satu proyek, satu bulan, atau satu pekerjaan tambah.
-   Bisa juga dibuat dengan tipe kolom ([bab 8](08-menjaga-isi.md)) supaya isinya selalu benar.
-3. **Dashboard, hanya dibaca.** Satu sheet yang isinya **rumus dan chart saja**. Rumusnya membaca tabel, chart-nya membaca rumus atau tabel.
-   Dengan hak akses ([bab 10](10-hak-akses.md)) sheet ini dikunci: semua orang bisa melihat, tidak ada yang bisa mengubah.
-
-Karena dashboard hanya rumus dan chart, begitu satu angka di tabel berubah, semua yang membacanya ikut berubah saat itu juga. Tidak ada
-tombol "refresh".
-
-## 12.2 Chart menempel di sel
-
-Chart di sheet ini tidak melayang bebas. Setiap chart berdiri di **`at`**, blok sel tempatnya (misalnya `'E2:K16'`), dan membaca datanya
-dengan salah satu dari dua cara (atau keduanya sekaligus):
-
-| Cara | Kapan | Bentuknya |
-|---|---|---|
-| **Blok** | cepat, sebagian besar kasus | `data: 'A1:C7'`: satu range, dibaca seperti Excel membaca pilihan sel (lihat di bawah) |
-| **Range per seri** | kolomnya tidak bersebelahan, atau dari sheet lain | `categories: 'A2:A8'` untuk semua seri, lalu setiap seri punya `values` (Y) dan `name` atau `nameFrom` (sel namanya) |
-
-Scatter memakai cara kedua: setiap seri punya `x` dan `values` sendiri ([12.11](#1211-seri-dari-range-sendiri-dan-scatter)).
-
-Semua range itu disimpan menurut **id baris dan kolom**, seperti named range. Akibatnya:
-
-- Baris disisipkan di atas chart: chart ikut turun. Kolom disisipkan di kiri data: range datanya ikut bergeser.
-- Isi sel di range data berubah: chart langsung berubah.
-- Chart ikut tersimpan di workbook (`toJSON`), dan saat diekspor ke .xlsx menjadi **chart Excel asli** di sel yang sama.
-
-**Cara chart membaca blok** sama seperti Excel membaca pilihan sel:
-
-- **Seri ke bawah atau ke samping.** Kalau range lebih tinggi daripada lebarnya, tiap kolom jadi satu seri. Kalau lebih lebar, tiap baris
-  jadi satu seri. Pilihan `seriesIn: 'cols'` atau `'rows'` memaksanya.
-- **Baris pertama berisi teks** (dan tidak ada angkanya) dipakai sebagai **nama seri**.
-- **Kolom pertama berisi teks** dipakai sebagai **kategori**, misalnya nama bulan. Kalau tidak ada, kategorinya 1, 2, 3, dan seterusnya.
-- **Sel yang bukan angka** dianggap kosong: garis putus di situ, kolomnya tidak digambar.
-
-**Dua macam chart menurut latarnya:**
-
-| `background` | Seperti apa | Untuk apa |
-|---|---|---|
-| `'white'` (bawaan) | kartu putih bergaris tepi. Klik untuk memilih, tarik untuk menggeser | chart biasa di dashboard |
-| `'none'` | transparan, digambar **di atas** sel. Klik tembus ke sel di bawahnya. Chart dipilih lewat tepinya | kurva S di atas time schedule |
+1. **Cell-Anchored**: Posisi dan dimensi chart ditentukan oleh rentang koordinat sel (`at: 'E2:K16'`). Saat baris/kolom disisipkan atau diperlebar, chart menyesuaikan geometrinya secara otomatis.
+2. **Reaktif terhadap Mutasi Data**: Mengubah angka di dalam tabel seketika memicu pembaruan visualisasi secara instan tanpa re-render penuh antarmuka.
+3. **Pemisahan Hak Akses**: Pengguna operasional hanya memerlukan hak `read` untuk melihat chart dinamis, sedangkan hak `chart` mengizinkan pembuatan, pergeseran posisi, dan modifikasi konfigurasi visualisasi.
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Katalog Ragam Tipe Chart
 
-## 12.3 Chart pertama
+| Tipe Chart | Spesialisasi Penggunaan | Fitur Utama |
+|---|---|---|
+| **Column / Bar** | Perbandingan kuantitatif antar kategori. | Pengelompokan seri bertumpuk (*stacked*), rotasi label kategori. |
+| **Line / Area** | Tren time-series dan kontinuitas temporal. | Garis halus (*smooth curve*), marker titik data, garis putus-putus (*dashed*). |
+| **Combo Dual-Axis** | Menghubungkan dua metrik dengan skala unit berbeda (misal: Nominal Rupiah di sumbu kiri, Persentase Progres di sumbu kanan). | Sumbu ganda independen (`axis: 'left'` dan `'right'`). |
+| **Pie / Donut** | Komposisi pangsa terhadap 100%. | Nilai sentral di tengah donut (*center text* & *center label*), persentase per irisan. |
+| **Bullet** | Pemantauan progres aktual terhadap target rencana. | Batas toleransi deviasi otomatis (zona hijau, kuning `warn`, merah `bad`). |
+| **Waterfall** | Jembatan varians finansial (misal: dari nilai kontrak awal hingga sisa tagihan). | Deteksi otomatis langkah naik, turun, dan baris total kumulatif. |
+| **Kurva S** | Pengawasan jadwal proyek konstruksi (jadwal kumulatif rencana vs realisasi fisik). | Latar transparan (`background: 'none'`) dengan perataan tepat di tengah kolom minggu (`align: 'cells'`). |
+| **Scatter Plot** | Korelasi spasial atau regresi antara dua variabel kontinu (X dan Y). | Nilai koordinat numerik bebas pada sumbu X dan Y. |
+| **In-Cell Sparkline** | Tren mini langsung di dalam satu sel tabel. | Jenis Garis (*line*), Batang (*column*), atau Menang/Kalah (*win/loss*). |
 
-**Tujuan:** chart kolom dari tabel penjualan bulanan.
+---
+
+## 3. Implementasi Panduan Langkah demi Langkah
+
+---
+
+### 3.1 Chart Kolom Dasar
+
+Menampilkan grafik batang kolom dari rentang data tabel:
 
 <!-- contoh: 12-03-kolom.page.tsx -->
 ```tsx
@@ -119,62 +73,14 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Chart kolom di E2:K16](img/chart-kolom.png)
+![Chart kolom menempati sel K6:Q18](img/chart-kolom.png)
+![Panel editor visual kustomisasi chart](img/chart-editor.png)
 
-**Penjelasan:**
+---
 
-- `addChart` menerima `at` (tempat chart) dan `data` (range yang dibaca). Hasilnya id chart, dipakai untuk `setChart` dan `removeChart`.
-- Bulan ada di kolom A, jadi menjadi kategori. "Semen (zak)" dan "Besi (batang)" di baris 1 menjadi nama seri.
-- Arahkan mouse ke sebuah batang: nilainya muncul di kotak kecil.
-- **Tanpa kode** pun bisa: pilih A1:C7, lalu **Insert → Chart**. Chart kolom langsung dibuat di sebelah kanan pilihan, lalu dipilih.
+### 3.2 Combo Chart dengan Sumbu Ganda (Dual-Axis)
 
-## 12.4 Mengatur chart dari layar
-
-**Tujuan:** mengubah apa pun tentang chart tanpa kode. Halamannya sama dengan [12.3](#123-chart-pertama).
-
-![Batang Semen diklik: seri itu terpilih di pohon, pengaturannya di bawah](img/chart-editor.png)
-
-**Memilih dan memindah:**
-
-- **Klik chart** untuk memilihnya. Bingkai ungu dan 8 titik pegangan muncul, dan **panel Chart** terbuka di kanan.
-- **Tarik chart** untuk memindahkannya, dan **tarik titik pegangan** untuk mengubah ukurannya. Keduanya per sel penuh, karena chart menempel
-  di sel.
-- **Delete** menghapus chart yang dipilih. **Escape** melepasnya. Setiap perubahan bisa di-undo (Ctrl+Z).
-
-**Panel Chart terdiri dari dua bagian:**
-
-1. **Pohon** di atas berisi bagian-bagian chart: *Chart* (jenis), *Data*, *Series* (satu baris per seri; titik di kanan menyembunyikan
-   atau menampilkan seri itu), *Axes*, *Title and legend*, *Labels and gridlines*, *Place and background*. Ada juga bagian yang hanya
-   muncul untuk jenis tertentu: *Slices* (pie, donut), *Center* (donut), *Limits* (bullet), *Steps* (waterfall).
-2. **Isian** di bawahnya: pengaturan bagian yang dipilih saja.
-
-**Klik langsung di chart** memilih bagiannya: klik batang memilih serinya (seperti di foto), klik judul atau legenda memilih *Title and
-legend*, klik angka sumbu memilih *Axes*, klik potongan pie memilih *Slices*.
-
-**Cara isian bekerja:**
-
-| Isian | Kapan berlaku |
-|---|---|
-| warna (6 warna cepat, **More** untuk warna lain, ↺ kembali ke bawaan) | langsung saat diklik |
-| pilihan (misalnya Left / Right) dan saklar | langsung |
-| teks dan angka | saat **Enter** atau saat pindah dari isian. Isian yang dikosongkan menghapus pengaturan itu |
-| range, dengan tombol **⊞** | ketik range, atau klik ⊞ lalu pilih sel di grid |
-
-**Tombol lain:**
-
-- **Data → Add series**: seri baru tanpa range. Isi *Values* dengan ⊞, maka seri itu langsung tergambar.
-- **⧉** di kepala panel menyalin gaya chart (jenis, warna, judul, legenda, sumbu, dan lainnya, tetapi bukan letak dan range-nya). Pilih chart
-  lain, lalu **⎘** untuk menempelkannya.
-- **Sparkline** punya panelnya sendiri, yang terbuka saat salah satu selnya dipilih ([12.10](#1210-sparkline-dan-data-bar)).
-
-**Panel menawarkan semua yang bisa ditulis di kode.** Panel dibentuk dari daftar pengaturan yang sama dengan tabel di
-[12.15](#1215-referensi), dan sebuah tes memastikan setiap pengaturan di types punya isiannya di panel.
-
-Orang tanpa hak `chart` tetap melihat chart dan nilai saat mouse diarahkan, tetapi tidak bisa memilih, memindah, atau mengubahnya.
-
-## 12.5 Kolom dan garis, dua sumbu
-
-**Tujuan:** tagihan termin per bulan (kolom, dalam juta) dan progres kumulatif (garis, dalam persen) di satu chart.
+Menampilkan nominal tagihan dalam bentuk batang kolom pada sumbu kiri dan garis persentase progres pada sumbu kanan:
 
 <!-- contoh: 12-05-combo.page.tsx -->
 ```tsx
@@ -209,18 +115,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Kolom tagihan di sumbu kiri, garis progres di sumbu kanan 0%–100%](img/chart-combo.png)
+![Grafik combo batang nominal di sumbu kiri dan garis persentase di sumbu kanan](img/chart-combo.png)
 
-**Penjelasan:**
+---
 
-- `type: 'combo'` membuat seri digambar sebagai kolom, kecuali seri yang punya `type: 'line'` (atau `'area'`).
-- `axis: 'right'` memberi seri itu **sumbu sendiri di kanan**. Ini perlu karena satuannya berbeda: juta rupiah dan persen.
-- Sumbu kanan tertulis dalam persen karena sel di kolom C berformat persen. Sumbu **mengikuti format sel datanya**, jadi tidak perlu diatur.
-- `smooth: true` membuat garis melengkung halus tanpa melewati puncak, sama seperti chart garis Nexa.
+### 3.3 Komposisi Donut Chart dengan Teks Sentral
 
-## 12.6 Pie dan donut
-
-**Tujuan:** pembagian pekerjaan tambah menurut statusnya.
+Menampilkan proporsi kategori anggaran dengan total nilai di tengah lingkaran:
 
 <!-- contoh: 12-06-donut.page.tsx -->
 ```tsx
@@ -254,19 +155,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Pie dengan persen di tiap potongan, donut dengan total di tengah](img/chart-donut.png)
+![Donut chart dengan teks total nominal di tengah](img/chart-donut.png)
 
-**Penjelasan:**
+---
 
-- Pie dan donut memakai **seri pertama** saja. Kategori jadi potongan, angkanya jadi besar potongan.
-- Angka `Jumlah` dihitung dengan `COUNTIF` dari tabel, bukan diketik. Kalau status sebuah pekerjaan berubah, chart ikut berubah.
-- `labels: true` menulis persen di setiap potongan yang cukup besar.
-- Donut menulis totalnya di tengah. `centerLabel` mengganti tulisan kecil di bawahnya, dan `centerText` mengganti angkanya.
-- `colors` memberi warna untuk tiap potongan secara berurutan, misalnya hijau untuk Lunas dan abu-abu untuk Cancel.
+### 3.4 Bullet Chart untuk Pemantauan KPI Progres
 
-## 12.7 Bullet: aktual terhadap rencana
-
-**Tujuan:** isi laporan progres mingguan ("aktual, rencana, deviasi") dalam satu gambar.
+Membandingkan progres riil fisik terhadap target rencana dengan indikator warna deviasi:
 
 <!-- contoh: 12-07-bullet.page.tsx -->
 ```tsx
@@ -301,19 +196,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Bar aktual, garis hitam rencana, warna menurut deviasi](img/chart-bullet.png)
+![Bullet chart dengan bar aktual dan garis hitam rencana](img/chart-bullet.png)
 
-**Penjelasan:**
+---
 
-- Untuk setiap kategori (proyek): seri pertama yang tampil digambar sebagai **bar** (aktual), seri kedua sebagai **garis hitam** (rencana).
-- Kolom Minggu ikut terbaca sebagai seri, jadi disembunyikan dengan `series: [{ hidden: true }]`.
-- Warna bar menurut deviasi (aktual dikurangi rencana): **merah** kalau tertinggal lebih dari `bad` (bawaan 5), **kuning** kalau lebih dari
-  `warn` (bawaan 1), **hijau** kalau tidak. Pada sumbu persen, batasnya dibaca sebagai **poin persen**: 5 berarti 5%.
-- Angka deviasi tertulis di ujung kanan setiap baris.
+### 3.5 Waterfall Chart Finansial
 
-## 12.8 Waterfall: dari kontrak ke sisa tagih
-
-**Tujuan:** melihat ke mana nilai kontrak pergi.
+Menganalisis jembatan arus kas atau varians pengurang nilai kontrak:
 
 <!-- contoh: 12-08-waterfall.page.tsx -->
 ```tsx
@@ -342,18 +231,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Kontrak 1.110, turun oleh uang muka, termin, dan retensi, sisa 235](img/chart-waterfall.png)
+![Waterfall chart memperlihatkan potongan arus nilai kontrak](img/chart-waterfall.png)
 
-**Penjelasan:**
+---
 
-- Batang pertama adalah titik awal (`totals: [0]`, kategori pertama). Batang berikutnya naik atau turun sebesar angkanya.
-- Sel terakhir dibiarkan **kosong**, jadi dihitung sebagai **total**: sisanya dijumlahkan oleh chart sendiri.
-- `downColor`, `upColor`, dan `totalColor` mengatur warnanya. Bawaannya hijau naik, merah turun, ungu total. Di sini pengurangan dibuat
-  biru, karena uang yang sudah dibayar bukan hal buruk.
+### 3.6 Kurva S Konstruksi di Atas Grid Jadwal
 
-## 12.9 Kurva S di atas time schedule
-
-**Tujuan:** kurva S rencana dan realisasi, digambar tepat di atas kolom minggu time schedule.
+Menghamparkan kurva transparan di atas tabel matriks mingguan time-schedule:
 
 <!-- contoh: 12-09-kurva-s.page.tsx -->
 ```tsx
@@ -382,23 +266,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Kurva S transparan di atas E2:N9, titik minggu ke-n di tengah kolom M-n](img/kurva-s.png)
+![Kurva S transparan menempel di atas tabel jadwal waktu proyek](img/kurva-s.png)
 
-**Penjelasan:**
+---
 
-- Isi time schedule dibuat oleh `buatJadwal()` (file `data/proyek.js`, lihat [12.13](#1213-contoh-lengkap-dashboard-proyek)): bobot setiap
-  pekerjaan dibagi rata ke minggu pelaksanaannya, lalu dijumlahkan menjadi baris "Bobot mingguan" dan "Kumulatif rencana". Semuanya rumus.
-- **`background: 'none'`** membuat chart transparan. Bar jadwal di bawahnya tetap terlihat, dan klik di dalam chart tembus ke sel. Chart
-  dipilih lewat **tepinya** (mouse berubah menjadi tanda geser).
-- **`align: 'cells'`** membuat titik minggu ke-n jatuh **tepat di tengah kolom M-n**. Kalau kolom dilebarkan, kurvanya ikut menyesuaikan.
-  Sumbu dan legenda digambar di luar blok sel, di sebelah kanan.
-- Data E11:N12 lebih lebar daripada tingginya, jadi tiap baris menjadi satu seri. `seriesIn: 'rows'` hanya menegaskannya.
-- Realisasi berhenti di minggu ke-6 karena sel M7–M10 masih kosong. `endLabel` menulis angka terakhirnya ("Realisasi 49,5%").
-- `y: { min: 0, max: 1 }` mengunci sumbu dari 0% sampai 100%, supaya kurva tidak meregang saat progres masih kecil.
+### 3.7 In-Cell Sparklines & Data Bars
 
-## 12.10 Sparkline dan data bar
-
-**Tujuan:** tren 8 minggu di satu sel per proyek, dan bar di belakang angka aktual.
+Menyisipkan visualisasi tren mini langsung di dalam sel:
 
 <!-- contoh: 12-10-sparkline.page.tsx -->
 ```tsx
@@ -436,24 +310,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Data bar di kolom Aktual, sparkline di kolom Tren 8 minggu](img/chart-sparkline.png)
+![Data bar di kolom Omzet dan sparkline tren di kolom C](img/chart-sparkline.png)
 
-**Penjelasan:**
+---
 
-- **Sparkline** adalah chart kecil di dalam satu sel, tanpa sumbu. `addSparkline({ at: 'C2:C8', data: 'D2:K8' })` membuat sel ke-i dari C2:C8
-  menggambar baris ke-i dari D2:K8. Kalau `at` berupa satu baris, sel ke-i menggambar kolom ke-i.
-- Jenisnya `'line'` (titik di nilai terakhir), `'column'`, atau `'winloss'` (naik untuk positif, turun untuk negatif). Ikut bergeser
-  bersama selnya, sama seperti chart.
-- **Data bar** adalah aturan conditional formatting ([bab 6](06-format.md)) dengan `kind: 'bar'`: bar di belakang teks sel, sepanjang
-  angkanya dibandingkan angka terbesar di range itu (dari 0 kalau semuanya positif). Data bar bisa dipakai bersama aturan warna lain.
-  Dari layar: **Format → Conditional formatting**, tab **Data bar**.
-- **Sparkline dari layar:** pilih range datanya (misalnya D2:K8), lalu **Insert → Sparkline**. Sparkline dibuat di kolom tepat di kanan
-  pilihan, satu sel per baris (atau di baris tepat di bawahnya kalau pilihannya satu baris), dan panel **Sparklines** terbuka untuk mengatur
-  jenis, warna, titik, min/max, dan range-nya. Klik sel sparkline kapan saja untuk membuka panel itu lagi.
+### 3.8 Seri Dinamis & Scatter Plot
 
-## 12.11 Seri dari range sendiri, dan scatter
-
-**Tujuan:** chart dari kolom yang tidak bersebelahan, dan scatter dengan X berupa tanggal yang jaraknya tidak rata.
+Konfigurasi seri dengan koordinat independen dan analisis korelasi titik data:
 
 <!-- contoh: 12-11-seri.page.tsx -->
 ```tsx
@@ -499,26 +362,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Bullet dari kolom C dan F, scatter progres terhadap tanggal opname](img/chart-seri.png)
+![Bullet dan scatter plot dengan seri range independen](img/chart-seri.png)
 
-**Penjelasan:**
+---
 
-- Chart bullet tidak punya `data`. **`categories: 'A2:A8'`** memberi label untuk semua seri, dan setiap seri menunjuk range-nya sendiri:
-  Aktual di kolom C, Rencana di kolom F. Kolom Catatan dan PIC di antaranya tidak mengganggu, dan tidak perlu menyembunyikan seri.
-- **`nameFrom: 'C1'`** mengambil nama seri dari sel. Kalau judul kolomnya diubah, nama di chart ikut berubah. `name: 'Aktual'` menulis
-  namanya langsung.
-- Range bisa dari **sheet lain**: `'Opname!A2:A7'`.
-- **Scatter**: setiap seri punya **`x`** dan **`values`** sendiri. Titik diletakkan menurut nilai X yang sebenarnya, jadi opname tanggal
-  1 dan 22 Oktober berjarak tiga minggu, bukan satu langkah. Karena sel X berformat tanggal, sumbunya menulis tanggal.
-- `lines: true` menyambung titik-titiknya dengan garis. Seri dengan `type: 'points'` tetap berupa titik saja.
-- Kedua cara bisa digabung: blok `data` dibaca lebih dulu, lalu seri yang punya `values` sendiri ditambahkan sesudahnya. Di panel: **Data →
-  Add series**.
-- Di file Excel, setiap seri ditulis dengan range-nya sendiri (scatter menjadi scatter Excel), dan chart Excel yang datanya terpisah-pisah
-  sekarang ikut masuk.
+### 3.9 Integrasi Form ke Tabel ke Dashboard Realtime
 
-## 12.12 Form mengisi tabel, dashboard hanya dibaca
-
-**Tujuan:** alur lengkap dari [12.1](#121-form-tabel-dashboard). Pilih proyek, isi progres, simpan, dan chart di dashboard langsung berubah.
+Mengubah input formulir di sel input langsung mengalir ke perhitungan tabel dan grafik ringkasan:
 
 <!-- contoh: 12-12-form.page.tsx -->
 ```tsx
@@ -575,27 +425,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Jababeka diisi 70,5%: bar-nya memanjang dan berubah kuning, deviasi −1,3%](img/chart-form.png)
-
-**Penjelasan:**
-
-- **Form** adalah form biasa milik aplikasi Anda. Tombolnya memanggil `setValues` ke tabel Progres. Validasi isinya bisa dilakukan di form,
-  atau dengan tipe kolom di tabel ([bab 8](08-menjaga-isi.md)).
-- **Dashboard** ditampilkan dengan baris akses `read` saja ([bab 10](10-hak-akses.md)). Sel tidak bisa diedit, dan chart tidak bisa dipilih,
-  digeser, atau diubah. Nilai saat mouse diarahkan tetap muncul. `marks={false}` menyembunyikan gembok di setiap sel, karena semuanya memang
-  terkunci.
-- Kode aplikasi Anda **tidak dibatasi** baris akses. Yang dibatasi adalah orang yang memakai sheet. Karena itu form tetap bisa menulis ke
-  tabel walaupun dashboard dikunci.
-- Rumus "Rata-rata deviasi" di B1 dan chart sama-sama membaca sheet Progres, jadi keduanya berubah bersamaan.
+![Form simulasi memperbarui grafik secara instan](img/chart-form.png)
 
 ---
 
-# Bagian C. Contoh lengkap, yang sering keliru, dan referensi
+### 3.10 Showcase Komprehensif: Dashboard Konstruksi Eksekutif
 
-## 12.13 Contoh lengkap: dashboard proyek
-
-Satu workbook dengan sheet Jadwal (kurva S), tiga sheet tabel (Progres, Termin, PEKTAM), dan sheet Dashboard yang hanya berisi rumus,
-chart, sparkline, dan data bar.
+Implementasi dashboard proyek skala penuh:
 
 <!-- contoh: 12-13-dashboard.page.tsx -->
 ```tsx
@@ -612,11 +448,7 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Bagian atas: angka kunci, bullet progres, termin](img/dashboard.png)
-
-![Bagian bawah: donut PEKTAM, waterfall, tabel dengan data bar, sparkline, dan status berwarna](img/dashboard-bawah.png)
-
-Semua data dan chart-nya dibuat di `data/proyek.js`:
+Helper dataset dashboard proyek:
 
 <!-- contoh: data/proyek.js -->
 ```js
@@ -764,36 +596,14 @@ export function buatDashboard() {
 ```
 <!-- /contoh -->
 
-**Yang perlu diperhatikan:**
+![Bagian atas dashboard eksekutif proyek](img/dashboard.png)
+![Bagian bawah dashboard eksekutif proyek](img/dashboard-bawah.png)
 
-- **Kartu angka** (baris 3–4) adalah sel biasa: rumus seperti `=COUNTIF(Progres!E2:E8,"<-0.05")`, huruf besar, dan format dengan akhiran
-  `' jt'`. Tidak perlu komponen khusus.
-- **Status berwarna** di kolom G adalah rumus `IF` biasa, ditambah tiga aturan conditional formatting `textIs`.
-- **Chart membaca sheet lain** lewat `data: 'Progres!A1:D8'`. Sheet Dashboard sendiri tidak menyimpan angka mentah.
+---
 
-## 12.14 Yang sering keliru
+## 4. Referensi Lengkap Properti Chart & Sparkline
 
-| Gejala | Penyebab | Perbaikan |
-|---|---|---|
-| Chart menampilkan "No data" | range `data` tidak berisi angka, atau barisnya sudah dihapus | periksa `charts()[i].dataText`, lalu `setChart(id, { data: '...' })` |
-| Nama seri tertulis "Series 1" | baris pertama range berisi angka, bukan teks | sertakan baris judul di range, atau beri `series: [{ name: '...' }]` |
-| Kategori terbaca sebagai seri (ada batang "Tahun") | kolom kategori berisi angka (2024, 2025) | `categories: true` memaksa kolom pertama menjadi kategori |
-| Seri dan kategori tertukar | range lebih lebar daripada tingginya, atau sebaliknya | `seriesIn: 'cols'` atau `'rows'` |
-| Bullet semuanya hijau | batas `warn`/`bad` dalam angka biasa, padahal sel berformat persen | pada sumbu persen batasnya poin persen: `bad: 5` berarti 5% |
-| Kurva S tidak lurus dengan kolom minggu | `align` masih `'fit'` | `align: 'cells'`, dan `at` tepat di kolom minggu |
-| Sel di bawah kurva S tidak bisa diklik | chart masih berlatar putih | `background: 'none'` |
-| Orang bisa menggeser chart di dashboard | baris akses memberi `chart` atau `*` | dashboard cukup `read` saja |
-| Ada kolom yang tidak diinginkan ikut jadi seri | blok `data` mencakup kolom di antaranya | pakai range per seri ([12.11](#1211-seri-dari-range-sendiri-dan-scatter)), atau sembunyikan seri itu |
-| Titik scatter berjarak sama padahal tanggalnya tidak | chart masih jenis line (X sebagai kategori) | `type: 'scatter'` dengan `x` per seri |
-| Seri baru dari "Add series" tidak tergambar | belum punya range `values` | isi *Values* dengan ⊞ |
-
-## 12.15 Referensi
-
-### Semua pengaturan
-
-Tabel ini dicetak dari daftar yang juga membentuk panel Chart, jadi selalu lengkap: setiap baris adalah satu isian di panel (node pohon →
-isian) sekaligus satu kunci di kode. Kunci `series.x` berarti kunci `x` di salah satu isi daftar `series`, dan `y.min` berarti `min` di
-dalam `y`.
+Berikut adalah katalog spesifikasi properti chart yang dihasilkan langsung dari metadata sistem:
 
 <!-- hasil: 12-pengaturan.js -->
 ```text
@@ -878,54 +688,6 @@ dalam `y`.
 ```
 <!-- /hasil -->
 
-Bawaannya: `type: 'column'`, `seriesIn: 'auto'`, `legend: 'top'`, `grid: true`, `markers: true`, `background: 'white'`, `align: 'fit'`, sumbu
-menurut format sel datanya, warna dari palet Carbon, bullet `warn: 1` dan `bad: 5`, waterfall `totals: [0]`.
+---
 
-### Fungsi
-
-| Fungsi | Artinya |
-|---|---|
-| `addChart(spec)` | chart baru (`at`, lalu `data` atau seri dengan `values` sendiri). Mengembalikan id |
-| `setChart(id, patch)` | ubah sebagian pengaturan (`at` dan `data` sebagai teks range) |
-| `removeChart(id)` | hapus chart |
-| `charts()` | semua chart sheet: pengaturannya (range sebagai teks), `at` dan `atText`, `dataText`, `dataAt` |
-| `chartData(id)` | yang digambar sekarang: `{ categories, series: [{ name, values, x?, format, ... }], seriesIn, layout, fromBlock }` |
-| `CHART_FIELDS`, `SPARKLINE_FIELDS`, `CHART_NODES` | daftar semua pengaturan seperti yang ditawarkan panel (dari `@kufayeka/sheet/core`) |
-| `addSparkline({ at, data, type, color, negColor, markers, min, max })` | sparkline di sel `at`. Mengembalikan id grup |
-| `setSparkline(id, patch)`, `removeSparkline(id)`, `sparklines()` | ubah, hapus, dan daftar grup sparkline (dengan angka setiap selnya) |
-| `addConditional(range, { kind: 'bar', color })` | data bar ([bab 6](06-format.md)) |
-| `chartSeries(block, spec)` | dari `@kufayeka/sheet/core`: cara range dibaca, tanpa workbook |
-| `CHART_TYPES`, `CHART_DEFAULTS` | daftar jenis chart, dan pengaturan awal chart baru |
-
-Semua fungsi dipanggil dari handle sheet (`wb.sheet('Dashboard').addChart(...)`), atau dari `wb` dengan nama sheet di depan. Setiap
-perubahan bisa di-undo.
-
-### Layar
-
-| Aksi | Hasil |
-|---|---|
-| Insert → Chart | chart kolom dari pilihan (atau blok terisi di sekitar sel aktif), di sebelah kanannya |
-| Insert → Sparkline | sparkline per baris pilihan, di kolom tepat di kanannya. Panelnya terbuka |
-| klik chart (chart transparan: klik tepinya) | pilih. Panel Chart terbuka |
-| tarik chart, tarik titik pegangan | pindah, ubah ukuran, per sel |
-| Delete, Escape | hapus chart yang dipilih, lepas pilihan |
-| mouse di atas batang, titik, atau potongan | nilainya muncul |
-| Format → Conditional formatting → Data bar | data bar dari layar |
-
-### Hak akses
-
-| Hak | Yang diizinkan |
-|---|---|
-| `chart` | membuat, memindah, mengubah, dan menghapus chart dan sparkline. Melihatnya cukup `read` |
-| `ui.menu.insert:chart`, `ui.panel.chart` (bagian layar) | menyembunyikan menu Insert → Chart dan panel Chart |
-
-### Di file Excel
-
-| | Ke .xlsx | Dari .xlsx |
-|---|---|---|
-| column, bar, line, area, pie, donut, combo dua sumbu, scatter | chart Excel asli di sel yang sama. Setiap seri menunjuk selnya sendiri | ya: sebagai blok kalau bagian-bagiannya membentuk satu blok, kalau tidak sebagai range per seri |
-| chart transparan | chart tanpa isi latar | ya (`background: 'none'`) |
-| `align: 'cells'` | posisinya tetap, tetapi Excel tidak menempelkan titik ke tengah kolom | tidak |
-| bullet, waterfall | sebagai batang dan kolom biasa (Excel tidak punya jenis ini di format chart klasik) | sebagai bar dan column |
-| sparkline | sparkline Excel | ya |
-| data bar | data bar Excel | ya |
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [11. Komentar Sel & Interoperabilitas Excel/CSV](11-komentar-excel.md) · Berikutnya: [13. Optimasi Performa & Referensi API](13-referensi.md)

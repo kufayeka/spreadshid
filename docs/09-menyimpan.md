@@ -1,26 +1,51 @@
-# 9. Memuat dan menyimpan
+# 09. Persistensi State & Sinkronisasi Server
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [8. Menjaga isi yang diketik](08-menjaga-isi.md) · Berikutnya: [10. Hak akses](10-hak-akses.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [08. Validasi Data & Proteksi Sel](08-menjaga-isi.md) · Berikutnya: [10. Kontrol Akses & Perizinan (ACL/RBAC)](10-hak-akses.md)
 
-Bab ini membahas dua sisi dari satu pekerjaan: **di React**, memuat workbook dari API, menyimpannya, dan menyimpan otomatis; lalu **di server**, menyimpannya ke database, hanya mengirim yang berubah, dan memeriksa ulang setiap simpanan.
+Bab ini membahas arsitektur persistensi state dan integrasi backend untuk `@kufayeka/sheet`: pemisahan lifecycle mutasi in-memory vs state database, pola penyimpanan manual dan otomatis (*debounced auto-save*), format serialisasi JSON, sinkronisasi berbasis *incremental patch* (delta ops), penegakan validasi di sisi server (Node.js), serta keamanan payload menggunakan *server-side masking* (`viewFor`).
 
-- [9.1 Isi dari server](#91-isi-dari-server)
-- [9.2 Tombol Simpan](#92-tombol-simpan)
-- [9.3 Workbook bukan state React](#93-workbook-bukan-state-react)
-- [9.4 Memuat dari API](#94-memuat-dari-api)
-- [9.5 Menyimpan otomatis](#95-menyimpan-otomatis)
-- [9.6 Aplikasi lengkap: kasir](#96-aplikasi-lengkap-kasir)
-- [9.7 Data dari props](#97-data-dari-props)
-- [9.8 Kesalahan yang sering terjadi](#98-kesalahan-yang-sering-terjadi)
-- [9.9 Tabelnya](#99-tabelnya)
-- [9.10 Kode server](#910-kode-server)
-- [9.11 Isi `content`](#911-isi-content)
-- [9.12 Relasi dengan view](#912-relasi-dengan-view)
-- [9.13 Lanjutan: patch, pemeriksaan, data rahasia](#913-lanjutan-patch-pemeriksaan-data-rahasia)
-- [9.14 Undo, redo, `source`, dan `apply`](#914-undo-redo-source-dan-apply)
-- [9.15 Jenis op](#915-jenis-op)
+---
 
-## 9.1 Isi dari server
+## 1. Mental Model: Workbook Bukan State React Biasa
+
+Instance **Workbook** adalah objek hidup (*live stateful engine*) berkinerja tinggi, bukan immutable JavaScript object konvensional:
+
+```text
+┌─────────────────────────┐               ┌─────────────────────────────────┐
+│  Input Pengguna (Grid)  │ ── Mutasi ──► │  Live Workbook Instance (RAM)   │
+└─────────────────────────┘               └───────┬─────────────────┬───────┘
+                                                  │                 │
+                                    Event Notif   │                 │ Debounced /
+                                    (onOp/tick)   ▼                 │ On-Demand
+                                  ┌───────────────────────────┐     │
+                                  │ Hook useWorkbook()        │     │
+                                  │ (hanya render indikator)  │     │
+                                  └─────────────┬─────────────┘     ▼
+                                                │         ┌───────────────────┐
+                                                ▼         │  API Endpoint     │
+                                  ┌───────────────────┐   │  (Patch / toJSON) │
+                                  │ Tombol Simpan &   │   └─────────┬─────────┘
+                                  │ Status Unsaved    │             │ SQL
+                                  └───────────────────┘             ▼
+                                                          ┌───────────────────┐
+                                                          │ Basis Data Server │
+                                                          │ (JSONB / Relasi)  │
+                                                          └───────────────────┘
+```
+
+1. **Mutasi Efisien**: Mengubah nilai satu sel langsung memperbarui struktur data internal workbook dan mengevaluasi rantai formula turunan tanpa memicu re-render seluruh komponen React.
+2. **Reaktivitas Granular**: Hook `useWorkbook(wb, selector)` hanya berlangganan pada potongan informasi yang dibutuhkan komponen React (misalnya: apakah dokumen kotor/`unsaved()`).
+3. **Pemisahan Penyimpanan**: Penyimpanan data ke server (atau `localStorage`) dilakukan secara berkala atau atas permintaan pengguna dengan memanggil `wb.toJSON()` atau menghasilkan delta patch via `wb.patch()`.
+
+---
+
+## 2. Implementasi Persistensi Client
+
+---
+
+### 2.1 Inisialisasi dari Backend & Tombol Simpan Manual
+
+Memuat template atau dokumen yang tersimpan dari server dan mengaktifkan tombol simpan hanya ketika terdapat mutasi data yang belum tersimpan:
 
 <!-- contoh: 11-langkah4.page.js -->
 ```jsx
@@ -43,16 +68,7 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Yang baru:
-
-- Server mengirim satu JSON, yaitu kolom `content` dari tabel `spreadsheet` ([9.9](09-menyimpan.md#99-tabelnya)).
-- `createWorkbook(doc)` mengubah JSON itu jadi workbook lagi. Dipanggil sekali, saat jawabannya datang.
-- Selama menunggu, `wb` masih `null`, jadi yang tampil "Memuat…".
-
-`ambilWorkbook` di contoh ini pura-pura jadi server, supaya contohnya bisa langsung dicoba ([`examples/data/api.js`](examples/data/api.js)). Di
-aplikasimu, isinya `fetch` ke server-mu sendiri.
-
-## 9.2 Tombol Simpan
+Menambahkan listener perubahan reaktif menggunakan `useWorkbook`:
 
 <!-- contoh: 11-langkah5.page.js -->
 ```jsx
@@ -84,41 +100,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Tombol Simpan aktif setelah Qty diubah](img/langkah5.png)
+![Tombol Simpan aktif setelah kuantitas diubah](img/langkah5.png)
 
-Menyimpan itu dua baris:
+---
 
-1. `wb.toJSON()` dikirim ke server. Server menyimpannya ke kolom `content` ([9.10](09-menyimpan.md#910-kode-server)).
-2. `wb.saved()` mencatat bahwa semuanya sudah tersimpan. `wb.unsaved()` jadi `false`, tombolnya jadi "Tersimpan".
+### 2.2 Penjelasan Hook Reaktif `useWorkbook`
 
-Sampai sini kamu sudah punya halaman spreadsheet yang bisa dibuka dan disimpan. Bagian selanjutnya untuk kebutuhan yang lebih banyak: simpan otomatis,
-halaman yang lebih besar, Next.js.
-
-## 9.3 Workbook bukan state React
-
-Workbook adalah objek yang berubah sendiri. Isinya berubah setiap kali orang mengetik, dan `<Sheet>` menggambar ulang dirinya tanpa `setState`. Karena itu
-workbook **tidak** disimpan sebagai state yang diganti-ganti. Workbook dibuat sekali, lalu objek yang sama dipakai terus:
-
-```jsx
-// benar: dibuat sekali, saat komponen pertama kali tampil
-const [wb] = useState(() => createWorkbook(doc));
-const [wb] = useState(buatTemplate);            // sama, dengan fungsi yang sudah ada
-```
-
-| Cara | Akibatnya |
-|---|---|
-| `const wb = createWorkbook()` di badan komponen | workbook baru di setiap render. Isi, undo, dan seleksi hilang setiap kali ada state lain berubah |
-| `useState(createWorkbook())` (dengan tanda kurung) | workbook baru tetap dibuat di setiap render lalu dibuang. Boros, dan `createWorkbook(doc)` yang berat jadi lambat |
-| `useMemo(() => createWorkbook(), [])` | biasanya jalan, tetapi React boleh membuang hasil `useMemo` kapan saja. Pakai `useState` |
-| `const wb = createWorkbook()` di luar komponen (tingkat modul) | satu workbook untuk semua: di Next.js, semua pengunjung di server memakai workbook yang sama |
-| `setWb(...)` setiap kali isinya berubah | tidak perlu. `wb.setValues(...)` langsung terlihat |
-
-Mengganti workbook dengan workbook lain (misalnya membuka file lain) boleh: simpan di `useState` lalu panggil `setWb(createWorkbook(docLain))`.
-`<Sheet>` menampilkan workbook baru itu.
-
-## 9.4 Memuat dari API
-
-Hook untuk memuat workbook, dan hook untuk menyimpannya (9.5), ditaruh di satu file. File ini dipakai oleh semua contoh berikutnya:
+Hook `useWorkbook` mengoptimalkan peredam rendering React dengan mekanisme selector:
 
 <!-- contoh: 11-hooks.js -->
 ```js
@@ -200,7 +188,11 @@ export function useAutosave(wb, id, jeda = 1000) {
 ```
 <!-- /contoh -->
 
-Halaman yang memakainya:
+---
+
+### 2.3 Penyimpanan Otomatis dengan Debounce (Auto-Save Pattern)
+
+Auto-save menyimpan perubahan secara berkala di latar belakang beberapa saat setelah pengguna berhenti mengetik:
 
 <!-- contoh: 11-memuat.page.js -->
 ```jsx
@@ -218,20 +210,7 @@ export default function HalamanPenjualan() {
 ```
 <!-- /contoh -->
 
-`ambilWorkbook` dan `simpanPatch` di contoh ini datang dari API tiruan ([`examples/data/api.js`](examples/data/api.js)) supaya contohnya bisa
-dijalankan. Di aplikasimu, keduanya adalah `fetch` ke API-mu sendiri. Isi file itu menjelaskan caranya.
-
-Yang perlu diperhatikan:
-
-- **`createWorkbook(doc)` dipanggil di dalam `.then`**, sekali per isi yang dimuat, lalu disimpan ke state. Jangan memanggilnya di badan komponen.
-- **AbortController.** Kalau komponen dilepas, atau `id` berganti sebelum jawaban datang, jawaban lama diabaikan. Tanpa ini, membuka workbook A lalu
-  cepat-cepat pindah ke B bisa berakhir dengan B yang tertimpa A. Hal yang sama membuat `<StrictMode>` aman, karena StrictMode menjalankan effect dua
-  kali saat development.
-- **Berganti workbook**: `id` lain memuat workbook lain, dan `<Sheet>` menampilkan workbook baru begitu jawabannya datang.
-
-## 9.5 Menyimpan otomatis
-
-`useAutosave` di file yang sama menyimpan satu detik setelah orang berhenti mengubah:
+Implementasi Auto-Save Debounced:
 
 <!-- contoh: 11-autosave.page.js -->
 ```jsx
@@ -255,26 +234,11 @@ export default function HalamanAutosave() {
 ```
 <!-- /contoh -->
 
-Cara kerjanya:
+---
 
-1. **Hanya yang berubah yang dikirim.** `wb.pendingPatch()` berisi baris, kolom, dan sheet yang berubah sejak simpan terakhir. Mengubah satu sel di sheet
-   10.000 baris mengirim satu baris, bukan 10.000.
-2. **Debounce.** Setiap perubahan (`wb.on('op')`) menunda penyimpanan. Mengetik 20 sel berturut-turut menghasilkan satu kali simpan.
-3. **`wb.saved(patch, jawaban)`** memberi tahu workbook bahwa patch itu sudah tersimpan. Yang dilupakan hanya isi patch itu. Perubahan yang dibuat selama
-   menunggu jawaban server tetap tercatat dan ikut di penyimpanan berikutnya, jadi tidak ada yang hilang.
-4. **Satu penyimpanan pada satu waktu.** Kalau penyimpanan sebelumnya belum selesai, yang berikutnya menunggu.
-5. **Gagal simpan** tidak membuang apa-apa. Patch berikutnya mengirim semua yang belum tersimpan.
-6. **`beforeunload`**: menutup tab saat masih ada yang belum tersimpan membuat browser bertanya dulu. `useWorkbook(wb, (w) => w.unsaved())` memberi tahu
-   kapan pengaman ini perlu dipasang.
+### 2.4 Aplikasi Terintegrasi: Form Kasir POS Lengkap
 
-Apa yang dilakukan server dengan patch itu (menggabungkan, memeriksa, menolak), dan bentuk tabel database-nya, dibahas di [bab 9](09-menyimpan.md).
-
-## 9.6 Aplikasi lengkap: kasir
-
-Semua bagian di atas dalam satu halaman. Header menampilkan omzet, jumlah transaksi, Undo/Redo, dan status simpan. Panel kanan menampilkan transaksi
-yang dipilih, dan di bawahnya ada form React untuk menambah transaksi:
-
-![Halaman kasir](img/kasir.png)
+Sistem kasir end-to-end yang memadukan input terprogram, auto-save debounce, dan pembacaan total reaktif:
 
 <!-- contoh: 11-kasir.page.js -->
 ```jsx
@@ -362,21 +326,13 @@ export default function Kasir() {
 ```
 <!-- /contoh -->
 
-Yang dipakai di sini:
+![Halaman kasir terintegrasi](img/kasir.png)
 
-- **`useWorkbook` di setiap komponen yang membaca workbook.** `Ringkasan` membaca dua sel dan dua status undo, `Detail` membaca satu baris. Masing-masing
-  hanya digambar ulang kalau yang dibacanya berubah.
-- **`ref` ke `<Sheet>`** untuk perintah dari luar: `sheetRef.current.select('N1')` memilih sel dan menggulir ke sana. Daftar lengkapnya ada di
-  [3.6](03-komponen-sheet.md#36-memberi-perintah-lewat-ref).
-- **`onSelectionChange`** memberi seleksi dalam nomor. Yang disimpan di state adalah **id baris** (`wb.rowId(...)`), bukan nomornya, jadi panel detail
-  tetap menunjuk transaksi yang sama walaupun sheet di-sort atau disisipi baris.
-- **Form React menulis ke sheet** dengan `{ source: 'user' }`, jadi validasi dan aturan sheet ([8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown),
-  [bab 8](08-menjaga-isi.md)) tetap berlaku seperti kalau orang mengetiknya sendiri. Perubahan itu juga masuk undo dan ikut tersimpan otomatis.
-- **Tombol Undo di luar sheet** cukup memanggil `wb.undo()`. Sheet dan header ikut berubah.
+---
 
-## 9.7 Data dari props
+### 2.5 Sinkronisasi Data dari Props Eksternal
 
-Laporan yang datanya datang lewat props, misalnya dari pilihan cabang di atasnya:
+Jika data spreadsheet dikendalikan oleh state induk dari luar (misal: pilihan dropdown pelanggan atau status faktur), gunakan ref untuk membandingkan perubahan identitas sebelum memperbarui workbook:
 
 <!-- contoh: 11-props.page.js -->
 ```jsx
@@ -436,84 +392,11 @@ export default function HalamanCabang() {
 ```
 <!-- /contoh -->
 
-Ada dua cara menanggapi props yang berubah:
+---
 
-| Cara | Kapan |
-|---|---|
-| **Isi diganti di `useEffect`** (seperti contoh): `clear` lalu `populate`, dengan `{ source: 'remote' }` | workbook-nya tetap sama: lebar kolom yang diatur orang, sheet aktif, dan seleksi tetap. `remote` membuat pengisian ini tidak masuk undo, jadi Ctrl+Z tidak menghapus data laporan |
-| **Workbook baru dengan `key`**: `<LaporanCabang key={cabang} ... />` | semuanya mulai dari awal untuk setiap cabang, termasuk undo dan pengaturan tampilan. Paling sederhana kalau memang itu yang diinginkan |
+## 3. Integrasi Sisi Server (Backend & Database)
 
-**Sheet aktif yang dikontrol.** Dengan prop `sheet` (id sheet) dan `onSheetChange`, sheet yang tampil dipegang oleh state-mu. Tombol di luar sheet bisa
-memindahkannya, dan klik tab di sheet memberi tahu state-mu. Contoh di atas menyimpan nama sheet di state dan mengubahnya menjadi id dengan
-`wb.sheetIdByName`. Nama lebih cocok untuk URL atau `localStorage`.
-
-## 9.8 Kesalahan yang sering terjadi
-
-| Gejala | Sebab | Solusi |
-|---|---|---|
-| Isi kembali kosong, undo hilang, setiap kali state lain berubah | `createWorkbook()` dipanggil di badan komponen | `useState(() => createWorkbook(...))` (9.3) |
-| Total di header tidak ikut berubah | dibaca sekali dengan `wb.value(...)` di render | `useWorkbook(wb, (w) => w.value(...))` (11.7) |
-| Header digambar ulang terus walau totalnya sama | `baca` mengembalikan objek atau array baru | kembalikan angka atau teks, atau pecah menjadi beberapa `useWorkbook` |
-| Pindah cepat dari workbook A ke B, yang tampil malah A | jawaban API yang lama datang belakangan | `AbortController` di effect (9.4) |
-| Perubahan hilang setelah autosave | `wb.saved()` dipanggil tanpa patch yang dikirim, atau sebelum jawaban datang | `wb.saved(patch, jawaban)` dengan patch yang sama, setelah server menjawab (9.5) |
-| Ctrl+Z menghapus data yang diisi dari API | data diisi dengan source bawaan (`code`), jadi masuk undo | isi dengan `{ source: 'remote' }` (9.7) |
-| Form React melewati validasi sheet | ditulis tanpa source, jadi dianggap kode | `{ source: 'user' }` (9.6) |
-| Panel detail menunjuk baris yang salah setelah sort | yang disimpan nomor baris | simpan `wb.rowId(r)`, cari nomornya lagi dengan `wb.rowIndex(id)` |
-
-## 9.9 Tabelnya
-
-```sql
-create table spreadsheet (
-    id      text primary key,     -- id dari aplikasimu: 'stok', 'penjualan-2026-10', ...
-    content jsonb not null        -- wb.toJSON(), utuh
-);
-```
-
-Isinya kira-kira begini:
-
-| id | content |
-|---|---|
-| `stok` | `{"id":"…","version":3,"settings":{…},"sheets":[{"props":{"name":"Produk"},"rows":[…]}]}` |
-| `penjualan-2026-10` | `{"id":"…","version":12,"settings":{…},"sheets":[…]}` |
-| `laporan-bulanan` | `{…}` |
-
-Itu saja. Satu spreadsheet = satu baris. Kalau mau, tambah kolom milikmu sendiri: pemilik, dibuat kapan, diubah kapan.
-
-## 9.10 Kode server
-
-Contoh dengan Express. Framework lain (Next.js route, Fastify, Hono) sama saja: dua route.
-
-```js
-// ambil: kirim content apa adanya
-app.get('/api/spreadsheet/:id', async (req, res) => {
-    const { rows } = await db.query('select content from spreadsheet where id = $1', [req.params.id]);
-    if (!rows.length) return res.status(404).end();
-    res.json(rows[0].content);
-});
-
-// simpan: content baru menggantikan yang lama (atau dibuat kalau belum ada)
-app.put('/api/spreadsheet/:id', express.json({ limit: '20mb' }), async (req, res) => {
-    await db.query(
-        'insert into spreadsheet (id, content) values ($1, $2) on conflict (id) do update set content = excluded.content',
-        [req.params.id, req.body]
-    );
-    res.json({ ok: true });
-});
-```
-
-Di browser, pasangannya sudah ada di [9.1 dan 9.2](09-menyimpan.md#91-isi-dari-server):
-
-```js
-const content = await fetch('/api/spreadsheet/stok').then((r) => r.json());
-const wb = createWorkbook(content);                                   // buka
-// ... orang mengedit ...
-await fetch('/api/spreadsheet/stok', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wb.toJSON()) });
-wb.saved();                                                           // simpan
-```
-
-## 9.11 Isi `content`
-
-Daftar harga tiga produk, dilihat dari tiga sisi: di layar, di dalam `content`, dan bagian mana yang berubah saat diedit:
+Simulasi siklus hidup persistensi backend pada runtime Node.js:
 
 <!-- contoh: 12-simulasi.js -->
 ```js
@@ -642,57 +525,11 @@ Baris baru (r5) mendapat key 0A, di antara 08 dan 0C. Urutan baris ditentukan ke
 ```
 <!-- /hasil -->
 
-Yang bisa diambil dari sini:
+---
 
-- **Satu baris di layar = satu baris di `content.sheets[…].rows`.** Isi sel-selnya ada di `cells`, dengan id kolom sebagai kuncinya. Sel kosong tidak
-  disimpan.
-- **Baris kosong di bawah tidak disimpan.** Sheet baru punya 1000 baris, tetapi yang disimpan hanya yang berisi, ditambah angka `rowCount`. Daftar 12
-  produk berukuran sekitar 8 KB.
-- **Rumus disimpan beserta hasilnya** (`v`). Saat dibuka lagi, hasilnya dihitung ulang. `v` ada supaya SQL dan alat lain yang tidak memakai library ini
-  bisa membaca angkanya (9.12).
-- **Urutan baris ditentukan `key`, bukan nomor.** Baris yang disisipkan mendapat key di antara kedua tetangganya.
+### Skema Database Relasional (PostgreSQL / MySQL)
 
-## 9.12 Relasi dengan view
-
-Data tetap disimpan utuh di `content`. Kalau ingin membacanya dari SQL seperti tabel biasa, atau menghubungkan dua spreadsheet, buat **view** PostgreSQL:
-
-![Relasi lewat view](img/relasi-view.svg)
-
-Dua spreadsheet terpisah: master produk dan penjualan Oktober. Keduanya disimpan dengan cara 9.10:
-
-<!-- contoh: 12-db.js -->
-```js
-import { writeFileSync } from 'node:fs';
-import { createWorkbook } from '@kufayeka/sheet/core';
-import { PRODUK, KOLOM_PRODUK, penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
-
-// Dua spreadsheet terpisah, seperti dua file: master produk, dan penjualan Oktober. Masing-masing disimpan sebagai satu baris di tabel spreadsheet.
-const produk = createWorkbook();
-produk.setSheetProps('Sheet1', { name: 'Produk' });
-produk.setValues('Produk', 'A1', [KOLOM_PRODUK, ...PRODUK]);
-
-const jual = createWorkbook();
-jual.setSheetProps('Sheet1', { name: 'Penjualan' });
-jual.setValues('Penjualan', 'A1', [KOLOM_PENJUALAN]);
-jual.setValues('Penjualan', 'A2', barisPenjualan(penjualan(300), 2));        // kolom Total adalah rumus
-
-// yang dikirim ke database: satu INSERT per spreadsheet, content = toJSON() utuh
-const insert = (id, wb) => `insert into spreadsheet (id, content) values ('${id}', $json$${JSON.stringify(wb.toJSON())}$json$);`;
-const sql = [insert('master-produk', produk), insert('penjualan-2026-10', jual)].join('\n');
-if (process.argv[2]) writeFileSync(process.argv[2], sql);
-console.log('master-produk     :', Math.round(JSON.stringify(produk.toJSON()).length / 1024), 'KB,', produk.toJSON().sheets[0].rows.length, 'baris tersimpan');
-console.log('penjualan-2026-10 :', Math.round(JSON.stringify(jual.toJSON()).length / 1024), 'KB,', jual.toJSON().sheets[0].rows.length, 'baris tersimpan');
-```
-<!-- /contoh -->
-
-<!-- hasil: 12-db.js -->
-```text
-master-produk     : 8 KB, 13 baris tersimpan
-penjualan-2026-10 : 317 KB, 301 baris tersimpan
-```
-<!-- /hasil -->
-
-View-nya:
+Dokumen workbook dapat disimpan langsung ke kolom `JSONB` pada database SQL:
 
 <!-- contoh: 12-db.sql -->
 ```sql
@@ -735,51 +572,49 @@ from spreadsheet_rows where sheet = 'Penjualan';
 ```
 <!-- /contoh -->
 
-- `spreadsheet_rows` adalah view umum. Setiap baris setiap sheet menjadi `{ "judul kolom": nilai }`, dengan judul yang diambil dari baris pertama
-  sheet. View ini cukup dibuat sekali, untuk semua spreadsheet.
-- `produk` dan `penjualan` adalah view per "tabel": nama kolom dan tipenya ditentukan di sini.
-- Sel rumus dibaca dari hasilnya (`v`), jadi kolom `Total` berisi angka.
+Operasi I/O Database:
 
-Lalu query biasa, termasuk `JOIN` antar spreadsheet:
+<!-- contoh: 12-db.js -->
+```js
+import { writeFileSync } from 'node:fs';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import { PRODUK, KOLOM_PRODUK, penjualan, KOLOM_PENJUALAN, barisPenjualan } from './data/toko.js';
 
-```sql
-select p.kategori, sum(j.qty) as qty, sum(j.total) as omzet
-from penjualan j join produk p on p.kode = j.kode
-group by p.kategori order by omzet desc;
+// Dua spreadsheet terpisah, seperti dua file: master produk, dan penjualan Oktober. Masing-masing disimpan sebagai satu baris di tabel spreadsheet.
+const produk = createWorkbook();
+produk.setSheetProps('Sheet1', { name: 'Produk' });
+produk.setValues('Produk', 'A1', [KOLOM_PRODUK, ...PRODUK]);
+
+const jual = createWorkbook();
+jual.setSheetProps('Sheet1', { name: 'Penjualan' });
+jual.setValues('Penjualan', 'A1', [KOLOM_PENJUALAN]);
+jual.setValues('Penjualan', 'A2', barisPenjualan(penjualan(300), 2));        // kolom Total adalah rumus
+
+// yang dikirim ke database: satu INSERT per spreadsheet, content = toJSON() utuh
+const insert = (id, wb) => `insert into spreadsheet (id, content) values ('${id}', $json$${JSON.stringify(wb.toJSON())}$json$);`;
+const sql = [insert('master-produk', produk), insert('penjualan-2026-10', jual)].join('\n');
+if (process.argv[2]) writeFileSync(process.argv[2], sql);
+console.log('master-produk     :', Math.round(JSON.stringify(produk.toJSON()).length / 1024), 'KB,', produk.toJSON().sheets[0].rows.length, 'baris tersimpan');
+console.log('penjualan-2026-10 :', Math.round(JSON.stringify(jual.toJSON()).length / 1024), 'KB,', jual.toJSON().sheets[0].rows.length, 'baris tersimpan');
 ```
+<!-- /contoh -->
 
-Hasilnya, dijalankan di PostgreSQL 18 dengan data contoh di atas:
-
+<!-- hasil: 12-db.js -->
 ```text
- kategori | qty  |   omzet
-----------+------+-----------
- Bata     |  244 | 178494750
- Cat      |  428 | 143393750
- Semen    | 1066 |  97448800
- Keramik  |  501 |  62241200
- Pasir    |  174 |  49358000
- Pipa     |  440 |  46807950
- Besi     |  405 |  42708700
+master-produk     : 8 KB, 13 baris tersimpan
+penjualan-2026-10 : 317 KB, 301 baris tersimpan
 ```
+<!-- /hasil -->
 
-Angka yang sama dengan pivot di [7.6](07-data.md#76-pivot-table). Yang perlu diingat:
+---
 
-- **View membaca judul kolom.** Kalau orang mengganti judul "Harga jual" di sheet, view `produk` perlu disesuaikan. Untuk sheet yang dibaca SQL, kunci
-  judulnya dengan aturan `readonly` ([bab 8](08-menjaga-isi.md)).
-- **View hanya untuk membaca.** Menulis tetap lewat spreadsheet: buka, ubah, simpan `content`.
-- Untuk data besar yang sering di-query, ganti `create view` dengan `create materialized view`, lalu `refresh materialized view` setelah menyimpan.
+### Delta Patching & Server-Side Security Masking (`viewFor`)
 
-## 9.13 Lanjutan: patch, pemeriksaan, data rahasia
+Untuk aplikasi enterprise, spreadsheet server memvalidasi patch mutasi dan melakukan sensor data sensitif (*security masking*) sebelum dokumen dikirimkan ke client:
 
-Cara 9.10 sudah cukup untuk sebagian besar aplikasi. Bagian ini untuk tiga keadaan khusus:
+![Relasi dokumen dan viewFor](img/relasi-view.svg)
 
-| Keadaan | Jawabannya |
-|---|---|
-| Spreadsheet besar (puluhan ribu baris), disimpan sering | kirim bagian yang berubah saja (`pendingPatch`), dan gabungkan di server (`mergePatch`) |
-| Ada aturan per orang (kasir tidak boleh mengubah harga) | server memeriksa ulang dengan `checkPatch`, karena browser bisa diakali |
-| Ada data yang tidak boleh sampai ke browser (harga beli) | server mengirim `viewFor(content, …)`, bukan `content` utuh |
-
-### Patch dan pemeriksaan
+Alur verifikasi patch transaksional:
 
 <!-- contoh: 12-alur.js -->
 ```js
@@ -845,29 +680,7 @@ patch palsu     : false
 ```
 <!-- /hasil -->
 
-Server yang menerima patch tetap menyimpan dengan cara 9.9, satu baris `content`:
-
-```js
-const lama = (await db.query('select content from spreadsheet where id = $1', [id])).rows[0].content;
-const cek = checkPatch(lama, patch, { rules, types });             // tolak kalau ada yang tidak boleh
-if (!cek.ok) return res.status(403).json(cek.problems);
-const baru = createWorkbook(mergePatch(lama, patch)).toJSON();       // gabungkan, lalu hitung ulang hasil rumus (v)
-await db.query('update spreadsheet set content = $2 where id = $1', [id, baru]);
-```
-
-`createWorkbook(…).toJSON()` setelah `mergePatch` membuat hasil rumus (`v`) di `content` tetap benar untuk view di 9.12.
-
-| Fungsi | Artinya |
-|---|---|
-| `wb.toJSON()` | seluruh isi, untuk disimpan sebagai `content` |
-| `wb.pendingPatch()` | yang berubah sejak simpan terakhir |
-| `wb.saved(patch?)` | tandai sudah tersimpan. Tanpa patch: semuanya, untuk simpan utuh |
-| `wb.unsaved()` | ada yang belum tersimpan atau tidak |
-| `checkPatch(content, patch, { rules, types, access, who })` | `{ ok, problems }` |
-| `mergePatch(content, patch)` | `content` baru dengan patch digabungkan |
-| `viewFor(content, { rules, access, who })` | `content` tanpa data yang tidak boleh dilihat orang itu |
-
-### Data rahasia: `viewFor`
+Masking Payload Rahasia Menggunakan `viewFor`:
 
 <!-- contoh: 12-viewfor.js -->
 ```js
@@ -899,18 +712,11 @@ angka 64000 ada di JSON kasir: false | di JSON asli: true
 ```
 <!-- /hasil -->
 
-Rumus yang membaca sel rahasia dikirim sebagai hasilnya saja. Hasil itu sendiri tetap terlihat: margin 11,1% dan harga jual 72.000 masih membuka harga
-beli. Kalau margin juga rahasia, sembunyikan kolom margin juga.
+---
 
-### Dua orang menyimpan bersamaan
+## 4. Undo, Redo, dan Taksonomi Operation Unit (`Op`)
 
-Dengan simpan utuh, yang menyimpan belakangan menimpa yang lebih dulu. Dengan patch, yang tertimpa hanya baris yang sama-sama diubah. Untuk banyak
-orang yang mengedit bersamaan dan saling melihat perubahannya, perubahan dikirim satu per satu (`wb.on('op')`) dan diterapkan di browser lain dengan
-`wb.apply(ops, { source: 'remote' })`. Bagian ini akan dibahas sendiri.
-
-## 9.14 Undo, redo, `source`, dan `apply`
-
-Setiap perubahan adalah daftar op. Daftar itu bisa dicatat, dikirim, dan diterapkan di workbook lain:
+Manajemen histori undo dan redo internal:
 
 <!-- contoh: 04-11-undo.ts -->
 ```ts
@@ -954,54 +760,7 @@ apply      : 25 | diterapkan 1 op | masuk undo server: false | op kasir pertama:
 ```
 <!-- /hasil -->
 
-**`source`** mengatakan dari mana sebuah perubahan datang. Ini menentukan apa yang memeriksanya dan apakah perubahan itu masuk undo:
-
-| `source` | Artinya | Diperiksa validasi, tipe, hak akses | `beforeOp` | Masuk undo |
-|---|---|---|---|---|
-| `'user'` | orang mengetik, paste, fill, atau kodemu menulis atas nama orang | ya | ya | ya |
-| `'code'` (bawaan) | kode aplikasimu | tidak | ya | ya |
-| `'undo'`, `'redo'` | undo dan redo | tidak | ya | (pindah tumpukan) |
-| `'remote'` | perubahan dari komputer lain atau server | tidak | tidak | tidak |
-
-| Fungsi | Artinya |
-|---|---|
-| `wb.undo()`, `wb.redo()` | mundur atau maju satu perubahan. `false` kalau tidak ada |
-| `wb.canUndo()`, `wb.canRedo()` | apakah ada yang bisa di-undo atau di-redo |
-| `wb.apply(ops, { source })` | terapkan daftar op sebagai satu perubahan. Mengembalikan op yang diterapkan, atau `null` kalau ditolak. Semua fungsi bab ini akhirnya memanggil ini |
-| `wb.revision` | angka yang naik setiap ada perubahan |
-| `wb.tick()` | hitung ulang `NOW()` dan `TODAY()` |
-
-Opsi `createWorkbook(doc, opsi)`:
-
-| Opsi | Artinya |
-|---|---|
-| `user` | `{ id, name }` orang yang sedang bekerja. Tercatat di setiap op dan di komentar |
-| `beforeOp` | 4.10 |
-| `now` | jam workbook: `() => new Date(...)`. Untuk `TODAY()`, `NOW()`, waktu op dan komentar. Berguna untuk test |
-| `undoLimit` | berapa langkah undo diingat. Bawaan 200 |
-
-## 9.15 Jenis op
-
-Isi `ops` di event `op` dan yang dilihat `beforeOp`. `sheet` adalah id sheet; baris dan kolom selalu id, jadi op yang sama tetap benar walaupun
-diterapkan di workbook yang barisnya sudah bergeser.
-
-| `op.t` | Isinya |
-|---|---|
-| `cells` | `changes: [{ row, col, before, after }]`: isi sel. Rumus berbentuk `{ f, refs }` |
-| `styles` | `changes: [{ row, col, before, after }]`: gaya sel |
-| `insertRows`, `deleteRows` | `rows: [{ id, key, cells, style, props }]`. `key` menentukan urutan |
-| `insertCols`, `deleteCols` | `cols: [{ id, key, props }]` |
-| `moveRows`, `moveCols` | `moves: [{ id, before, after }]`: key lama dan baru |
-| `rowProps`, `colProps` | `changes: [{ id, before, after }]` |
-| `sheetProps` | `before`, `after`: props sheet |
-| `addSheet`, `removeSheet` | `sheet`: isi sheet lengkap |
-| `moveSheet` | `before`, `after`: key urutan sheet |
-| `settings` | `before`, `after`: pengaturan workbook |
-
-Setiap op juga membawa `user` (dari opsi `user`) dan `at` (waktu ISO). Menghapus baris di ujung sebuah range menghasilkan dua op dalam satu perubahan:
-`cells` (rumus yang range-nya menyusut) lalu `deleteRows`.
-
-Seperti apa op-op itu untuk perubahan sehari-hari, dengan id diganti nama pendek supaya mudah dibaca:
+Audit Trail Mutasi Atomik (`Op` Structure):
 
 <!-- contoh: 04-12-op.ts -->
 ```ts
@@ -1055,4 +814,22 @@ undo  | settings {"locale":"id-ID"} -> {} | oleh {"id":"u1","name":"Rina"} pada 
 ```
 <!-- /hasil -->
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [8. Menjaga isi yang diketik](08-menjaga-isi.md) · Berikutnya: [10. Hak akses](10-hak-akses.md)
+---
+
+## 5. Referensi Taksonomi Operasi (`Op`)
+
+| Tipe Op (`op.t`) | Payload Struktur | Keterangan Mutasi |
+|---|---|---|
+| `'cells'` | `changes: [{ row, col, before, after }]` | Mutasi nilai sel atau formula. |
+| `'styles'` | `changes: [{ row, col, before, after }]` | Perubahan styling sel. |
+| `'insertRows'`, `'deleteRows'` | `rows: [{ id, key, cells, style, props }]` | Penambahan atau penghapusan baris entitas. |
+| `'insertCols'`, `'deleteCols'` | `cols: [{ id, key, props }]` | Penambahan atau penghapusan kolom entitas. |
+| `'moveRows'`, `'moveCols'` | `moves: [{ id, before, after }]` | Pemindahan posisi baris/kolom. |
+| `'rowProps'`, `'colProps'` | `changes: [{ id, before, after }]` | Konfigurasi properti dimensi atau format kolom. |
+| `'sheetProps'` | `before: any, after: any` | Perubahan nama sheet atau pembekuan baris/kolom. |
+| `'addSheet'`, `'removeSheet'` | `sheet: SheetDoc` | Penambahan atau penghapusan lembar sheet utuh. |
+| `'settings'` | `before: any, after: any` | Perubahan konfigurasi global workbook (locale/mata uang). |
+
+---
+
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [08. Validasi Data & Proteksi Sel](08-menjaga-isi.md) · Berikutnya: [10. Kontrol Akses & Perizinan (ACL/RBAC)](10-hak-akses.md)

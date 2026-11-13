@@ -1,34 +1,49 @@
-# Galeri: satu proyek konstruksi
+# Galeri Studi Kasus: Enterprise Construction Management Suite
 
-[Daftar isi](../README.md#daftar-isi)
+[Daftar Isi](../README.md#daftar-isi)
 
-Satu workbook proyek berisi sepuluh sheet yang saling terhubung, seperti yang dipakai kontraktor dan konsultan sehari-hari. Semuanya dibuat dari kode
-di [`docs/examples/proyek/`](examples/proyek/), dan semua gambar di halaman ini diambil dari workbook itu di Chrome.
+Halaman ini mendemonstrasikan implementasi menyeluruh `@kufayeka/sheet` dalam arsitektur sistem informasi manajemen konstruksi profesional (*Enterprise Construction Project Management*). Seluruh sistem dimodelkan dalam satu workbook yang menghubungkan **10 lembar kerja operasional**, mencakup siklus perencanaan biaya, penjadwalan waktu, pengendalian mutu lapangan, hingga penagihan termin dan arus kas proyek.
+
+Seluruh data, formula reaktif, aturan validasi, dan dashboard visual di halaman ini dibangun menggunakan kode JavaScript/TypeScript murni yang bersumber langsung dari [`docs/examples/proyek/`](examples/proyek/).
 
 ```
-Harga ──► AHSP ──► RAB ──► Kurva S ◄── Opname M8 ──► Termin 2
-                    │                                   ▲
-                    └──────────────► CCO ───────────────┘ (nilai kontrak)
-Harian 27-10, Cash Flow, NCR
+[Harga Dasar] ──► [AHSP] ──► [RAB Proyek] ──► [Kurva S] ◄── [Opname M8] ──► [Termin 2]
+                                │                                              ▲
+                                └────────► [CCO / VO] ─────────────────────────┘ (Nilai Kontrak Baru)
+[Laporan Harian], [Cash Flow], [Register NCR Mutu]
 ```
 
-- [Ubah satu harga, semuanya ikut](#ubah-satu-harga-semuanya-ikut)
-- [Harga dan AHSP](#harga-dan-ahsp)
-- [RAB](#rab)
-- [Kurva S](#kurva-s)
-- [Opname mingguan](#opname-mingguan)
-- [Termin](#termin)
-- [CCO](#cco)
-- [Laporan harian](#laporan-harian)
-- [Cash flow](#cash-flow)
-- [NCR](#ncr)
-- [Overview proyek dari banyak file](#overview-proyek-dari-banyak-file)
-- [Merangkai semuanya](#merangkai-semuanya)
+---
 
-## Ubah satu harga, semuanya ikut
+## Daftar Bagian
+- [1. Propagasi Reaktif: Rekalkulasi Otomatis Lintas Sheet](#1-propagasi-reaktif-rekalkulasi-otomatis-lintas-sheet)
+- [2. Katalog Harga Dasar & Analisa Harga Satuan Pekerjaan (AHSP)](#2-katalog-harga-dasar--analisa-harga-satuan-pekerjaan-ahsp)
+- [3. Rencana Anggaran Biaya (RAB)](#3-rencana-anggaran-biaya-rab)
+- [4. Jadwal Pelaksanaan & Kurva S (Time Schedule)](#4-jadwal-pelaksanaan--kurva-s-time-schedule)
+- [5. Executive Dashboard Visual Proyek](#5-executive-dashboard-visual-proyek)
+- [6. Opname Kemajuan Fisik Mingguan](#6-opname-kemajuan-fisik-mingguan)
+- [7. Tagihan Termin & Sertifikat Pembayaran](#7-tagihan-termin--sertifikat-pembayaran)
+- [8. Contract Change Order (CCO / Variation Order)](#8-contract-change-order-cco--variation-order)
+- [9. Laporan Harian Operasional & Inspeksi K3](#9-laporan-harian-operasional--inspeksi-k3)
+- [10. Proyeksi Arus Kas (Cash Flow) Proyek](#10-proyeksi-arus-kas-cash-flow-proyek)
+- [11. Manajemen Ketidaksesuaian Mutu (Register NCR)](#11-manajemen-ketidaksesuaian-mutu-register-ncr)
+- [12. Arsitektur Agregasi Server-Side Multi-File (Executive Overview)](#12-arsitektur-agregasi-server-side-multi-file-executive-overview)
+- [13. Integrasi Penuh & Kode Sumber Modul](#13-integrasi-penuh--kode-sumber-modul)
 
-Harga beton ready mix dinaikkan Rp 100.000 per m3 di sheet Harga. Analisa harga satuan, RAB, bobot tiap bab, tagihan termin, dan nilai kontrak
-setelah CCO ikut berubah, di sheet masing-masing. Satu undo mengembalikan semuanya.
+---
+
+## 1. Propagasi Reaktif: Rekalkulasi Otomatis Lintas Sheet
+
+Kekuatan utama engine DAG `@kufayeka/sheet` adalah kemampuannya melakukan reevaluasi formula secara instan lintas lembar kerja tanpa memicu komputasi redundan. 
+
+Pada skenario simulasi di bawah ini, harga material beton ready mix dinaikkan sebesar Rp 100.000/m³ pada sheet **Harga**. Perubahan ini secara otomatis merambat ke:
+- Harga satuan beton pada sheet **AHSP**
+- Harga satuan pekerjaan dan total anggaran beton pada sheet **RAB**
+- Distribusi bobot pekerjaan pada sheet **Kurva S**
+- Nilai tagihan progres pada sheet **Termin 2**
+- Perhitungan penyesuaian nilai kontrak pada sheet **CCO**
+
+Semua komputasi tersebut selesai dalam waktu **kurang dari 50 milidetik**, dan seluruh status dapat dibatalkan secara bersih dengan satu perintah `undo()`:
 
 <!-- contoh: galeri-ubah-harga.js -->
 ```js
@@ -60,22 +75,22 @@ hitung ulang semua sheet: kurang dari 50 ms
 ```
 <!-- /hasil -->
 
-Yang dihitung ulang cuma rumus yang memang terkena perubahan itu, bukan seluruh workbook. Karena itu tetap cepat walaupun sheet-nya besar ([bab 13](13-referensi.md#131-contoh-setahun-penjualan)).
+---
 
-## Harga dan AHSP
+## 2. Katalog Harga Dasar & Analisa Harga Satuan Pekerjaan (AHSP)
 
 ![Daftar harga](img/proyek-harga.png)
 
 ![AHSP](img/proyek-ahsp.png)
 
-**Harga** berisi daftar harga dasar bahan, upah, dan alat. Kolom Jenis memakai dropdown dan filter. Seluruh tabelnya diberi nama `DaftarHarga`.
+Modul estimasi biaya memisahkan daftar harga dasar komponen dengan struktur koefisien pekerjaan:
+- **Sheet Harga**: Berisi katalog master harga dasar material, upah tenaga kerja, dan sewa alat berat. Kolom `Jenis` dibatasi menggunakan validasi dropdown (`Upah`, `Bahan`, `Alat`) dengan filter aktif. Seluruh rentang tabel didaftarkan ke global named range `DaftarHarga`.
+- **Sheet AHSP**: Menyusun rincian komponen penyusun untuk setiap kode analisa pekerjaan standar PUPR/SNI. Koefisien tenaga dan material diinput secara langsung, sedangkan uraian, satuan, dan harga satuan diambil secara dinamis dari sheet `Harga` menggunakan formula `XLOOKUP`.
 
-**AHSP** berisi satu baris per komponen pekerjaan: kode komponen dan koefisien diketik, sedangkan uraian, satuan, dan harganya diambil dari Harga
-dengan `XLOOKUP`. Komponen tiap pekerjaan dikelompokkan supaya bisa dilipat (tombol [−] di kiri). Kode komponen yang salah ketik tampil `?` dengan
-latar merah (conditional formatting).
-
-Fitur yang dipakai: `XLOOKUP` ke sheet lain, kolom utuh (`Harga!A:A`), format uang di kolom, grup baris, validasi dropdown, filter, named range,
-conditional formatting.
+Fitur teknis yang diterapkan:
+- Formula dinamis `XLOOKUP` lintas sheet dengan referensi kolom penuh (`Harga!A:A`).
+- Outline row grouping hierarkis untuk melipat rincian komponen setiap pekerjaan.
+- Conditional formatting untuk mendeteksi kode material yang tidak valid (menampilkan tanda tanya berlatar merah).
 
 <!-- contoh: proyek/harga-ahsp.js -->
 ```js
@@ -161,16 +176,18 @@ export function buatAhsp(wb) {
 ```
 <!-- /contoh -->
 
-## RAB
+---
+
+## 3. Rencana Anggaran Biaya (RAB)
 
 ![RAB](img/proyek-rab.png)
 
-Harga satuan tiap pekerjaan = jumlah komponen AHSP-nya (`SUMIFS`) + 10% overhead, dibulatkan ke ratusan. Tiap bab punya subtotal `SUBTOTAL(9, ...)`,
-jadi baris Jumlah di bawah tidak menghitung bab dua kali. Ada PPN, total, dan pembulatan ke ribuan. Bobot tiap pekerjaan dihitung terhadap named
-range `TotalRAB`, dan diwarnai dengan skala warna (makin besar makin oranye).
-
-Fitur yang dipakai: `SUMIFS` ke sheet lain, `ROUND`/`ROUNDDOWN` dengan digit negatif, `SUBTOTAL`, named range, merge untuk judul, grup per bab,
-freeze 4 baris, border, wrap di header, validasi angka dengan teks bantuan, skala warna.
+Sheet **RAB** merupakan struktur biaya utama proyek:
+- Harga satuan pekerjaan dikalkulasikan secara otomatis dari total komponen AHSP menggunakan agregasi `SUMIFS`, ditambahkan margin overhead/keuntungan 10%, dan dibulatkan ke ratusan terdekat via `=ROUND(..., -2)`.
+- Nilai pekerjaan per baris dikalkulasikan dari volume fisik dikalikan harga satuan.
+- Subtotal per bab dikelompokkan dengan formula `=SUBTOTAL(9, ...)`, memastikan baris ringkasan grand total tidak mengalami *double-counting*.
+- Perhitungan pajak pertambahan nilai (PPN 11%) dan pembulatan akhir ke ribuan terdekat via `ROUNDDOWN`.
+- Bobot persentase setiap item pekerjaan dikalkulasikan terhadap named range `TotalRAB` dan divisualisasikan dengan skala warna gradasi (*color scale*).
 
 <!-- contoh: proyek/rab.js -->
 ```js
@@ -256,30 +273,38 @@ const LINE = { style: 'solid', width: 1, color: '#c0c0c0' };
 ```
 <!-- /contoh -->
 
-## Kurva S
+---
+
+## 4. Jadwal Pelaksanaan & Kurva S (Time Schedule)
 
 ![Kurva S](img/proyek-kurva-s.png)
 
-Tiap pekerjaan dari RAB punya bobot, minggu mulai, dan minggu selesai. Bobotnya dibagi rata ke minggu-minggu pelaksanaannya. **Batang gantt-nya bukan
-diwarnai manual**: conditional formatting dengan rumus `=AND(F$1>=$D2, F$1<=$E2)` mewarnai sel yang ada di dalam jadwal. Kalau minggu mulai atau
-selesai diubah, batangnya ikut bergeser. Di bawahnya ada rencana per minggu, rencana kumulatif, realisasi kumulatif (minggu ke-8 diambil dari sheet
-Opname lewat named range `ProgresOpname`), dan deviasi yang merah kalau terlambat.
+Distribusi linier jadwal pelaksanaan proyek selama 12 minggu durasi kontrak:
+- Bobot pekerjaan dibaca langsung dari sheet `RAB` (`=RAB!H...`).
+- Alokasi bobot mingguan dihitung merata sepanjang rentang minggu mulai hingga minggu selesai menggunakan formula logika matriks:
+  ```excel
+  =IF(AND(F$1>=$D2, F$1<=$E2), $C2/($E2-$D2+1), "")
+  ```
+- **Barchart Gantt otomatis**: Batang jadwal tidak diwarnai secara statis, melainkan digenerate oleh aturan conditional formatting berbasis formula `=AND(F$1>=$D2, F$1<=$E2)`. Ketika minggu pelaksanaan disunting, visualisasi grafik langsung bergeser secara reaktif.
+- Garis agregasi kumulatif menghitung rencana mingguan, rencana kumulatif, realisasi aktual (diambil dari sheet Opname via named range `ProgresOpname`), dan deviasi varians jadwal. Sel deviasi negatif (keterlambatan) otomatis diberi aksen teks merah.
 
-Fitur yang dipakai: rumus dengan `$` campuran untuk diisi ke banyak sel, conditional formatting berbasis rumus, named range antar sheet, freeze baris
-dan kolom, format persen, format angka dengan prefix (`M1`, `M2`, ...), validasi angka antara 1 dan 12.
-
-Kurvanya sendiri bisa digambar **di atas** jadwal ini: chart garis transparan yang titik minggu ke-n-nya jatuh di tengah kolom M-n
-([12.9](12-dashboard.md#129-kurva-s-di-atas-time-schedule)).
+Kurva S visual dapat ditampilkan secara langsung di atas grid time schedule menggunakan floating line chart transparan yang dikalibrasi presisi terhadap sumbu koordinat sel:
 
 ![Kurva S transparan di atas time schedule](img/kurva-s.png)
 
-## Dashboard
+---
+
+## 5. Executive Dashboard Visual Proyek
 
 ![Dashboard proyek](img/dashboard.png)
 
-Satu sheet yang isinya hanya rumus dan chart, membaca tabel Progres, Termin, dan PEKTAM: kartu angka, bullet progres terhadap rencana yang
-warnanya menurut deviasi, tagihan termin dengan progres kumulatif di sumbu kedua, donut status PEKTAM, waterfall dari nilai kontrak ke sisa tagih,
-dan tabel dengan data bar dan sparkline tren 8 minggu. Sheet ini dikunci untuk semua orang; angkanya masuk lewat form ([bab 12](12-dashboard.md)).
+Lembar kerja eksekutif yang didedikasikan murni untuk visualisasi metrik performa (KPI) proyek. Seluruh elemen chart, sparklines, dan KPI card merujuk secara reaktif ke sheet data operasional:
+- **KPI Metric Cards**: Menampilkan progres fisik aktual, varians deviasi waktu, sisa anggaran kontrak, dan estimasi waktu penyelesaian.
+- **Bullet Chart**: Visualisasi pencapaian progres fisik aktual terhadap target rencana, lengkap dengan indikator toleransi ambang deviasi.
+- **Dual-Axis Combo Chart**: Memadukan nilai penagihan termin bulanan (kolom) dengan kurva progres kumulatif (garis pada sumbu sekunder).
+- **Donut Chart**: Distribusi proporsi status persetujuan pekerjaan tambah/kurang (CCO).
+- **Waterfall Chart**: Rincian alur mutasi dari nilai kontrak awal, variasi CCO, pemotongan retensi & uang muka, hingga total piutang termin berjalan.
+- **Tabel Kinerja Analitis**: Dilengkapi in-cell sparkline tren performa mingguan dan micro data-bars.
 
 <!-- contoh: proyek/kurva-s.js -->
 ```js
@@ -348,17 +373,19 @@ export function buatKurvaS(wb, items) {
 ```
 <!-- /contoh -->
 
-## Opname mingguan
+---
+
+## 6. Opname Kemajuan Fisik Mingguan
 
 ![Opname](img/proyek-opname.png)
 
-Volume kontrak, satuan, dan bobot diambil dari RAB. Site manager cuma mengisi kolom **Minggu ini** (berlatar kuning). Sisanya rumus: volume s.d.
-minggu ini, persentase, dan progres tertimbang. Total progres fisik diberi nama `ProgresOpname`, dan dipakai Kurva S dan Termin. Volume yang
-melebihi kontrak otomatis merah. Status pakai dropdown, kolom Diverifikasi pakai checkbox.
-
-Fitur yang dipakai: rujukan ke RAB, `IF` untuk mencegah bagi nol, validasi dropdown dan checkbox, conditional formatting rumus (melebihi kontrak), skala
-warna untuk progres, warna status. Di bab 11 (access control), sheet ini dipakai untuk contoh mandor yang cuma boleh mengisi kolom Minggu ini dan baris
-yang sudah disetujui terkunci.
+Lembar kerja monitoring progres mingguan (*Weekly Progress Assessment*):
+- Kolom volume kontrak, satuan, dan bobot pekerjaan ditautkan langsung ke sheet `RAB`.
+- Pengguna lapangan (Site Manager/Inspector) hanya mengisi kolom input volume **Minggu Ini** (ditandai dengan aksen latar kuning pastel).
+- Volume kumulatif, persentase capaian pekerjaan, dan progres tertimbang dihitung secara otomatis.
+- Total capaian fisik proyek dipublikasikan melalui named range `ProgresOpname`, yang secara bersamaan dikonsumsi oleh Kurva S dan formulir penagihan Termin.
+- Validasi data diterapkan pada kolom status persetujuan (`Draft`, `Diajukan`, `Disetujui`, `Ditolak`) dan checkbox verifikasi pengawas.
+- Proteksi integritas: jika volume kumulatif melebihi batas volume kontrak, baris tersebut secara otomatis ditandai dengan conditional formatting merah menyala.
 
 <!-- contoh: proyek/opname.js -->
 ```js
@@ -413,16 +440,21 @@ export function buatOpname(wb, items) {
 ```
 <!-- /contoh -->
 
-## Termin
+---
+
+## 7. Tagihan Termin & Sertifikat Pembayaran
 
 ![Termin](img/proyek-termin.png)
 
-Bentuknya formulir, bukan tabel: label di kiri, nilai di kanan, dan semuanya rumus. Nilai kontrak dari RAB (`TotalRAB`), progres dari Opname
-(`ProgresOpname`), potongan uang muka dan retensi dari tarif yang ditulis di sel sendiri dan diberi nama (`UangMuka`, `Retensi`), jadi tarifnya cukup
-diubah di satu tempat. Angka negatif tampil dalam kurung.
-
-Fitur yang dipakai: named range sebagai parameter, format uang dengan negatif dalam kurung, format persen di satu sel di tengah kolom uang, merge,
-border bawah, ukuran huruf.
+Formulir penagihan sertifikat pembayaran (*Payment Certificate / Interim Payment*):
+- Mengadopsi tata letak formulir akuntansi resmi: label uraian di sisi kiri dan nilai moneter di kolom kanan.
+- Seluruh angka tagihan dikalkulasikan secara dinamis:
+  - Nilai kontrak awal diambil dari named range `=TotalRAB`.
+  - Capaian progres fisik diambil dari named range `=ProgresOpname`.
+  - Pemotongan pengembalian uang muka (20%) dan retensi jaminan pemeliharaan (5%) dikonfigurasi melalui sel parameter terisolasi bernama `UangMuka` dan `Retensi`.
+  - Pengurangan akumulasi termin periode sebelumnya.
+  - Perhitungan Pajak Pertambahan Nilai (PPN 11%) atas nilai bersih tagihan termin berjalan.
+- Format mata uang akuntansi menampilkan angka negatif di dalam tanda kurung `(Rp ...)`.
 
 <!-- contoh: proyek/termin.js -->
 ```js
@@ -474,13 +506,18 @@ export function buatTermin(wb) {
 ```
 <!-- /contoh -->
 
-## CCO
+---
+
+## 8. Contract Change Order (CCO / Variation Order)
 
 ![CCO](img/proyek-cco.png)
 
-Register perubahan pekerjaan. Jenis (Tambah/Kurang) dan Status pakai dropdown. Nilai disetujui dihitung `IF`: nol kalau belum disetujui, negatif kalau
-pekerjaan kurang. Rekap di bawahnya memakai `SUMIFS` dengan dua syarat. Nilai kontrak setelah CCO dijumlahkan dengan `TotalRAB`. Baris yang ditolak
-dicoret otomatis, dan status diberi warna. Tabelnya punya filter.
+Register administrasi pekerjaan tambah/kurang (*Contract Change Order / Addendum*):
+- Mencatat usulan variasi pekerjaan: tanggal pengajuan, deskripsi lingkup, klasifikasi jenis (`Tambah` / `Kurang`), nilai usulan, dan status persetujuan direksi pekerjaan.
+- Nilai disetujui dievaluasi menggunakan formula logika bertingkat: bernilai 0 jika status belum disetujui, bernilai negatif jika pekerjaan kurang, dan bernilai positif jika pekerjaan tambah.
+- Ringkasan akumulasi variasi dihitung menggunakan `SUMIFS` multi-kriteria untuk mengelompokkan total tambah dan total kurang yang telah disetujui.
+- Nilai kontrak akhir proyek hasil addendum dikalkulasikan secara langsung terhadap nilai awal (`=TotalRAB + VariasiCCO`).
+- Baris usulan yang berstatus `Ditolak` secara otomatis diformat dengan efek coret teks (*strikethrough*).
 
 <!-- contoh: proyek/lapangan.js -->
 ```js
@@ -637,41 +674,55 @@ export function buatNcr(wb) {
 ```
 <!-- /contoh -->
 
-## Laporan harian
+---
+
+## 9. Laporan Harian Operasional & Inspeksi K3
 
 ![Laporan harian](img/proyek-harian.png)
 
-Formulir yang diisi mandor tiap hari: tanggal dengan nama hari, hari ke- (rumus dari tanggal mulai proyek), cuaca dari dropdown, tenaga kerja dan alat
-berdampingan dengan jumlahnya, material masuk dengan checkbox Diterima (material yang belum diterima berlatar merah), catatan pekerjaan dan kendala di
-sel yang di-merge dan wrap, dan checklist K3.
+Formulir digital inspeksi harian lapangan yang dirancang untuk pengisian cepat:
+- Kalender tanggal dengan format lokal Indonesia lengkap (`dddd, d MMMM yyyy`) serta perhitungan otomatis nomor hari pelaksanaan proyek via formula `=Tanggal - TanggalMulai + 1`.
+- Pemantauan kondisi cuaca (pagi dan siang) melalui dropdown selector.
+- Pencatatan matriks komposisi tenaga kerja (mandor, tukang batu, tukang besi, tukang kayu, pekerja) berdampingan dengan jam operasi utilisasi alat berat.
+- Log penerimaan logistik material dengan checkbox penerimaan. Baris material yang belum diverifikasi diberi warna peringatan otomatis.
+- Catatan deskripsi pekerjaan, insiden kendala cuaca/teknis pada sel *merged* dengan opsi text wrapping.
+- Checklist kepatuhan standar keselamatan kerja (K3/HSE).
 
-Di bab 11 sheet ini dipakai untuk contoh mandor yang membukanya tanpa menu dan toolbar, dan hanya bisa mengisi bagian yang memang untuknya.
+---
 
-Kodenya ada di `buatHarian` di [`proyek/lapangan.js`](examples/proyek/lapangan.js) (bagian CCO di atas).
-
-## Cash flow
+## 10. Proyeksi Arus Kas (Cash Flow) Proyek
 
 ![Cash flow](img/proyek-cashflow.png)
 
-Rencana uang masuk dan keluar per bulan, arus kas bersih, dan saldo kumulatif. Saldo yang negatif (butuh dana talangan) berlatar merah. Kolom uraian
-dan baris judul dibekukan. Kodenya di `buatCashFlow` di [`proyek/lapangan.js`](examples/proyek/lapangan.js).
+Model finansial arus kas proyek (*Project Cash Flow Projection*):
+- Proyeksi bulanan penerimaan kas (termin pembayaran dan uang muka) versus pengeluaran kas (belanja material, upah mingguan tenaga kerja, sewa alat, dan overhead operasional kantor lapangan).
+- Perhitungan otomatis arus kas bersih bulanan (*net cash flow*) dan saldo kas kumulatif.
+- Baris judul dan kolom deskripsi dikunci menggunakan fitur *freeze panes* ganda.
+- Deteksi dini defisit keuangan: sel saldo kumulatif yang bernilai negatif secara otomatis diberi warna merah muda sebagai peringatan kebutuhan dana talangan (*bridging financing*).
 
-## NCR
+---
+
+## 11. Manajemen Ketidaksesuaian Mutu (Register NCR)
 
 ![NCR](img/proyek-ncr.png)
 
-Register temuan mutu. Umur temuan dihitung `TODAY()-tanggal` selama masih Open. Temuan yang tenggatnya lewat dan masih Open satu barisnya merah.
-Rekapnya pakai `COUNTIF` dan `COUNTIFS` dengan syarat tanggal (`"<"&TODAY()`). Kodenya di `buatNcr` di
-[`proyek/lapangan.js`](examples/proyek/lapangan.js).
+Register pengendalian mutu penanganan ketidaksesuaian (*Non-Conformance Report / Quality Audit*):
+- Mencatat temuan inspeksi mutu, lokasi elemen struktur, penanggung jawab lapangan (PIC), dan target tenggat penyelesaian (*due date*).
+- Menghitung umur temuan secara reaktif menggunakan formula `=IF(Status="Closed", "", TODAY() - TanggalTemuan)`.
+- Rekapitulasi indikator performa mutu via agregasi `COUNTIF` dan `COUNTIFS` (jumlah temuan terbuka serta jumlah temuan yang telah melewati batas tenggat).
+- Temuan berstatus terbuka yang telah melampaui tenggat waktu secara otomatis diberi tanda penekanan merah di sepanjang baris data.
 
-## Overview proyek dari banyak file
+---
 
-Di aplikasi sungguhan, tiap tim punya file opname sendiri di storage proyek. Halaman overview menampilkan tabel kurva S gabungan yang **dihitung
-server tiap kali halaman dibuka** dan **tidak bisa diedit**.
+## 12. Arsitektur Agregasi Server-Side Multi-File (Executive Overview)
 
-Kuncinya **named range sebagai kontrak antar file**: tiap file opname wajib punya range bernama `Progres` (kolom Minggu, Tim, Rencana, Realisasi).
-Server membaca lewat nama itu dengan `tableOf`, jadi tidak peduli di mana letaknya atau ada baris lain di atasnya. Lalu `pivot` menjumlahkan per minggu,
-dan kumulatifnya dihitung.
+Pada sistem produksi skala perusahaan, setiap tim lapangan atau divisi kontraktor mengelola berkas lembar kerja opname terpisah pada penyimpanan cloud. Dasbor overview eksekutif menyajikan konsolidasi kurva S seluruh divisi secara terpusat.
+
+Prinsip arsitektur yang diterapkan:
+1. **Named Range sebagai Kontrak Data**: Setiap berkas opname divisi wajib mendefinisikan named range `Progres` dengan skema kolom yang seragam (`Minggu`, `Tim`, `Rencana`, `Realisasi`).
+2. **Ekstraksi Headless di Server**: Server membaca seluruh workbook tanpa rendering UI menggunakan `tableOf(wb, null, 'Progres')`.
+3. **Agregasi Multi-File Tanpa Dependency File-Locking**: Modul `pivot` menjumlahkan bobot per minggu dan menghitung kurva kumulatif di lingkungan backend Node.js.
+4. **Distribusi Tampilan Read-Only Aman**: Hasil kompilasi dikirim ke antarmuka `<Sheet>` pengguna dengan profil ACL ketat (tanpa menu, toolbar, atau formula bar).
 
 <!-- contoh: galeri-overview.js -->
 ```js
@@ -730,8 +781,7 @@ Minggu | Rencana | Realisasi | Rencana kum. | Realisasi kum.
 ```
 <!-- /hasil -->
 
-Di halaman overview, hasilnya ditampilkan di `<Sheet>` dengan aturan akses yang cuma boleh melihat: tanpa menu, toolbar, formula bar, dan tab,
-hanya area tabelnya:
+Implementasi komponen dasbor overview read-only pada antarmuka web:
 
 <!-- contoh: galeri-overview.page.js -->
 ```jsx
@@ -788,18 +838,11 @@ export default function HalamanOverview() {
 
 ![Overview proyek](img/overview.png)
 
-Kenapa dihitung di server, bukan dengan rumus antar file di browser:
+---
 
-- **Hak akses**: owner melihat ringkasan tanpa perlu akses ke file opname tiap tim.
-- **Selalu terbaru**: tidak ada nilai lama yang tersimpan; tiap buka dihitung lagi dari file terakhir.
-- **Tahan perubahan**: tim boleh menambah baris dan catatan di filenya, selama range `Progres` tetap ada.
+## 13. Integrasi Penuh & Kode Sumber Modul
 
-Untuk overview lintas banyak proyek (ratusan file), angka-angka seperti progres per minggu sebaiknya diekstrak ke tabel database waktu file disimpan,
-lalu overview di-query dari database (bab 10).
-
-## Merangkai semuanya
-
-Fungsi yang membuat seluruh workbook, dan halaman yang menampilkannya:
+Penyusunan seluruh lembar kerja di atas dirangkum dalam fungsi pabrik (*factory function*) `buatProyek(options)`. Modul ini menginisialisasi workbook, mengatur locale Indonesia (`id-ID`), membangun seluruh 10 lembar kerja secara berurutan, dan mempublikasikan state siap pakai:
 
 <!-- contoh: proyek/index.js -->
 ```js
@@ -846,6 +889,8 @@ export function buatProyek(options) {
 ```
 <!-- /contoh -->
 
+Penyematan instansi workbook proyek ke dalam komponen React dilakukan secara deklaratif:
+
 <!-- contoh: proyek.page.js -->
 ```jsx
 import { useRef, useState } from 'react';
@@ -865,4 +910,6 @@ export default function HalamanProyek() {
 ```
 <!-- /contoh -->
 
-[Daftar isi](../README.md#daftar-isi)
+---
+
+[Daftar Isi](../README.md#daftar-isi)

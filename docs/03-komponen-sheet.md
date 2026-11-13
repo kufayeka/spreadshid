@@ -1,79 +1,96 @@
-# 3. Komponen `<Sheet>`
+# 03. Komponen `<Sheet>` & Kustomisasi UI
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md) · Berikutnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [02. Konsep Arsitektur & Mental Model](02-konsep.md) · Berikutnya: [04. Manipulasi Data Programatis](04-api-workbook.md)
 
-Bab ini membahas `<Sheet>` itu sendiri: cara aplikasimu mendengar apa yang dilakukan orang di sheet, memberi perintah ke sheet, mengatur sheet
-mana yang tampil, menyederhanakan layarnya, dan mengganti warnanya. Setiap langkah adalah satu halaman React dengan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [3.1 Bagian-bagian `<Sheet>`](#31-bagian-bagian-sheet)
-- [3.2 Tiga arah bicara dengan sheet](#32-tiga-arah-bicara-dengan-sheet)
-- [3.3 Ukuran sheet](#33-ukuran-sheet)
-
-**Bagian B. Langkah demi langkah**
-- [3.4 Mendengar perubahan](#34-mendengar-perubahan)
-- [3.5 Membaca seleksi](#35-membaca-seleksi)
-- [3.6 Memberi perintah lewat `ref`](#36-memberi-perintah-lewat-ref)
-- [3.7 Sheet mana yang tampil](#37-sheet-mana-yang-tampil)
-- [3.8 Layar yang lebih sederhana](#38-layar-yang-lebih-sederhana)
-- [3.9 Warna sendiri](#39-warna-sendiri)
-- [3.10 Dua sheet, satu workbook](#310-dua-sheet-satu-workbook)
-
-**Bagian C. Yang sering keliru, dan referensi**
-- [3.11 Yang sering keliru](#311-yang-sering-keliru)
-- [3.12 Referensi](#312-referensi)
+Bab ini mengulas tuntas arsitektur komponen visual `<Sheet />`: pola komunikasi bidirectional (Props, Event Listener, dan Imperative Handle via `ref`), kontrol navigasi sheet aktif, kustomisasi modular elemen antarmuka (Menu bar, Toolbar, Formula bar, Sheet tabs), theming berbasis CSS Variables, serta skenario rendering multi-view (split-screen).
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Anatomi & Struktur Visual Komponen
 
-## 3.1 Bagian-bagian `<Sheet>`
+Komponen `<Sheet />` merender seluruh antarmuka spreadsheet interaktif yang terorganisir ke dalam lima modul utama:
 
-![Bagian-bagian layar](img/bagian-layar.png)
+![Anatomi Antarmuka Komponen Sheet](img/bagian-layar.png)
 
-| Bagian | Isinya |
-|---|---|
-| **Menu bar** | File, Edit, View, Insert, Format, Data |
-| **Toolbar** | undo/redo, zoom, format angka (Rp, %, desimal), font, tebal/miring, warna, border, merge, rata, dan lainnya |
-| **Formula bar** | kotak nama di kiri (alamat sel aktif; ketik alamat lalu Enter untuk loncat), lalu isi sel aktif |
-| **Grid** | huruf kolom, nomor baris, dan sel |
-| **Tab sheet** | `+` untuk sheet baru, `☰` daftar semua sheet, lalu satu tab per sheet |
+1. **Menu Bar**: Menyediakan menu navigasi tingkat atas (*File, Edit, View, Insert, Format, Data*) untuk operasi dokumen, import/export, dan konfigurasi global.
+2. **Toolbar**: Kontrol cepat untuk aksi umum seperti Undo/Redo, Zooming, Number Formatting (Currency, Percent, Decimals), Font Styling, Cell Alignment, Borders, Merge Cells, dan Filter.
+3. **Formula Bar**: Terdiri dari *Name Box* (menampilkan dan mengarahkan koordinat kursor sel aktif) serta editor multiline input formula reaktif.
+4. **Virtualized Grid**: Area kerja tabel spreadsheet dengan header baris/kolom virtualized untuk performa tinggi pada dataset masif.
+5. **Sheet Tab Bar**: Kontrol navigasi sheet, penambahan sheet baru (`+`), dan menu dropdown untuk melihat daftar seluruh sheet dalam workbook.
 
-Isi setiap menu, tombol toolbar, dan panel ada di 3.12.
-
-## 3.2 Tiga arah bicara dengan sheet
-
-| Arah | Caranya | Contoh |
-|---|---|---|
-| **Aplikasimu → sheet** (data) | props | `workbook`, `sheet` (sheet yang tampil), `fileName`, `style` |
-| **Sheet → aplikasimu** (kabar) | event, berupa prop `on...` | `onOp` (isi berubah), `onSelectionChange` (seleksi berubah), `onSheetChange` |
-| **Aplikasimu → sheet** (perintah) | `ref` | `select('E5')`, `startEdit('300')`, `focus()` |
-
-Isi workbook sendiri dibaca dan diubah lewat workbook-nya, seperti di bab 2. Props, event, dan `ref` hanya untuk hal yang dimiliki **layar**:
-seleksi, sheet yang tampil, editor yang terbuka, tampilan.
-
-## 3.3 Ukuran sheet
-
-`<Sheet>` selalu **mengisi penuh kotak pembungkusnya**. Ukurannya diatur oleh pembungkus itu, dengan salah satu cara berikut:
-
-| Cara | Contoh |
-|---|---|
-| tinggi tetap | `<div style={{ height: 420 }}><Sheet /></div>` |
-| setinggi layar | `<main style={{ height: '100vh' }}><Sheet /></main>` |
-| sisa ruang di kolom flex | pembungkus `display: flex; flex-direction: column` yang punya tinggi, lalu `<Sheet style={{ flex: 1 }} />` |
-| berdampingan | pembungkus `display: flex`, lalu `<Sheet style={{ flex: 1 }} />` di samping panelmu |
-
-Sheet mengukur ulang dirinya saat ukuran pembungkusnya berubah, misalnya saat panel di sampingnya dibuka atau jendela diubah ukurannya.
+Setiap modul di atas dapat dikonfigurasi, disembunyikan, atau dibatasi aksesnya secara selektif.
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Pola Komunikasi Komponen (Data Flow & Control)
 
-Semua contoh memakai daftar produk dari bab 2 (`buatProduk`). Baris yang baru ditandai `// baru`.
+Komunikasi antara aplikasi React dan komponen `<Sheet />` berjalan melalui tiga saluran terstruktur:
 
-## 3.4 Mendengar perubahan
+```text
+┌────────────────────────────────────────────────────────┐
+│                 Aplikasi React (Host)                  │
+└───────┬───────────────────────▲────────────────▲───────┘
+        │                       │                │
+1. Props (Top-Down)     2. Events (Reaktif)   3. Ref (Imperatif)
+   • workbook              • onOp                • select()
+   • sheet                 • onSelectionChange   • scrollTo()
+   • access                • onSheetChange       • focus()
+   • fileName              • onReject            • startEdit()
+        │                       │                │
+        ▼                       │                │
+┌───────────────────────────────┴────────────────┴───────┐
+│                 Komponen <Sheet /> (UI)                │
+└───────────────────────────────┬────────────────────────┘
+                                │ sinkronisasi state & canvas
+                                ▼
+┌────────────────────────────────────────────────────────┐
+│        Workbook Core Instance (@kufayeka/sheet/core)   │
+└────────────────────────────────────────────────────────┘
+```
 
-**Tujuan:** mencatat setiap perubahan yang dilakukan orang di sheet, di panel samping.
+1. **Props (Top-Down)**: Mengalirkan data workbook, sheet target yang aktif, aturan hak akses (ACL), dan styling dokumen.
+2. **Events (Bottom-Up)**: Mengirimkan callback ke aplikasi induk saat terjadi mutasi data (`onOp`), perubahan area seleksi kursor (`onSelectionChange`), pergantian sheet (`onSheetChange`), atau penolakan aksi validasi (`onReject`).
+3. **Imperative Handle (`ref`)**: Mengontrol fokus kursor, seleksi range, inisiasi mode edit, dan navigasi scroll secara langsung dari kode aplikasi.
+
+---
+
+## 3. Ukuran & Constraint Layout
+
+Komponen `<Sheet />` secara default mengisi 100% lebar dan tinggi elemen container pembungkusnya (`width: 100%`, `height: 100%`). Pastikan parent container memiliki batasan tinggi yang eksplisit:
+
+```tsx
+// Menggunakan tinggi tetap (fixed height)
+<div style={{ height: 500 }}>
+    <Sheet workbook={wb} />
+</div>
+
+// Mengisi seluruh viewport layar (full screen)
+<div style={{ height: '100vh' }}>
+    <Sheet workbook={wb} />
+</div>
+
+// Mengisi fleksibel di dalam flex container
+<div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <header style={{ height: 60 }}>Header Aplikasi</header>
+    <main style={{ flex: 1, minHeight: 0 }}>
+        <Sheet workbook={wb} />
+    </main>
+</div>
+```
+
+> **Perhatian**: Hindari pembungkus dengan `height: auto` tanpa batas tinggi, karena spreadsheet akan terender dengan dimensi tinggi 0 piksel.
+
+---
+
+## 4. Implementasi Panduan Langkah demi Langkah
+
+Semua contoh berikut menggunakan dataset produk toko bangunan dari `data/produk.js`.
+
+---
+
+### 4.1 Menangkap Mutasi Pengguna via `onOp`
+
+Gunakan event handler `onOp` untuk mendeteksi setiap perubahan data yang dilakukan oleh pengguna secara langsung di layar:
 
 <!-- contoh: 03-04-perubahan.page.tsx -->
 ```tsx
@@ -105,19 +122,17 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Orang mengetik 400 di D2 dan 250 di D3:
+![Daftar perubahan user ditangkap pada panel samping](img/layar-perubahan.png)
 
-![Dua perubahan tercatat di panel samping](img/layar-perubahan.png)
+Payload `onOp` mengembalikan:
+- `ops`: Sekumpulan operasi atomik (`Op[]`) yang diaplikasikan.
+- `source`: Asal mutasi (`'user'` saat diedit langsung di grid, `'undo'`/`'redo'`, dsb).
 
-**Penjelasan:**
+---
 
-- `onOp` dipanggil setiap kali isi workbook berubah, sama seperti `wb.on('op', ...)` di 2.10, tapi tanpa perlu `useEffect`.
-- Perubahan dari sheet bersumber `user`. Perubahan dari kodemu bersumber `code`, dan juga ikut tercatat di sini.
-- Untuk hal yang lebih sederhana, misalnya "ada perubahan yang belum disimpan", `useWorkbook(wb, (w) => w.unsaved())` sudah cukup (1.8).
+### 4.2 Membaca Area Seleksi Kursor (`onSelectionChange`)
 
-## 3.5 Membaca seleksi
-
-**Tujuan:** menampilkan range yang dipilih orang, dan jumlah angkanya, di luar sheet.
+Event `onSelectionChange` dipancarkan setiap kali kursor berpindah sel atau pengguna memilih rentang area (range):
 
 <!-- contoh: 03-05-seleksi.page.tsx -->
 ```tsx
@@ -157,28 +172,18 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Orang men-drag E2 sampai E4:
+![Status seleksi sel dan kalkulasi cepat agregasi angka](img/layar-seleksi.png)
 
-![Range terpilih dan jumlahnya](img/layar-seleksi.png)
+Objek `SheetSelection` memuat atribut:
+- `sheet`: Nama sheet aktif tempat seleksi berada.
+- `address`: Alamat range string yang mudah dibaca (misal `'D2:D4'` atau `'B2'`).
+- `r1`, `c1`, `r2`, `c2`: Batas koordinat numerik 0-based yang siap diiterasi loop.
 
-**Penjelasan:**
+---
 
-- `onSelectionChange` memberi seleksi baru. Saat orang men-drag, event ini muncul **sekali, setelah mouse dilepas**, bukan di setiap sel yang
-  dilewati. Klik dan tombol panah langsung memicunya.
-- Isinya:
+### 4.3 Menjalankan Perintah Imperatif via `ref` (`SheetHandle`)
 
-  | Kolom | Contoh | Artinya |
-  |---|---|---|
-  | `address` | `'E2:E4'` | alamat seleksi, siap ditampilkan |
-  | `ranges` | `[{ r1: 1, c1: 4, r2: 3, c2: 4, address: 'E2:E4' }]` | setiap range, dengan nomor mulai dari 0. Lebih dari satu kalau orang memakai Ctrl |
-  | `active` | `{ r: 1, c: 4, address: 'E2' }` | sel aktif |
-  | `sheet` | `{ id, name }` | sheet tempat seleksi itu |
-
-- Jumlahnya dihitung dengan `wb.value` di setiap sel range, memakai nomor baris dan kolom.
-
-## 3.6 Memberi perintah lewat `ref`
-
-**Tujuan:** tombol di luar sheet yang memilih sel dan membuka editor.
+Gunakan React `ref` untuk mengeksekusi kontrol navigasi viewport dan kursor secara imperatif:
 
 <!-- contoh: 03-06-perintah.page.tsx -->
 ```tsx
@@ -209,20 +214,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol "Pilih semua stok" diklik:
+![Kolom stok terpilih dan disorot secara terprogram](img/layar-perintah.png)
 
-![Kolom stok terpilih dari tombol](img/layar-perintah.png)
+---
 
-**Penjelasan:**
+### 4.4 Mengontrol Navigasi Sheet Aktif (Controlled Active Sheet)
 
-- `useRef<SheetHandle>(null)` dan `<Sheet ref={sheet}>` memberi akses ke perintah sheet.
-- `select('D2:D4')` memilih range dan menggulir ke sana. `select('E5')` memilih satu sel.
-- `startEdit('300')` membuka editor di sel aktif, berisi `300`, seperti orang mulai mengetik. Orang tinggal menekan Enter untuk menyimpannya.
-- Perintah lainnya (`focus`, `showSheet`, `getSelection`) ada di 3.12.
-
-## 3.7 Sheet mana yang tampil
-
-**Tujuan:** tombol sendiri untuk berpindah sheet, yang tetap sinkron saat orang mengklik tab di sheet.
+Secara default, navigasi tab sheet dikelola internal oleh komponen. Anda dapat mengontrol sheet mana yang sedang aktif melalui perpaduan prop `sheet` dan `onSheetChange`:
 
 <!-- contoh: 03-07-sheet-aktif.page.tsx -->
 ```tsx
@@ -261,21 +259,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol "Catatan" diklik:
+![Navigasi sheet aktif dikendalikan dari tombol eksternal](img/layar-sheet-aktif.png)
 
-![Sheet Catatan tampil](img/layar-sheet-aktif.png)
+> **Penting**: Selalu pasangkan prop `sheet={aktif}` dengan handler `onSheetChange={setAktif}` agar interaksi klik tab langsung di dalam spreadsheet tetap dapat memperbarui state aplikasi Anda.
 
-**Penjelasan:**
+---
 
-- `sheet={aktif}` menentukan sheet yang tampil, berupa id sheet.
-- `onSheetChange={setAktif}` memberi tahu saat orang mengklik tab, menambah sheet, atau loncat ke sheet lain. Dengan meneruskannya ke state yang
-  sama, tombolmu dan tab di sheet selalu sepakat.
-- Tanpa prop `sheet`, sheet sendiri yang mengatur tab aktifnya, dan aplikasimu tidak perlu ikut campur.
-- `wb.addSheet('Catatan')` menambah sheet baru dan memberi id-nya. `wb.sheetProps(id).name` memberi namanya.
+### 4.5 Kustomisasi Visibilitas Modul UI (Minimalist / Embedded View)
 
-## 3.8 Layar yang lebih sederhana
-
-**Tujuan:** sheet tanpa menu bar, toolbar, dan tab, misalnya untuk form input yang ringkas.
+Untuk skenario embedding seperti form input sederhana, widget dashboard, atau review mode, modul antarmuka dapat disembunyikan menggunakan prop `access.ui`:
 
 <!-- contoh: 03-08-bagian-layar.page.tsx -->
 ```tsx
@@ -304,20 +296,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Sheet tanpa menu, toolbar, dan tab](img/layar-sederhana.png)
+![Spreadsheet dengan layout minimalis tanpa menu dan toolbar](img/layar-sederhana.png)
 
-**Penjelasan:**
+Menonaktifkan modul UI melalui prop `access.ui` juga secara otomatis menonaktifkan shortcut keyboard terkait (misalnya `Ctrl+B` tidak akan mengeksekusi styling jika tombol toolbar/menu terkait dibatasi).
 
-- Bagian layar diatur dengan **baris aturan** yang sama dengan hak akses. Satu aturan per bagian yang disembunyikan: `ui.menubar`, `ui.toolbar`,
-  `ui.tabs`, `ui.formulaBar`, `ui.headers`, `ui.gridlines`.
-- Baris pertama, `* allow *`, membuat semua orang tetap boleh melakukan semuanya. Tanpa baris itu, sheet menjadi tidak bisa dipakai, karena
-  aturan akses memakai prinsip "yang tidak diizinkan, tidak didapat".
-- Menu, tombol, atau panel satu per satu juga bisa disembunyikan (`ui.menu.Insert`, `ui.tool.paint`, ...), dan bisa berbeda per orang. Semua itu
-  dibahas di [bab 10](10-hak-akses.md#1022-bagian-layar).
+---
 
-## 3.9 Warna sendiri
+### 4.6 Theming & Desain Visual via CSS Custom Properties
 
-**Tujuan:** sheet dengan warna aplikasimu.
+Seluruh palet warna, tipografi, dan dimensi garis grid dikontrol melalui variabel CSS. Anda dapat menyesuaikan tampilan spreadsheet agar menyatu sempurna dengan *design system* aplikasi Anda:
 
 <!-- contoh: 03-09-tema.page.tsx -->
 ```tsx
@@ -346,20 +333,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Harga dipilih, supaya warna seleksinya terlihat:
+![Spreadsheet dengan kustomisasi tema bernuansa hijau](img/layar-tema.png)
 
-![Sheet dengan tema hijau](img/layar-tema.png)
+---
 
-**Penjelasan:**
+### 4.7 Multi-View Spreadsheet (Split-Screen / Two Grids, One Workbook)
 
-- Semua warna dan huruf sheet adalah **variabel CSS** yang diawali `--ks-`. Ganti lewat prop `style`, seperti di contoh, atau lewat CSS-mu
-  sendiri: `.ks-sheet { --ks-accent: #188038; }`.
-- `as CSSProperties` diperlukan di TypeScript, karena tipe `style` React belum mengenal variabel CSS buatan sendiri.
-- Daftar semua variabel ada di 3.12.
-
-## 3.10 Dua sheet, satu workbook
-
-**Tujuan:** dua `<Sheet>` berdampingan yang menampilkan workbook yang sama.
+Dua komponen `<Sheet />` dapat di-binding ke satu instance workbook yang sama secara berdampingan. Setiap view memiliki state kursor, viewport scrolling, dan sheet aktif yang independen, tetapi berbagi state data yang identik secara instan:
 
 <!-- contoh: 03-10-dua-sheet.page.tsx -->
 ```tsx
@@ -381,171 +361,96 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Orang mengetik 400 di D2 pada sheet kiri:
-
-![Yang diketik di kiri langsung terlihat di kanan](img/layar-dua-sheet.png)
-
-**Penjelasan:**
-
-- Keduanya menerima `workbook={wb}` yang sama. Yang diketik di kiri langsung terlihat di kanan, beserta hasil rumusnya.
-- Setiap sheet punya seleksi, gulirannya, dan sheet aktifnya sendiri. Yang sama hanya isinya.
-- Kegunaannya: data di kiri dengan ringkasan di kanan, atau dua bagian sheet yang berjauhan dibuka berdampingan.
+![Dua grid spreadsheet tersinkronisasi pada workbook yang sama](img/layar-dua-sheet.png)
 
 ---
 
-# Bagian C. Yang sering keliru, dan referensi
+## 5. Gotchas & Kesalahan Umum
 
-## 3.11 Yang sering keliru
+| Permasalahan | Akar Masalah | Solusi Rekomendasi |
+|---|---|---|
+| **Spreadsheet terpotong / hilang** | Parent wrapper tidak memiliki batas `height` yang jelas. | Berikan tinggi eksplisit (misal `style={{ height: '500px' }}` atau `100vh`). |
+| **Mencoba memodifikasi data sel via `sheetRef`** | Ref hanya didesain untuk manipulasi viewport UI dan kursor kustom. | Lakukan perubahan data langsung pada instance workbook: `wb.sheet('Sheet1').setValues(...)`. |
+| **Nilai `getSelection()` tidak terbarui tepat setelah `select()`** | Seleksi baru diaplikasikan pada siklus rendering berikutnya. | Pantau seleksi terkini melalui callback `onSelectionChange`. |
+| **Tab sheet tidak merespons klik saat berpindah sheet** | Mengirimkan prop `sheet={aktif}` tanpa menyertakan handler `onSheetChange`. | Pasangkan kedua prop secara bersamaan untuk skenario controlled component. |
+| **Menyembunyikan menu/toolbar via CSS display none biasa** | Shortcut keyboard bawaan tetap dapat dipicu oleh pengguna. | Konfigurasikan prop `access={{ ui: { menu: false, toolbar: false } }}` agar proteksi menyeluruh diaplikasikan. |
+| **TypeScript error saat menyetel variabel CSS kustom pada objek style** | Tipe `CSSProperties` default React menolak custom property string bebas. | Lakukan type-casting: `{ '--ks-accent': '#1b7340' } as CSSProperties`. |
 
-| Keliru | Benar |
-|---|---|
-| Sheet tidak terlihat | pembungkusnya harus punya tinggi (3.3) |
-| Mengubah isi lewat `ref` | `ref` untuk perintah layar. Isi diubah lewat workbook: `wb.sheet('Produk').setValues(...)` (bab 2) |
-| `getSelection()` tepat setelah `select()` masih memberi seleksi lama | seleksi baru berlaku di render berikutnya. Dengarkan `onSelectionChange` |
-| Memberi `sheet={...}` tanpa `onSheetChange` | tab di sheet tidak bisa berpindah, karena aplikasimu terus memaksa sheet yang sama. Selalu pasangkan keduanya (3.7) |
-| Menyembunyikan toolbar dengan CSS | pakai baris aturan `ui.*` (3.8), supaya Ctrl+B dan tombol keyboard lain ikut dibatasi kalau perlu |
-| Variabel tema ditolak TypeScript | tambahkan `as CSSProperties` (3.9) |
+---
 
-## 3.12 Referensi
+## 6. Referensi Lengkap API
 
-### Props
+### Props Interface (`<Sheet />`)
 
-| Prop | Tipe | Bawaan | Artinya |
+| Prop | Tipe Data | Nilai Default | Penjelasan |
 |---|---|---|---|
-| `workbook` | `Workbook` | workbook kosong baru | workbook yang ditampilkan dan diubah (bab 2) |
-| `sheet` | id sheet | (diatur tab) | sheet yang tampil; pasangkan dengan `onSheetChange` (3.7) |
-| `onSheetChange` | `(sheetId) => void` | | sheet yang tampil berganti (3.7) |
-| `onOp` | `({ ops, source }) => void` | | setiap perubahan yang diterapkan (3.4) |
-| `onSelectionChange` | `(sel: SheetSelection) => void` | | seleksi berubah; saat men-drag, sekali setelah mouse dilepas (3.5) |
-| `onReject` | `({ reason, op, source }) => void` | | sebuah perubahan ditolak oleh aturan atau validasi (bab 8) |
-| `onNotice` | `(n: SheetNotice) => string \| null \| undefined` | | setiap pesan sheet sebelum tampil: diganti, dimatikan, atau ditampilkan sendiri ([10](10-hak-akses.md#1026-pesan-penolakan)) |
-| `onCellError` | `({ address, field, value, expected }) => void` | | nilai tidak cocok dengan tipe kolomnya (bab 8) |
-| `fileName` | string | `'Spreadsheet'` | nama file, tanpa ekstensi, saat orang memilih File → Download |
-| `access` | `{ rows, who, view?, ... }` | tanpa batasan | aturan akses dan bagian layar (3.8, [bab 10](10-hak-akses.md)) |
-| `marks` | `false \| { lock, hidden, tint, stripes }` | `{ lock: true, hidden: true }` | tanda di sel yang tidak boleh diubah ([10](10-hak-akses.md#1025-variasi-tanda)) |
-| `user` | `{ id, name }` | | orang yang membuka sheet; namanya tercatat di komentar |
-| `className` | string | | class tambahan di elemen terluar |
-| `style` | objek style | | style elemen terluar, termasuk ukuran dan variabel tema (3.3, 3.9) |
-| `ref` | `Ref<SheetHandle>` | | perintah untuk sheet (3.6) |
+| `workbook` | `Workbook` | Instance kosong baru | Instance workbook yang ditampilkan dan dimutasi. |
+| `sheet` | `string` | Sheet pertama | Identifier atau nama sheet yang sedang aktif ditampilkan. |
+| `onSheetChange` | `(sheetId: string) => void` | `undefined` | Callback saat pengguna berpindah tab sheet. |
+| `onOp` | `(payload: { ops: Op[], source: OpSource }) => void` | `undefined` | Callback setiap kali mutasi data berhasil diaplikasikan ke workbook. |
+| `onSelectionChange` | `(selection: SheetSelection) => void` | `undefined` | Callback saat area seleksi sel/range kursor berubah. |
+| `onReject` | `(payload: { reason: string, op: Op, source: OpSource }) => void` | `undefined` | Callback saat aksi pengguna ditolak oleh aturan validasi atau hak akses. |
+| `onNotice` | `(notice: SheetNotice) => string \| null \| undefined` | `undefined` | Interceptor pesan feedback sebelum ditampilkan ke layar (dapat dimodifikasi atau diredam). |
+| `onCellError` | `(payload: { address: string, field: string, value: any, expected: string }) => void` | `undefined` | Callback saat nilai masukan melanggar tipe skema kolom. |
+| `fileName` | `string` | `'Spreadsheet'` | Nama file default saat dokumen diunduh melalui menu *File → Download*. |
+| `access` | `SheetAccessConfig` | `{}` | Konfigurasi granular kontrol modul UI dan pembatasan hak akses sel/baris. |
+| `marks` | `boolean \| CellMarksConfig` | `{ lock: true, hidden: true }` | Indikator visual tanda gembok (terkunci) atau masking (tersembunyi) pada sel. |
+| `user` | `{ id: string, name: string }` | `undefined` | Identitas pengguna aktif saat ini (disematkan pada riwayat author komentar). |
+| `className` | `string` | `undefined` | Class CSS tambahan pada elemen kontainer spreadsheet terluar. |
+| `style` | `CSSProperties` | `undefined` | Objek inline style, termasuk injeksi variabel tema CSS. |
+| `ref` | `Ref<SheetHandle>` | `undefined` | Ref imperatif untuk interaksi kendali antarmuka. |
 
-### Perintah lewat `ref` (`SheetHandle`)
+### Imperative Handle Methods (`SheetHandle`)
 
-| Perintah | Artinya |
-|---|---|
-| `select(target)` | memilih sel atau range, lalu menggulir ke sana. `target` berupa teks (`'B2'`, `'B2:C4'`) atau `{ r1, c1, r2, c2 }` |
-| `scrollTo(alamat)` | memilih satu sel dan menggulir ke sana |
-| `startEdit(teks?)` | membuka editor di sel aktif, berisi `teks` (tanpa `teks`: isi sel sekarang) |
-| `focus()` | mengembalikan keyboard ke grid, misalnya setelah dialogmu ditutup |
-| `showSheet(id)` | menampilkan sheet lain |
-| `getSelection()` | seleksi sekarang, bentuknya sama dengan `onSelectionChange` |
-| `workbook` | workbook yang sedang ditampilkan |
-
-### Keyboard
-
-| Tombol | Fungsi |
-|---|---|
-| Panah | pindah sel; dengan `Shift` memperluas seleksi; dengan `Ctrl` melompat ke ujung data |
-| `Tab` / `Shift+Tab` | sel kanan / kiri |
-| `Enter` / `F2` | mulai mengedit sel; `Enter` saat mengedit menyimpan dan turun satu baris |
-| `Shift+Enter` | naik satu baris |
-| `Alt+Enter` / `Ctrl+Enter` | baris baru di dalam sel saat mengedit |
-| `Escape` | batal mengedit |
-| `F4` | saat mengetik rumus: alamat di kursor berganti `A1` → `$A$1` → `A$1` → `$A1` (bab 5) |
-| `Delete` / `Backspace` | mengosongkan sel yang dipilih |
-| `Home` / `End` | kolom A / kolom terakhir yang berisi data, di baris itu; dengan `Ctrl`: sel A1 / sel terakhir yang berisi data |
-| `PageUp` / `PageDown` | satu layar ke atas / bawah |
-| `Ctrl+A` | memilih semua |
-| `Ctrl+Z` / `Ctrl+Y` (`Ctrl+Shift+Z`) | undo / redo |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy / cut / paste (dari dan ke Excel juga) |
-| `Ctrl+Shift+V` | paste nilai saja |
-| `Ctrl+B` / `Ctrl+I` / `Ctrl+U` | tebal / miring / garis bawah |
-| `Alt+Shift+5` | coret |
-| `Ctrl+\` | hapus format |
-| `Ctrl+K` | sisipkan link |
-| `Ctrl+Shift+1` … `5` | format angka / jam / tanggal / uang / persen |
-| `Ctrl+F` / `Ctrl+H` | cari / cari dan ganti |
-| `Alt+↓` | membuka dropdown sel (data validation) |
-| `Space` | mencentang checkbox sel |
-| `Alt+Shift+→` / `Alt+Shift+←` | grup / lepas grup baris (kolom kalau seluruh kolom dipilih) |
-| `Ctrl+Alt+M` | membuka panel komentar untuk sel aktif |
-
-### Variabel tema
-
-| Variabel | Bawaan | Dipakai untuk |
+| Metode | Parameter | Deskripsi |
 |---|---|---|
-| `--ks-accent` | `#1a73e8` | sel aktif, seleksi, tombol utama, tab aktif |
-| `--ks-bg` | `#ffffff` | latar sheet dan panel |
-| `--ks-fg` | `#161616` | teks |
-| `--ks-grid` | `#e2e3e3` | garis grid dan bingkai luar |
-| `--ks-head-bg` | `#f8f9fa` | latar huruf kolom dan nomor baris |
-| `--ks-head-fg` | `#575757` | teks huruf kolom dan nomor baris |
-| `--ks-head-line` | `#c0c0c0` | garis di sekitar header |
-| `--ks-freeze` | `#bdc1c6` | garis tebal baris/kolom yang dibekukan |
-| `--ks-error` | `#d93025` | pesan salah dan tanda nilai tidak valid |
-| `--ks-font` | `10pt/1.25 Arial, …` | huruf di dalam sel (bawaan; sel bisa punya huruf sendiri) |
-| `--ks-ui-font` | `13px/1.4 "IBM Plex Sans", system-ui, sans-serif` | huruf menu, toolbar, panel, dialog |
+| `select(target)` | `target: string \| { r1: number, c1: number, r2: number, c2: number }` | Memilih sel atau range koordinat, lalu menggulirkan viewport ke target. |
+| `scrollTo(cellAddress)` | `cellAddress: string` | Memilih satu sel dan menggulirkan viewport secara langsung. |
+| `startEdit(initialText?)` | `initialText?: string` | Membuka editor in-place pada sel aktif dengan opsi isi teks awal. |
+| `focus()` | - | Mengembalikan fokus keyboard ke area grid spreadsheet (misal setelah dialog ditutup). |
+| `showSheet(sheetId)` | `sheetId: string` | Mengarahkan viewport untuk menampilkan sheet tertentu. |
+| `getSelection()` | - | Mengambil snapshot objek seleksi kursor saat ini. |
+| `workbook` | - | Mengambil referensi instance workbook aktif. |
 
-### Menu
+### Shortcut Keyboard Bawaan
 
-| Menu | Isi | Di kode |
-|---|---|---|
-| **File** | Import… (`.xlsx`, `.csv`) · Download → Microsoft Excel (`.xlsx`) atau CSV sheet ini · Spreadsheet settings… (locale, mata uang) | `importXlsxInto`, `exportXlsx`, `exportCsv`, `setSettings` |
-| **Edit** | Undo, Redo · Cut, Copy, Paste · Paste special → Values only, Format only · Find and replace · Delete → Values, baris, kolom | `undo`, `copyBlock`, `pasteClip`, `findAll`, `replaceIn`, `clear`, `deleteRows` |
-| **View** | Freeze → baris dan kolom · Group → grup baris dan kolom, lipat dan buka semua · Comments · Show → Gridlines · Zoom | `setSheetProps`, `groupRows`, `showRowLevel`, `hideGridlines` |
-| **Insert** | Rows (di atas, di bawah) · Columns (kiri, kanan) · Sheet · Checkbox · Dropdown · Function · Link · Comment · Pivot table | `insertRows`, `insertCols`, `addSheet`, `addValidation`, `addComment`, `addPivot` |
-| **Format** | Number · Text (tebal, miring, garis bawah, coret) · Alignment · Wrapping · Rotation · Font size · Merge cells · Conditional formatting · Clear formatting | `setStyle`, `mergeCells`, `addConditional` |
-| **Data** | Sort sheet · Sort range · Create a filter · Data validation · Named ranges | `sortRange`, `createFilter`, `setValidation`, `addName` |
-
-**Klik kanan** pada sel, nomor baris, atau judul kolom membuka menu konteks: Cut, Copy, Paste, Paste values only, Insert dan Delete baris atau kolom,
-Clear contents, Hide dan Unhide, Merge dan Unmerge, serta Sort.
-
-### Toolbar
-
-| Tombol | Artinya |
+| Shortcut | Aksi |
 |---|---|
-| ↶ ↷ | undo, redo |
-| kuas | salin format: pilih sel sumber, klik kuas, lalu klik sel tujuan |
-| 100% | zoom |
-| `Rp` `%` | format uang (mata uang workbook) dan persen |
-| `.0←` `.00→` | kurangi atau tambah desimal |
-| `123` | daftar format: angka, tanggal, jam, durasi, teks, dan pola sendiri |
-| font, ukuran | jenis dan ukuran huruf |
-| **B** *I* ~~S~~ U | tebal, miring, coret, garis bawah |
-| A, ember | warna huruf, warna latar |
-| kotak | border: semua, luar, dalam, atas, bawah, kiri, kanan, hapus |
-| gabung | merge sel |
-| perataan | kiri, tengah, kanan, dan atas, tengah, bawah |
-| bungkus | Overflow (meluber ke sel kosong), Wrap (turun ke baris berikut), Clip (dipotong) |
-| putar | kemiringan teks |
-| rantai | link |
-| Σ | fungsi cepat: SUM, AVERAGE, COUNT, MAX, MIN untuk seleksi |
-| T× | hapus format |
+| `Arrow Keys` | Navigasi kursor antar sel; `Shift + Arrow` memperluas range seleksi; `Ctrl + Arrow` melompat ke tepi dataset. |
+| `Tab` / `Shift + Tab` | Berpindah ke sel kanan / kiri. |
+| `Enter` / `F2` | Mengaktifkan in-place cell editor; `Enter` saat mode edit menyimpan nilai dan berpindah ke baris bawah. |
+| `Shift + Enter` | Berpindah satu sel ke atas. |
+| `Alt + Enter` / `Ctrl + Enter` | Menyisipkan baris baru (newline) di dalam sel saat mode pengeditan teks. |
+| `Escape` | Membatalkan pengeditan yang sedang berlangsung tanpa menyimpan perubahan. |
+| `F4` | Mengubah siklus referensi koordinat formula di kursor (`A1` → `$A$1` → `A$1` → `$A1`). |
+| `Delete` / `Backspace` | Menghapus konten pada sel yang sedang terpilih. |
+| `Home` / `End` | Bergerak ke kolom pertama / terakhir yang terisi data pada baris aktif. |
+| `Ctrl + A` | Memilih seluruh sel dalam sheet aktif. |
+| `Ctrl + Z` / `Ctrl + Y` | Undo / Redo operasi data. |
+| `Ctrl + C` / `Ctrl + X` / `Ctrl + V` | Copy / Cut / Paste (terintegrasi penuh dengan clipboard sistem OS dan Excel). |
+| `Ctrl + Shift + V` | Paste nilai saja (tanpa formula atau gaya pemformatan). |
+| `Ctrl + B` / `Ctrl + I` / `Ctrl + U` | Mengubah format teks menjadi Tebal / Miring / Garis Bawah. |
+| `Alt + Shift + 5` | Menerapkan format coret (*strikethrough*). |
+| `Ctrl + \` | Menghapus seluruh format gaya pada sel yang dipilih. |
+| `Ctrl + K` | Membuka dialog penyisipan hyperlink. |
+| `Ctrl + F` / `Ctrl + H` | Membuka dialog Cari / Cari dan Ganti (*Find & Replace*). |
+| `Alt + ↓` | Membuka popup menu dropdown validasi data pada sel aktif. |
+| `Space` | Mengubah status centang pada sel bertipe checkbox. |
+| `Alt + Shift + →` / `Alt + Shift + ←` | Membuat grup / membubarkan grup baris bertingkat. |
+| `Ctrl + Alt + M` | Membuka thread panel komentar pada sel yang dipilih. |
 
-Tombol yang tidak boleh dipakai seseorang tampil abu-abu, atau hilang kalau ada aturan `deny ui.disallowed`.
+### Katalog Variabel Tema CSS
 
-### Panel samping
-
-Panel muncul di kanan grid, satu panel pada satu waktu:
-
-| Panel | Dibuka dari | Bab |
+| Variabel CSS | Nilai Bawaan | Area Penggunaan |
 |---|---|---|
-| Comments | View → Comments, Insert → Comment, Ctrl+Alt+M | [11](11-komentar-excel.md) |
-| Pivot table editor | memilih sel pivot, Insert → Pivot table | [7.6](07-data.md#76-pivot-table) |
-| Conditional formatting | Format → Conditional formatting | [6.6](06-format.md#66-conditional-formatting) |
-| Data validation | Data → Data validation, Insert → Dropdown | [8.3](08-menjaga-isi.md#83-pilihan-dari-daftar-dropdown) |
-| Named ranges | Data → Named ranges | [5.11](05-rumus.md#511-named-range) |
-| Find and replace | Ctrl+F, Ctrl+H | [7.7](07-data.md#77-mencari-dan-mengganti) |
-
-### Di dalam grid
-
-- **Fill handle**: kotak kecil di pojok kanan bawah seleksi. Tarik untuk melanjutkan deret (1, 2, 3 · Senin, Selasa · Item 1, Item 2) atau menyalin
-  rumus. Tahan Ctrl untuk menyalin apa adanya.
-- **Mengubah ukuran**: tarik garis di antara judul kolom atau nomor baris. Klik dua kali untuk menyesuaikan dengan isi.
-- **Filter**: tombol di judul kolom membuka urut dan saring ([7.4](07-data.md#74-menyaring)).
-- **Dropdown dan checkbox** dari validasi data: klik panahnya, atau tekan Alt+↓.
-- **Tanda di pojok sel**: oranye berarti ada komentar terbuka, merah berarti nilainya melanggar validasi yang hanya menandai.
-- **Grup**: tombol `[-]` dan `[+]` di samping nomor baris dan di atas judul kolom, dan tombol level di pojok kiri atas.
-- **Tab sheet**: klik kanan untuk Rename, Duplicate, Delete, Hide, serta Move left dan Move right. Tombol `+` menambah sheet, dan tombol ☰ menampilkan semua sheet
-  termasuk yang tersembunyi.
-
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [2. Konsep dasar](02-konsep.md) · Berikutnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md)
+| `--ks-accent` | `#1a73e8` | Indikator sel aktif, outline seleksi kursor, tombol aksi utama, dan highlight tab aktif. |
+| `--ks-bg` | `#ffffff` | Warna latar utama grid spreadsheet, modal dialog, dan panel flyout. |
+| `--ks-fg` | `#161616` | Warna teks utama konten sel dan antarmuka. |
+| `--ks-grid` | `#e2e3e3` | Garis batas antar sel (*gridlines*) dan bingkai kontainer luar. |
+| `--ks-head-bg` | `#f8f9fa` | Warna latar header kolom (huruf) dan header baris (nomor). |
+| `--ks-head-fg` | `#575757` | Warna teks label pada header kolom dan baris. |
+| `--ks-head-line` | `#c0c0c0` | Garis pembatas antara header dengan area sel grid. |
+| `--ks-freeze` | `#bdc1c6` | Garis pembatas tebal pemisah baris/kolom yang dibekukan (*frozen panes*). |
+| `--ks-error` | `#d93025` | Indikator segitiga error validasi sel dan pesan kegagalan. |
+| `--ks-font` | `10pt/1.25 Arial, sans-serif` | Tipografi default untuk konten sel spreadsheet. |
+| `--ks-ui-font` | `13px/1.4 "IBM Plex Sans", system-ui, sans-serif` | Tipografi antarmuka kontrol (menu bar, toolbar, panel, dan dialog). |

@@ -1,122 +1,129 @@
-# 5. Rumus
+# 05. Formula Calculation Engine
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md) · Berikutnya: [6. Format](06-format.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [04. Manipulasi Data Programatis](04-api-workbook.md) · Berikutnya: [06. Format](06-format.md)
 
-Bab ini mulai dari nol. Bagian A memakai satu nota belanja yang dibangun pelan-pelan, tanpa kode: setiap gambar adalah sheet sungguhan, sel yang
-dipilih diberi kotak biru, dan rumusnya terlihat di baris atas (formula bar). Bagian B menulis rumus dari kode, dengan halaman React dan fotonya.
-
-**Bagian A. Rumus di layar (tanpa kode)**
-- [5.1 Rumus itu apa](#51-rumus-itu-apa)
-- [5.2 Membaca sel lain](#52-membaca-sel-lain)
-- [5.3 Range dan SUM](#53-range-dan-sum)
-- [5.4 Menyalin rumus ke bawah](#54-menyalin-rumus-ke-bawah)
-- [5.5 Tanda `$`: sel yang tidak ikut bergeser](#55-tanda--sel-yang-tidak-ikut-bergeser)
-- [5.6 Teks dan tanggal di rumus](#56-teks-dan-tanggal-di-rumus)
-- [5.7 Error dan artinya](#57-error-dan-artinya)
-
-**Bagian B. Rumus dari kode**
-- [5.8 Menulis rumus dari kode](#58-menulis-rumus-dari-kode)
-- [5.9 Membaca sheet lain](#59-membaca-sheet-lain)
-- [5.10 Laporan dengan rumus](#510-laporan-dengan-rumus)
-- [5.11 Named range](#511-named-range)
-
-**Bagian C. Contoh lengkap, semua fungsi, dan yang sering keliru**
-- [5.12 Contoh lengkap](#512-contoh-lengkap)
-- [5.13 Semua fungsi: buat apa, cara pakai, hasilnya](#513-semua-fungsi-buat-apa-cara-pakai-hasilnya)
-- [5.14 Yang sering keliru](#514-yang-sering-keliru)
+Bab ini membahas arsitektur dan kapabilitas **Formula Calculation Engine** bawaan `@kufayeka/sheet`: sistem evaluasi dependency graph (DAG) reaktif, model referensi sel relatif dan absolut (`$`), kalkulasi lintas sheet, named ranges, penanganan taksonomi error, manipulasi array/matriks, serta referensi lengkap 180+ fungsi bawaan (finansial, statistik, logika, rekayasa, lookup, hingga fungsi teks lokal seperti `TERBILANG`).
 
 ---
 
-# Bagian A. Rumus di layar (tanpa kode)
+## 1. Arsitektur Engine & Prinsip Komputasi
 
-## 5.1 Rumus itu apa
+Formula engine beroperasi menggunakan prinsip **Directed Acyclic Graph (DAG)** dan *topological sorting*:
 
-Rumus adalah isi sel yang diawali tanda `=`. Sel tidak menampilkan rumusnya, tetapi **hasilnya**. Ketik `=2+3` di sebuah sel, tekan Enter, dan sel itu
-menampilkan `5`. Rumusnya tetap bisa dilihat di formula bar saat sel itu dipilih:
+```text
+┌────────────────────┐     ┌─────────────────────────┐
+│  Sel Input         │ ──► │  Formula Sel            │
+│  (B2: Qty, C2: HSP)│     │  (D2 = B2 * C2)         │
+└────────────────────┘     └───────────┬─────────────┘
+                                       │
+                                       ▼
+┌────────────────────┐     ┌─────────────────────────┐
+│  Formula Turunan   │ ◄── │  Agregasi Rangking/Sum  │
+│  (D6 = D5 * $B$6)  │     │  (D5 = SUM(D2:D4))      │
+└────────────────────┘     └─────────────────────────┘
+```
 
-![=2+3 menampilkan 5](img/rumus-dasar.png)
+1. **Reaktif & Minimal Recalculation**: Mengubah satu sel pada dataset 100.000 baris hanya memicu kalkulasi ulang pada rantai sel yang bergantung langsung padanya (*downstream dependents*), menjaga frame rate tetap 60fps tanpa lagging.
+2. **Volatile Formulas**: Fungsi dinamis seperti `TODAY()` dan `NOW()` dievaluasi ulang saat terjadi mutasi atau pemanggilan eksplisit `wb.tick()`. Timestamp deterministik dapat disuntikkan via opsi `now` pada `createWorkbook` untuk keperluan *unit testing*.
+3. **Number Precision & Currency Rounding**: Untuk mencegah *floating-point error* tipikal JavaScript (`0.1 + 0.2 = 0.30000000000000004`), engine menerapkan pembulatan otomatis berbasis skala desimal format kolom mata uang.
 
-Tanda hitung yang bisa dipakai: `+` tambah, `-` kurang, `*` kali, `/` bagi, `^` pangkat, `%` persen (`=20%` sama dengan 0,2). Urutannya seperti
-matematika: kali dan bagi dulu, baru tambah dan kurang. Pakai kurung untuk mengubah urutan: `=(2+3)*4` hasilnya 20.
+---
 
-Di dalam rumus, desimal selalu ditulis dengan **titik**: `=72000*1.5`, bukan `=72000*1,5`. Koma dipakai untuk memisahkan isi fungsi (5.3).
+## 2. Sintaks Dasar & Operator Komputasi
 
-## 5.2 Membaca sel lain
+Formula ditandai dengan karakter sama dengan (`=`) di awal teks input. Formula engine mendukung operator matematika standar dan string concatenation:
 
-Rumus bisa membaca isi sel lain lewat alamatnya. Di nota ini, Jumlah di D2 adalah Harga × Qty:
+![Formula dasar penjumlahan =2+3](img/rumus-dasar.png)
 
-![D2 berisi =B2*C2](img/rumus-sel.png)
+### Operator Matematika & Logika
 
-`=B2*C2` artinya "isi B2 dikali isi C2". Kalau Qty di C2 diubah dari 10 menjadi 12, Jumlah di D2 langsung menjadi Rp 864.000, begitu juga Subtotal,
-PPN, dan Total di bawahnya. Rumus selalu memakai isi terbaru dari sel yang dibacanya.
+| Operator | Operasi | Contoh | Evaluasi Hasil |
+|---|---|---|---|
+| `+`, `-` | Penjumlahan & Pengurangan | `=100 - 25 + 5` | `80` |
+| `*`, `/` | Perkalian & Pembagian | `=50 * 2 / 4` | `25` |
+| `^` | Eksponensial (Pangkat) | `=2 ^ 8` | `256` |
+| `%` | Persentase | `=50%` | `0.5` |
+| `&` | String Concatenation | `="Total: " & D7` | `"Total: 7714500"` |
+| `=`, `<>` | Kesetaraan & Ketidaksamaan | `=A1 = "Semen"` | `TRUE` / `FALSE` |
+| `>`, `<`, `>=`, `<=` | Perbandingan Numerik | `=D2 >= 1000` | `TRUE` / `FALSE` |
 
-Sel di sheet lain ditulis dengan nama sheet dan tanda seru: `=Produk!B2`. Kalau nama sheet-nya ada spasi, beri tanda kutip satu: `='Daftar Harga'!B2`.
+> **Kaidah Literal Numerik**: Di dalam string formula, angka desimal selalu menggunakan tanda titik (`.`), misalnya `=72000 * 1.5`. Tanda koma (`,`) digunakan khusus sebagai pemisah argumen fungsi.
 
-## 5.3 Range dan SUM
+---
 
-Dua alamat yang disambung titik dua adalah **range**, yaitu kotak berisi beberapa sel. `D2:D4` berarti D2, D3, dan D4. Subtotal menjumlahkan range itu
-dengan **fungsi** `SUM`:
+## 3. Model Referensi Koordinat Sel
 
-![D5 berisi =SUM(D2:D4)](img/rumus-sum.png)
+### Referensi Sel Tunggal & Rantai Ketergantungan
+Formula dapat membaca koordinat sel lain untuk menghasilkan komputasi dinamis:
 
-Fungsi adalah rumus siap pakai yang punya nama. Bentuknya selalu `NAMA(isi)`. Isinya bisa range, sel, angka, atau teks, dipisahkan koma:
-`=SUM(D2:D4, 50000)` menjumlahkan D2 sampai D4, lalu ditambah 50.000. Ada 189 fungsi; semuanya ada di [5.13](#513-semua-fungsi-buat-apa-cara-pakai-hasilnya).
+![Referensi sel D2 membaca B2 dikali C2](img/rumus-sel.png)
 
-Bentuk range lain: `D:D` (seluruh kolom D), `2:2` (seluruh baris 2), dan `A1:D4` (kotak empat kolom kali empat baris).
+Ketika sel `C2` (Qty) mengalami perubahan dari `10` menjadi `12`, nilai `D2` (`=B2*C2`) secara otomatis terhitung ulang menjadi `Rp 864.000`, yang kemudian memicu kalkulasi ulang pada `Subtotal (D5)` dan `Total (D7)`.
 
-## 5.4 Menyalin rumus ke bawah
+### Rentang Sel (Range Syntax) & Agregasi
+Dua koordinat sel yang dihubungkan tanda titik dua (`:`) membentuk **Range**:
 
-Rumus Jumlah di D3 dan D4 tidak diketik satu per satu. D2 dipilih, lalu **fill handle** (kotak kecil di pojok kanan bawah sel) ditarik ke bawah. Rumusnya
-ikut menyesuaikan barisnya sendiri:
+![Fungsi SUM menjumlahkan rentang D2:D4](img/rumus-sum.png)
 
-![D4 berisi =B4*C4](img/rumus-fill.png)
+Bentuk range yang didukung:
+- `D2:D4`: Blok sel vertikal baris 2 hingga 4 pada kolom D.
+- `A1:E10`: Matriks 2 dimensi (persegi).
+- `D:D`: Seluruh kolom D secara vertikal.
+- `2:2`: Seluruh baris ke-2 secara horizontal.
 
-| Sel | Rumus |
-|---|---|
-| D2 | `=B2*C2` |
-| D3 | `=B3*C3` |
-| D4 | `=B4*C4` |
+### Penyesuaian Relatif saat Duplikasi (Fill Handle)
+Ketika formula disalin ke bawah (via drag handle atau programatis `fillBlock`), referensi koordinat relatif akan bergeser secara proporsional:
 
-Alamat di rumus bergeser sejauh rumus itu dipindah: satu baris ke bawah, `B2` menjadi `B3`. Hal yang sama terjadi saat rumus di-copy lalu di-paste.
+![Formula disalin ke bawah menyesuaikan baris](img/rumus-fill.png)
 
-## 5.5 Tanda `$`: sel yang tidak ikut bergeser
-
-Tarif PPN ada di **satu** sel saja, B6. Rumus PPN harus selalu membaca B6, ke mana pun rumusnya disalin. Untuk itu B6 ditulis `$B$6`:
-
-![D6 berisi =D5*$B$6](img/rumus-dolar.png)
-
-| Ditulis | Disalin satu baris ke bawah | Artinya |
+| Koordinat Sel | Formula Tersimpan | Penyesuaian Baris |
 |---|---|---|
-| `=D5*B6` | `=D6*B7` | dua-duanya ikut bergeser: tarif PPN ikut pindah, salah |
-| `=D5*$B$6` | `=D6*$B$6` | `$` di depan kolom dan baris: B6 tidak bergeser, benar |
-| `=D5*B$6` | `=D6*B$6` | hanya baris yang dikunci |
-| `=D5*$B6` | `=D6*$B7` | hanya kolom yang dikunci |
+| `D2` | `=B2*C2` | Mengalikan baris ke-2 |
+| `D3` | `=B3*C3` | Otomatis bergeser ke baris ke-3 |
+| `D4` | `=B4*C4` | Otomatis bergeser ke baris ke-4 |
 
-Tekan **F4** saat mengetik alamat di rumus untuk berganti di antara keempat bentuk itu.
+### Penguncian Koordinat Absolut (`$`)
+Gunakan simbol dollar (`$`) untuk mengunci kolom, baris, atau keduanya agar referensi sel tidak bergeser saat formula disalin:
 
-## 5.6 Teks dan tanggal di rumus
+![Referensi absolut $B$6 mengunci tarif PPN](img/rumus-dolar.png)
 
-**Teks** ditulis di antara tanda kutip dua: `="Total: " & D7`. Tanda `&` menyambung teks dengan teks atau angka. Baris Terbilang di nota memakai fungsi
-`TERBILANG` untuk mengubah angka Total menjadi kata-kata, seperti di kwitansi:
+| Notasi Formula | Perilaku Saat Disalin ke Bawah | Klasifikasi Referensi |
+|---|---|---|
+| `=D5*B6` | `=D6*B7` | **Relatif penuh**: baris dan kolom ikut bergeser. |
+| `=D5*$B$6` | `=D6*$B$6` | **Absolut penuh**: kolom B dan baris 6 terkunci permanen. |
+| `=D5*B$6` | `=D6*B$6` | **Baris terkunci, kolom relatif**. |
+| `=D5*$B6` | `=D6*$B7` | **Kolom terkunci, baris relatif**. |
 
-![B8 berisi TERBILANG](img/rumus-terbilang.png)
+> **Tips Interaksi**: Tekan tombol **F4** saat mengedit formula di formula bar untuk mengganti siklus format referensi kursor secara cepat: `A1` → `$A$1` → `A$1` → `$A1`.
 
-`=PROPER(TERBILANG(D7)) & " Rupiah"` dibaca dari dalam ke luar: `TERBILANG(D7)` mengubah angka di D7 menjadi kata-kata, `PROPER` membuat huruf pertama
-setiap kata menjadi besar, lalu `& " Rupiah"` menambahkan kata Rupiah di belakangnya.
+---
 
-**Tanggal** di sheet sebenarnya angka, yaitu jumlah hari sejak 30 Desember 1899 (sama dengan Excel). 1 Oktober 2026 adalah 46296. Format tanggal yang
-membuatnya tampil sebagai `01/10/2026` ([bab 6](06-format.md)). Karena tanggal adalah angka, tanggal bisa dihitung:
+## 4. Manipulasi Teks, Tanggal, & Utilitas Lokal
 
-| Rumus | Hasil |
+### Teks & Fungsi `TERBILANG`
+Teks diapit tanda kutip ganda (`"`). Fungsi bawaan `TERBILANG` mengonversi nilai numerik menjadi representasi ejaan kata bahasa Indonesia formal untuk kwitansi atau invoice:
+
+![Fungsi TERBILANG mengubah angka menjadi teks terbilang rupiah](img/rumus-terbilang.png)
+
+```excel
+=PROPER(TERBILANG(D7)) & " Rupiah"
+```
+
+### Operasi Aritmatika Tanggal
+Nilai tanggal dihitung sebagai serial integer (jumlah hari sejak 30 Desember 1899, setara standar ISO/Excel), memungkinkan kalkulasi tanggal secara presisi:
+
+| Formula | Fungsi Evaluasi |
 |---|---|
-| `=A2+14` | 14 hari setelah tanggal di A2 (jatuh tempo) |
-| `=B2-A2` | selisih hari antara dua tanggal |
-| `=TODAY()` | tanggal hari ini, berubah setiap hari |
-| `=WORKDAY(A2, 10)` | 10 hari kerja setelah A2, tanpa Sabtu dan Minggu |
+| `=A2 + 14` | Menghitung tanggal jatuh tempo (14 hari kalender setelah A2). |
+| `=B2 - A2` | Menghitung durasi selisih hari antar dua tanggal. |
+| `=WORKDAY(A2, 10, Libur)` | Menghitung 10 hari kerja setelah A2 (mengecualikan Sabtu, Minggu, dan range hari libur). |
+| `=NETWORKDAYS(A2, B2)` | Menghitung total jumlah hari kerja aktif di antara dua tanggal. |
 
-## 5.7 Error dan artinya
+---
 
-Kalau rumus tidak bisa dihitung, sel menampilkan kode error. Error bukan berarti sheet rusak, tetapi tanda ada yang perlu dibetulkan:
+## 5. Taksonomi Error & Mekanisme Recovery
+
+Ketika formula tidak dapat dievaluasi, engine menghasilkan objek error terstruktur (`{ code: string }`). Error menjalar (*propagate*) ke formula turunan yang mereferensikannya, dan secara otomatis pulih begitu sel penyebabnya diperbaiki:
 
 <!-- contoh: 05-error.js -->
 ```js
@@ -168,25 +175,23 @@ kolom dihapus : =#REF!*2 = #REF!
 ```
 <!-- /hasil -->
 
-| Tampil | Artinya | Biasanya karena | Cara membetulkan |
-|---|---|---|---|
-| `#DIV/0!` | dibagi nol | pembaginya kosong atau 0 | isi pembaginya, atau `=IFERROR(B1/D1, 0)` |
-| `#N/A` | tidak ketemu | yang dicari `VLOOKUP`/`XLOOKUP`/`MATCH` tidak ada | cek ejaannya, atau `=IFNA(..., "tidak ada")` |
-| `#VALUE!` | jenis isi salah | teks dikali angka, atau range yang panjangnya beda | pastikan selnya berisi angka |
-| `#NAME?` | nama tidak dikenal | salah ketik nama fungsi (`SUMM`) | betulkan ejaannya |
-| `#REF!` | sel yang dibaca sudah dihapus | baris, kolom, atau sheet yang dibaca dihapus | undo, atau tulis ulang rumusnya |
-| `#NUM!` | angka tidak mungkin | `SQRT(-4)` | cek angkanya |
-| `#CYCLE!` | rumus membaca dirinya sendiri | A1 membaca B1, B1 membaca A1 | putus lingkarannya |
+### Panduan Penanganan Error
 
-Error menjalar: rumus yang membaca sel error ikut error. Begitu penyebabnya dibetulkan, semua yang ikut error pulih sendiri.
+| Kode Error | Penyebab Utama | Penanganan & Mitigasi |
+|---|---|---|
+| `#DIV/0!` | Pembagian dengan angka 0 atau sel kosong. | Bungkus dengan `=IFERROR(B1/D1, 0)`. |
+| `#N/A` | Nilai pencarian pada `VLOOKUP`/`XLOOKUP` tidak ditemukan. | Gunakan default value pada `XLOOKUP(..., [if_not_found])` atau bungkus dengan `IFNA()`. |
+| `#VALUE!` | Operasi matematika pada tipe non-numerik (string). | Validasi tipe input via `ISNUMBER()` sebelum kalkulasi. |
+| `#NAME?` | Penulisan fungsi tidak terdaftar atau named range belum dibuat. | Periksa ejaan fungsi atau pastikan deklarasi named range telah terdaftar. |
+| `#REF!` | Target baris, kolom, atau sheet yang direferensikan telah terhapus. | Perbaiki formula atau kembalikan entitas via `undo()`. |
+| `#NUM!` | Domain numerik invalid (misal akar bilangan negatif `SQRT(-1)`). | Periksa batasan parameter komputasi numerik. |
+| `#CYCLE!` | Rantai dependensi sirkular (sel mereferensikan dirinya sendiri baik langsung maupun tidak). | Putus siklus perulangan dependensi antar sel. |
 
 ---
 
-# Bagian B. Rumus dari kode
+## 6. Implementasi Formula dari Kode
 
-## 5.8 Menulis rumus dari kode
-
-**Tujuan:** nota di bagian A, dibuat dari kode.
+Formula dapat disuntikkan secara programatis via `sheet.setValues()`:
 
 <!-- contoh: 05-nota.page.js -->
 ```jsx
@@ -229,24 +234,11 @@ export default function Nota() {
 ```
 <!-- /contoh -->
 
-Dari kode, rumus ditulis dengan `setValues` seperti mengetik di sel: teks yang diawali `=` menjadi rumus. Hasilnya dibaca dengan `value`, dan rumusnya
-dengan `input` (bab 2).
+---
 
-| Fungsi | Artinya |
-|---|---|
-| `setValues(alamat, '=…')` | tulis rumus |
-| `value(alamat)` | hasilnya. Error berupa `{ code }`, cek dengan `isError` |
-| `input(alamat)` | rumusnya sebagai teks, seperti di formula bar |
-| `fillBlock(wb, sheet, sumber, tujuan, arah)` | fill handle dari kode |
-| `FUNCTION_NAMES` | nama semua fungsi |
+## 7. Referensi Formula Lintas Sheet & XLOOKUP
 
-Hanya rumus yang terkena sebuah perubahan yang dihitung ulang, jadi mengubah satu sel di sheet 100.000 baris tetap cepat. `TODAY()` dan `NOW()` dihitung
-ulang setiap ada perubahan, atau saat `wb.tick()` dipanggil. Opsi `now` di `createWorkbook` mengganti jamnya, misalnya untuk test. Rumus di sel yang
-formatnya uang dibulatkan ke desimal formatnya, supaya total tidak meleset sepeser pun dari yang tampil.
-
-## 5.9 Membaca sheet lain
-
-**Tujuan:** nota yang mengambil nama dan harga dari sheet Produk, dan tarif PPN dari sheet Pengaturan.
+Sistem multi-sheet memungkinkan konsolidasi data master dan transaksi:
 
 <!-- contoh: 05-09-antar-sheet.page.tsx -->
 ```tsx
@@ -289,21 +281,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-D2 dipilih:
+![Harga dan nama produk diambil dari sheet lain via XLOOKUP](img/rumus-antar-sheet.png)
 
-![Harga diambil dari sheet Produk](img/rumus-antar-sheet.png)
+---
 
-**Penjelasan:**
+## 8. Laporan Agregasi Bersyarat (`SUMIFS`, `COUNTIFS`)
 
-- `Produk!$A$2:$A$4` adalah range di sheet Produk. Nama sheet ditulis sebelum `!`. Nama yang mengandung spasi ditulis di antara tanda kutip
-  satu: `'Daftar Harga'!A2`.
-- `XLOOKUP(A2, kolom_kode, kolom_harga)` mencari kode di A2 di kolom kode, lalu memberi nilai di baris yang sama dari kolom harga.
-- `$` menahan range supaya tidak ikut bergeser saat rumusnya disalin ke baris berikutnya (5.5).
-- Kalau tarif PPN di sheet Pengaturan diubah, semua PPN di nota ikut berubah. Kalau sheet-nya diganti nama, rumusnya ikut menulis nama baru.
-
-## 5.10 Laporan dengan rumus
-
-**Tujuan:** 300 transaksi di sheet Penjualan, diringkas per cabang di sheet Laporan.
+Pembuatan laporan eksekutif dan rekap data bersyarat:
 
 <!-- contoh: 05-10-laporan.page.tsx -->
 ```tsx
@@ -353,23 +337,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-B2 dipilih:
+![Ringkasan metrik cabang dihasilkan dari formula bersyarat](img/rumus-laporan.png)
 
-![Ringkasan per cabang](img/rumus-laporan.png)
+---
 
-**Penjelasan:**
+## 9. Named Ranges: Variabel Deklaratif dalam Formula
 
-- `SUMIFS(yang_dijumlah, range_syarat, syarat)` menjumlah hanya baris yang memenuhi syarat: di sini baris yang cabangnya sama dengan A2.
-- `COUNTIFS` menghitung barisnya. Rata-rata dan pangsa dihitung dari keduanya.
-- Rumusnya dibuat dengan template string di dalam `map`, satu baris rumus per cabang. `A${r}` menjadi `A2`, `A3`, `A4`.
-- Kalau ada transaksi baru di sheet Penjualan (di dalam range), laporannya ikut berubah sendiri.
-
-Yang dipakai: `SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, dan `MAXIFS` untuk total dengan syarat, `$` di penyebut pangsa, `INDEX` + `MATCH` dan `XLOOKUP` +
-`LARGE` untuk "siapa yang terbesar", dan `">=" & tanggal` untuk menjumlah per periode. Semua range di satu `SUMIFS` harus sama panjang.
-
-## 5.11 Named range
-
-**Tujuan:** memberi nama pada range, supaya rumus laporan terbaca seperti kalimat.
+Gunakan **Named Range** untuk mendefinisikan alias semantik terhadap koordinat range, membuat formula lebih mudah dibaca dan dikelola:
 
 <!-- contoh: 05-11-nama.page.tsx -->
 ```tsx
@@ -415,36 +389,23 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-B3 dipilih:
+![Formula deklaratif dengan named ranges](img/rumus-nama.png)
 
-![Rumus dengan nama](img/rumus-nama.png)
+### API Named Range
 
-**Penjelasan:**
-
-- `wb.addName('Omzet', 'Penjualan', 'K2:K301')` memberi nama `Omzet` pada range itu.
-- `=SUMIFS(Omzet, Cabang, "Bandung")` sama dengan `=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`, tapi jauh lebih mudah
-  dibaca.
-- Kalau range sebuah nama diperluas, semua rumus yang memakainya ikut menghitung baris baru. Kalau namanya diganti, rumusnya ikut menulis nama
-  baru (5.12).
-- Nama juga bisa dibuat orang di layar, lewat Data → Named ranges, atau dengan mengetik nama di kotak nama.
-
-| Fungsi | Artinya |
+| Metode | Deskripsi |
 |---|---|
-| `wb.addName(nama, sheet, range)` | buat nama |
-| `wb.setName(id, { name, sheetId, range })` | ganti nama atau range-nya |
-| `wb.removeName(id)` | hapus nama |
-| `wb.names()` | `[{ id, name, sheetId, range, ref }]` |
-| `wb.nameRange(nama)`, `wb.nameProblem(nama)` | range sebuah nama, dan alasan sebuah nama tidak boleh dipakai |
+| `wb.addName(nama, sheet, range)` | Mendaftarkan alias range baru. |
+| `wb.setName(id, { name, sheetId, range })` | Memperbarui nama atau range koordinat (semua formula otomatis sinkron). |
+| `wb.removeName(id)` | Menghapus alias named range. |
+| `wb.names()` | Mengambil daftar seluruh named range terdaftar (`[{ id, name, sheetId, range, ref }]`). |
+| `wb.nameProblem(nama)` | Memvalidasi sintaks nama (menghasilkan string alasan jika nama bentrok dengan koordinat sel seperti `A1` atau sudah ada). |
 
 ---
 
-# Bagian C. Contoh lengkap, semua fungsi, dan yang sering keliru
+## 10. Studi Kasus Integrasi Lanjutan
 
-## 5.12 Contoh lengkap
-
-Contoh-contoh di bawah ini lebih panjang. Hasilnya dicetak sebagai teks, supaya setiap langkahnya terlihat.
-
-### Nota dengan sheet lain, fill dari kode, dan sheet yang diganti nama
+### Siklus Hidup Formula: Fill Programatis & Rename Sheet
 
 <!-- contoh: 05-rumus.js -->
 ```js
@@ -509,7 +470,9 @@ setelah ubah  : =ROUND(E7*'Atur Toko'!B1, 0) = 834000
 ```
 <!-- /hasil -->
 
-### Laporan bulanan lengkap
+---
+
+### Pipeline Analitik Finansial & Lookup Lanjutan (`INDEX`/`MATCH`, `IFS`, `RANK`)
 
 <!-- contoh: 05-laporan.js -->
 ```js
@@ -586,11 +549,11 @@ jumlah 5 minggu = total omzet: true | 1 Oktober 2026 hari ke 4 (Senin = 1, jadi 
 ```
 <!-- /hasil -->
 
-### Named range dan SUBTOTAL
+---
 
-**Named range** adalah nama untuk sebuah range. `=SUMIFS(Omzet, Cabang, "Bandung")` lebih mudah dibaca daripada
-`=SUMIFS(Penjualan!$K$2:$K$301, Penjualan!$C$2:$C$301, "Bandung")`. **SUBTOTAL** menjumlah tanpa menghitung subtotal lain di dalam range-nya, dan bisa
-melewati baris yang disembunyikan:
+### Perhitungan Bertingkat & Filter-Aware Aggregations (`SUBTOTAL`)
+
+Fungsi `SUBTOTAL` mencegah penghitungan ganda (*double-counting*) pada hierarki subtotal, serta dapat melompati baris yang disembunyikan:
 
 <!-- contoh: 05-nama-subtotal.js -->
 ```js
@@ -677,18 +640,9 @@ filter tanpa Surabaya       : 104075000 (9) | 104075000 (109)
 ```
 <!-- /hasil -->
 
-- Rumus boleh ditulis sebelum namanya dibuat: hasilnya `#NAME?` sampai nama itu ada.
-- Mengganti nama membuat semua rumus menulis nama baru. Memperluas range sebuah nama membuat semua rumus ikut menghitung range baru.
-- Nama tidak boleh berupa alamat sel. `PPN2026` adalah alamat (kolom PPN, baris 2026), jadi pakai `Tarif_PPN`.
-- Di layar: Data → Named ranges.
+---
 
-Angka pertama `SUBTOTAL` memilih fungsinya: 1 `AVERAGE`, 2 `COUNT`, 3 `COUNTA`, 4 `MAX`, 5 `MIN`, 6 `PRODUCT`, 7 `STDEV`, 8 `STDEVP`, 9 `SUM`, 10 `VAR`,
-11 `VARP`. Ditambah 100 (`SUBTOTAL(109, ...)`), baris yang disembunyikan dengan tangan atau grup yang dilipat juga dilewati. Baris yang disaring filter
-selalu dilewati.
-
-### Rumus untuk proyek dan keuangan
-
-AHSP, jadwal hari kerja, kwitansi termin, cicilan alat, dan rekap dinamis:
+### Komputasi Rekayasa Proyek & Finansial (AHSP, Jadwal Kerja, PMT, IRR)
 
 <!-- contoh: 05-konstruksi.js -->
 ```js
@@ -770,21 +724,11 @@ OFFSET         : 220000000 | INDIRECT 1157320
 ```
 <!-- /hasil -->
 
-**Range di dalam hitungan.** `=SUM(B2:B6*D2:D6)` mengalikan kedua range baris demi baris, lalu menjumlahkannya. Ini berlaku untuk semua tanda hitung
-dan perbandingan. Perbandingan menghasilkan `TRUE`/`FALSE` per baris, yang dihitung 1 dan 0 kalau dikali, jadi syarat bisa ditulis langsung:
-`=SUMPRODUCT((C2:C6<>"OH")*B2:B6*D2:D6)` hanya menjumlahkan baris yang satuannya bukan OH. Range yang ukurannya berbeda menghasilkan `#N/A`. Hasil
-seperti ini yang ditulis sendirian di satu sel (`=A2:A9*2`) menampilkan nilai pertamanya saja.
+---
 
-`OFFSET` dan `INDIRECT` dihitung ulang setiap ada perubahan, karena sel yang dibacanya baru diketahui saat dihitung. Excel juga begitu. Pakai secukupnya
-di sheet yang sangat besar.
+## 11. Katalog Lengkap Fungsi Bawaan (180+ Functions)
 
-`TERBILANG` tidak ada di Excel. Di file `.xlsx` hasilnya ikut tersimpan, jadi teksnya tampil saat dibuka di Excel, tetapi kalau Excel menghitung ulang
-sel itu, hasilnya `#NAME?`.
-
-## 5.13 Semua fungsi: buat apa, cara pakai, hasilnya
-
-Setiap fungsi dengan satu contoh. Hasilnya dihitung oleh library ini dari tabel contoh di bawah, jadi yang tertulis di sini adalah hasil sungguhan.
-Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokumentasi gagal.
+Tabel berikut dihasilkan dan diverifikasi secara langsung terhadap test suite formula engine.
 
 <!-- tabel: 05-fungsi.js -->
 **Tabel contoh.** Semua contoh di bawah membaca sheet `Data` ini:
@@ -1042,19 +986,18 @@ Daftar ini diperiksa otomatis: kalau ada fungsi yang belum tercantum, test dokum
 | `AGGREGATE` | total yang bisa melewati error dan baris tersembunyi (9 = SUM, 6 = lewati error) | `=AGGREGATE(9, 6, B2:B5, B2/0)` | 586.500 |
 <!-- /tabel -->
 
-Fungsi yang belum tersedia antara lain `NA`, `WORKDAY.INTL`, `FILTER`, `SORT`, `UNIQUE` (fungsi yang hasilnya tumpah ke banyak sel), konstanta array
-seperti `{1,2,3}`, dan `IMPORTRANGE`. Rumus dengan nama yang tidak ada menampilkan `#NAME?`.
+---
 
-## 5.14 Yang sering keliru
+## 12. Gotchas & Kesalahan Umum
 
-| Keliru | Benar |
-|---|---|
-| Rumus disalin ke bawah, tapi range-nya ikut bergeser | tahan dengan `$`: `$B$6`, `Produk!$A$2:$A$4` (5.5) |
-| Baris baru tidak ikut dijumlah | sisipkan di **dalam** range, bukan di bawahnya ([4.3](04-api-workbook.md#43-menulis-satu-baris)) |
-| `SUMIFS` memberi `#VALUE!` | semua range di satu `SUMIFS` harus sama panjang |
-| Total di sheet beda sepeser dengan yang tampil | sel bertipe uang dibulatkan ke desimal formatnya; pakai `ROUND` kalau perlu pembulatan lain |
-| Nama sheet berspasi di rumus | tulis di antara tanda kutip satu: `='Produk Nov'!E5` |
-| Menghitung dengan teks hasil `display` | pakai `value` (bab 2) |
-| `TODAY()` di tes selalu berubah | beri jam tetap lewat pilihan `now` di `createWorkbook` (bab 2) |
+| Kesalahan | Konsekuensi | Solusi |
+|---|---|---|
+| **Lupa menyematkan tanda `$` saat menyalin formula ke bawah** | Range pencarian atau referensi sel parameter ikut bergeser ke baris kosong. | Kunci koordinat menggunakan `$`, misal `$B$6` atau `Produk!$A$2:$A$10`. |
+| **Menyisipkan baris di luar jangkauan agregasi `SUM`** | Data baris baru tidak masuk ke dalam perhitungan total. | Sisipkan baris di dalam batas range data sebelum baris total ([Bab 04](04-api-workbook.md#31-menyisipkan-baris-data-terhitung-secara-programatis)). |
+| **Argumen range pada fungsi multi-syarat (`SUMIFS`, `COUNTIFS`) memiliki panjang berbeda** | Menghasilkan error `#VALUE!`. | Pastikan seluruh range yang dipasangkan memiliki dimensi baris dan kolom yang identik. |
+| **Nilai komputasi tanggal/waktu pada automated testing berubah setiap hari** | Test gagal karena nilai `TODAY()` tidak statis. | Tentukan waktu konstan menggunakan opsi `now: () => new Date(...)` pada saat factory `createWorkbook` dipanggil. |
+| **Nama sheet dengan karakter spasi tidak dibungkus kutip** | Parser formula gagal mengevaluasi nama sheet. | Selalu gunakan tanda petik tunggal untuk nama sheet berspasi: `='Produk Nov'!E5`. |
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [4. Mengisi dan membaca dari kode](04-api-workbook.md) · Berikutnya: [6. Format](06-format.md)
+---
+
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [04. Manipulasi Data Programatis](04-api-workbook.md) · Berikutnya: [06. Format](06-format.md)

@@ -1,60 +1,32 @@
-# 7. Data
+# 07. Operasi Data: Sorting, Filtering, Grouping & Pivot Table
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [8. Menjaga isi yang diketik](08-menjaga-isi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [06. Format](06-format.md) · Berikutnya: [08. Validasi Data & Proteksi Sel](08-menjaga-isi.md)
 
-Bab ini membahas cara mengolah tabel data: mengurutkan, menyaring, melipat kelompok baris, meringkas dengan pivot table, dan mencari serta
-mengganti. Semua yang ada di menu Data di layar juga bisa dilakukan dari kode, dan semuanya bisa di-undo. Setiap langkah adalah satu halaman
-React dengan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [7.1 Tabel data di sheet](#71-tabel-data-di-sheet)
-- [7.2 Alat-alatnya](#72-alat-alatnya)
-
-**Bagian B. Langkah demi langkah**
-- [7.3 Mengurutkan](#73-mengurutkan)
-- [7.4 Menyaring](#74-menyaring)
-- [7.5 Melipat kelompok baris](#75-melipat-kelompok-baris)
-- [7.6 Pivot table](#76-pivot-table)
-- [7.7 Mencari dan mengganti](#77-mencari-dan-mengganti)
-
-**Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
-- [7.8 Contoh lengkap](#78-contoh-lengkap)
-- [7.9 Yang sering keliru](#79-yang-sering-keliru)
-- [7.10 Referensi](#710-referensi)
+Bab ini membedah fitur-fitur manipulasi data tingkat lanjut pada `@kufayeka/sheet`: pengurutan multi-kolom (*multi-column sorting*), penyaringan data interaktif (*conditional filtering*), outline hierarkis baris (*row grouping & folding*), engine **Pivot Table** dinamis, serta mesin pencarian dan penggantian teks/rumus berbasis Regex (*Find & Replace*).
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Ikhtisar Kapabilitas Manipulasi Data
 
-## 7.1 Tabel data di sheet
+Spreadsheet menyediakan serangkaian alat terintegrasi untuk eksplorasi dan analisis dataset besar:
 
-Semua alat di bab ini bekerja paling baik pada **tabel data**: baris pertama berisi judul kolom, lalu setiap baris di bawahnya adalah satu catatan
-(satu transaksi, satu produk), tanpa baris kosong di tengahnya.
-
-| Kode | Produk | Harga | Stok |
+| Fitur | Deskripsi | API Programatis | Interaksi Pengguna (UI) |
 |---|---|---|---|
-| SMN-01 | Semen Portland 50 kg | 72000 | 420 |
-| BSI-10 | Besi beton 10 mm | 79500 | 260 |
-
-Baris total sebaiknya dipisah dari data, atau dibiarkan di luar range yang diurutkan dan disaring.
-
-## 7.2 Alat-alatnya
-
-| Alat | Hasilnya | Isi data berubah? | Langkah |
-|---|---|---|---|
-| **Sort** | baris diurutkan menurut satu kolom | urutannya, ya; isinya tidak | 7.3 |
-| **Filter** | baris yang tidak memenuhi syarat disembunyikan | tidak | 7.4 |
-| **Grup** | baris rincian bisa dilipat dan dibuka | tidak | 7.5 |
-| **Pivot table** | ringkasan per kelompok, ditulis di tempat lain | data asli tidak; ringkasannya ditulis ke sheet | 7.6 |
-| **Cari dan ganti** | teks yang dicari diganti di semua sel | ya | 7.7 |
+| **Sorting** | Mengurutkan baris data berdasarkan satu atau beberapa kriteria kolom (A-Z, Z-A, angka, tanggal). | `sheet.sortRange(range, specs)` | Menu *Data → Sort range*, klik kanan header. |
+| **Filter View** | Menyaring baris secara kondisional tanpa menghapus data; mendukung exclusion list dan kondisi nilai. | `sheet.createFilter(range)`, `setFilterColumn()` | Tombol toolbar Filter, menu *Data → Create a filter*. |
+| **Row Grouping** | Mengelompokkan baris ke dalam hierarki bertingkat yang dapat dilipat/dibuka (folding/accordion). | `sheet.groupRows(from, to)`, `toggleGroup()` | Tombol garis margin kiri `[+]` / `[-]`, shortcut `Alt+Shift+Right`. |
+| **Pivot Table** | Mengagregasi data multidimensi (baris, kolom, nilai, filter, grup tanggal) secara otomatis. | `sheet.addPivot(at, source, spec)` | Menu *Insert → Pivot table*. |
+| **Find & Replace** | Pencarian cepat teks/nilai/formula dengan pencocokan kata utuh, case-sensitive, atau JavaScript Regex. | `findAll()`, `replaceIn()` | Dialog shortcut `Ctrl+F` dan `Ctrl+H`. |
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Implementasi Panduan Langkah demi Langkah
 
-## 7.3 Mengurutkan
+---
 
-**Tujuan:** tombol yang mengurutkan produk menurut nama, tanpa mengikutkan baris judul dan baris total.
+### 2.1 Pengurutan Data (Sorting)
+
+Pengurutan data dapat dilakukan pada rentang data tertentu (`sortRange`) agar tidak mengacak baris header dan baris total di bawahnya:
 
 <!-- contoh: 07-03-sort.page.tsx -->
 ```tsx
@@ -80,28 +52,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah "Nama A-Z" diklik:
+![Daftar produk diurutkan berdasarkan nama A-Z](img/data-sort.png)
 
-![Produk diurutkan menurut nama](img/data-sort.png)
+> **Integritas Formula saat Sorting**: Formula yang mereferensikan sel di baris yang sama (`=C2*D2`) akan otomatis menyesuaikan referensinya ke baris baru setelah posisi baris dipindahkan oleh algoritma sorting.
 
-**Penjelasan:**
+---
 
-- `sortRange(wb, sheet, range, kolom, arah)`: range `A2:E4` adalah baris produk saja, jadi judul (baris 1) dan total (baris 5) tidak ikut.
-- `kolom` boleh huruf (`'B'`) atau nomor. `arah` adalah `'asc'` (kecil ke besar, A ke Z) atau `'desc'`.
-- Rumus di setiap baris ikut pindah bersama barisnya, dan total tetap benar.
+### 2.2 Penyaringan Data (Filtering)
 
-- **Baris dipindah utuh, rumus ikut.** Sort memindahkan baris, bukan menyalin isinya, jadi `=H2*I2*(1-J2)` tetap menghitung baris transaksinya sendiri.
-  Rumus di tempat lain yang membaca baris itu juga tetap benar.
-- **Sel kosong selalu di bawah**, apa pun arahnya. Nilai yang sama mempertahankan urutan lamanya.
-- **Sort bertahap.** Karena nilai yang sama tetap pada urutannya, urutkan dari kunci terakhir ke kunci pertama. Contohnya total dulu, baru cabang, maka
-  hasilnya diurutkan per cabang dan di dalam cabang menurut total.
-- Satu sort adalah satu perubahan.
-
-Di layar: Data → Sort range, atau menu di tombol filter.
-
-## 7.4 Menyaring
-
-**Tujuan:** tombol filter di setiap judul kolom, untuk menyaring dan mengurutkan dari layar.
+Filter menyembunyikan baris-baris yang tidak memenuhi kriteria tanpa menghapus baris tersebut dari memori atau memutus formula:
 
 <!-- contoh: 07-filter.page.js -->
 ```jsx
@@ -138,35 +97,13 @@ export default function HalamanFilter() {
 ```
 <!-- /contoh -->
 
-| Fungsi | Artinya |
-|---|---|
-| `createFilter(range)` | pasang filter. Baris pertama range adalah judul kolom, dan setiap judul mendapat tombol filter |
-| `setFilterColumn(kolom, syarat)` | syarat untuk satu kolom (`'C'` atau nomor). `null` membuang syaratnya |
-| `removeFilter()` | lepas filter. Semua baris tampil lagi |
-| `filterOf()` | filter sheet: `{ r1, c1, r2, c2, columns }` dengan kolom sebagai id, atau `null` |
-| `filterValues(kolom)` | `[{ text, count }]`: nilai di kolom itu, untuk daftar centang |
-| `filteredOut(r)` | apakah baris nomor `r` sedang disembunyikan filter |
+![Menu filter interaktif pada header kolom](img/filter.png)
 
-![Menu filter di kolom Cabang](img/filter.png)
+---
 
-Lanjutan contoh di atas. Filter menyembunyikan baris yang tidak memenuhi syarat, dan `SUBTOTAL(103, ...)` dan `SUBTOTAL(109, ...)` di kolom N langsung
-menghitung yang tampil saja:
+### 2.3 Hierarki Baris Bertingkat (Row Grouping & Folding)
 
-- **Menurut nilai**: `{ hidden: ['Bandung', 'Surabaya'] }`, yaitu nilai yang disembunyikan, sama seperti mencentang daftar di menu filter. `''` berarti
-  sel kosong. `filterValues(kolom)` memberi daftar nilai beserta jumlahnya, untuk menu buatanmu sendiri.
-- **Menurut kondisi**: syarat yang sama dengan conditional formatting ([6.6](06-format.md#66-conditional-formatting)), misalnya `{ op: 'gt', a: 5000000 }`,
-  `{ op: 'textContains', a: 'semen' }`, atau `{ op: 'between', a: 1, b: 10 }`.
-- **Menurut rumus**: `{ op: 'formula', formula: '=AND(J2>0, OR(G2="Semen", G2="Besi"))' }`, ditulis untuk baris pertama di bawah judul dan bergeser
-  untuk baris lain. Dengan rumus, syarat boleh membaca kolom mana saja.
-
-Satu baris tampil kalau lolos **semua** kolom yang disaring. Satu sheet hanya punya satu filter, dan filter baru menggantikan yang lama.
-
-Baris disaring **saat filter diubah**, bukan saat nilai berubah. Baris yang diedit sampai tidak lagi memenuhi syarat tetap
-tampil sampai filter diubah atau diterapkan ulang. Dengan begitu baris yang sedang diedit orang tidak tiba-tiba hilang dari layar.
-
-## 7.5 Melipat kelompok baris
-
-**Tujuan:** rincian per kategori yang bisa dilipat, sehingga yang tampil hanya ringkasannya.
+Fitur Grouping memungkinkan pembuatan hierarki baris (outline levels). Baris detail dapat dilipat (*collapse*) untuk hanya memperlihatkan baris ringkasan/subtotal:
 
 <!-- contoh: 07-05-grup.page.tsx -->
 ```tsx
@@ -214,39 +151,14 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Terbuka:
+![Grup baris dalam keadaan terbuka penuh](img/data-grup-buka.png)
+![Grup baris dalam keadaan terlipat menampilkan ringkasan level 1](img/data-grup-lipat.png)
 
-![Grup terbuka](img/data-grup-buka.png)
+---
 
-Setelah "Lipat semua" diklik:
+### 2.4 Analisis Data Multidimensi (Pivot Table)
 
-![Grup terlipat](img/data-grup-lipat.png)
-
-**Penjelasan:**
-
-- `groupRows('3:4')` membuat baris 3 dan 4 satu level lebih dalam. Tombol `[-]` tampil di baris di atasnya, yaitu baris judul kategori. Grup di dalam
-  grup dibuat dengan menggrup range yang lebih besar, sampai 7 level.
-- `foldRowGroup(nomor, level, true)` melipat satu grup, ditunjuk dengan nomor baris pertamanya (dihitung dari 0) dan levelnya. `false` membukanya.
-- `showRowLevel(n)` sama dengan tombol angka di pojok kiri atas: semua grup yang lebih dalam dari `n` dilipat. `0` melipat semuanya, angka besar
-  membuka semuanya.
-- Baris yang dilipat tetap dihitung `SUM`, tetapi dilewati `SUBTOTAL(10x, ...)` ([5.11](05-rumus.md#511-named-range)).
-- Fungsi kolom sama persis: `groupCols`, `ungroupCols`, `foldColGroup`, `showColLevel`, `colGroups`.
-
-| Fungsi | Artinya |
-|---|---|
-| `groupRows(baris)`, `groupCols(kolom)` | satu level lebih dalam |
-| `ungroupRows(baris)`, `ungroupCols(kolom)` | satu level lebih dangkal |
-| `foldRowGroup(nomor, level, lipat)`, `foldColGroup(...)` | lipat atau buka satu grup |
-| `showRowLevel(n)`, `showColLevel(n)` | tampilkan sampai level `n` |
-| `rowGroups()`, `colGroups()` | `{ groups: [{ level, from, to, folded }], maxLevel }` |
-- Tombol `[+]` dan `[-]` di sebelah kiri nomor baris, dan tombol angka `1 2` di pojok kiri atas, adalah cara orang melipat dan membuka grup di
-  layar.
-
-## 7.6 Pivot table
-
-Pivot table meringkas tabel data per kelompok: omzet per kategori dan cabang, transaksi per minggu, penjualan per sales. Cara kerjanya sama dengan pivot
-table di Excel. Pivot disimpan di sheet, ditulis sebagai nilai biasa, dan dihitung ulang setiap kali datanya berubah. Fungsi yang sama
-juga bisa dipakai tanpa sheet, misalnya di server, untuk meringkas data dari database.
+Engine Pivot Table mengagregasikan ratusan baris data mentah secara dinamis tanpa perlu menulis rumus manual:
 
 <!-- contoh: 08-pivot.page.js -->
 ```jsx
@@ -268,26 +180,13 @@ export default function HalamanAnalisa() {
 ```
 <!-- /contoh -->
 
-![Pivot table dan editornya](img/pivot.png)
+![Pivot table dengan panel konfigurasinya](img/pivot.png)
 
-Di layar, memilih satu sel pivot membuka editornya di kanan. Di sana ada sumber data, field untuk baris dan kolom (dengan urutan, urut menurut nilai,
-dan pengelompokan tanggal), value dengan fungsinya, dan filter:
+---
 
-Yang perlu diketahui:
+### 2.5 Pencarian dan Penggantian Teks / Formula (Find & Replace)
 
-- **Sumbernya range atau named range** yang baris pertamanya berisi nama field, misalnya `'Penjualan!A1:K301'`, `'A1:K301'` di sheet yang sama, atau
-  nama seperti `'Transaksi'`. Baris kosong dilewati. Dengan named range ([5.11](05-rumus.md#511-named-range)), pivot mengikuti nama itu ke mana pun range-nya
-  dipindah atau diperluas.
-- **Ditulis sebagai nilai.** Isi pivot adalah nilai biasa, bukan rumus, jadi rumus lain bisa membacanya (`=A2`, `=E2/E9`), dan ikut tersimpan serta
-  ikut ke Excel sebagai nilai.
-- **Dihitung ulang setelah setiap perubahan** pada datanya. Ukuran pivot boleh berubah: sel yang tidak lagi terpakai dikosongkan.
-- **Dikunci untuk orang.** Mengetik di sel pivot ditolak dengan pesan. Pivot diubah lewat editornya atau lewat `setPivot`.
-- **Tidak boleh di dalam datanya sendiri.** `addPivot` menolak tempat yang menimpa range sumbernya.
-- Pivot baru di layar dibuat lewat Insert → Pivot table.
-
-## 7.7 Mencari dan mengganti
-
-**Tujuan:** mengganti sebuah teks di seluruh sheet dari tombol, dan tahu berapa yang diganti.
+Fungsi `findAll` dan `replaceIn` mendukung pencarian presisi berbasis substring, case-sensitivity, formula internal, dan regular expression:
 
 <!-- contoh: 07-07-cari.page.tsx -->
 ```tsx
@@ -318,24 +217,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol diklik:
-
-![Portland diganti Gresik](img/data-cari.png)
-
-**Penjelasan:**
-
-- `findAll(wb, sheet, teks)` memberi semua sel yang memuat teks itu, sebagai `[{ r, c }]`.
-- `replaceIn(wb, sheet, sel, cari, ganti)` mengganti teks itu di sel-sel tersebut, dan mengembalikan jumlah yang diganti. Satu panggilan adalah
-  satu perubahan, jadi satu undo membatalkan semuanya.
-- Pilihan pencarian (huruf besar-kecil, seluruh sel, di dalam rumus, regex) ada di 7.10.
+![Pencarian dan penggantian kata secara programatis](img/data-cari.png)
 
 ---
 
-# Bagian C. Contoh lengkap, yang sering keliru, dan referensi
+## 3. Eksekusi Programatis via Core Engine
 
-## 7.8 Contoh lengkap
+Berikut adalah demonstrasi programatis terhadap operasi pengurutan, penyaringan, grouping, pivot table, dan regex replacement:
 
-### Sort bertahap dan filter, dengan hasilnya
+### Sorting & Filtering Programatis
 
 <!-- contoh: 07-sort-filter.js -->
 ```js
@@ -401,10 +291,9 @@ filter dihapus  : 300 baris
 ```
 <!-- /hasil -->
 
-`sortRange(wb, sheet, range, kolom, arah)` dari `@kufayeka/sheet/core` mengurutkan baris di dalam range menurut satu kolom, `'asc'` (A ke Z, kecil ke
-besar) atau `'desc'`. Range-nya tanpa baris judul. Yang perlu diketahui:
+---
 
-### Grup baris dan kolom
+### Grouping Baris & Outline Levels
 
 <!-- contoh: 07-grup.js -->
 ```js
@@ -472,7 +361,9 @@ lepas satu level: 7 grup tersisa, level terdalam 1
 ```
 <!-- /hasil -->
 
-### Pivot di sheet
+---
+
+### Evaluasi Komprehensif Pivot Table
 
 <!-- contoh: 08-pivot.js -->
 ```js
@@ -587,7 +478,9 @@ pivot dihapus       : 2 tersisa, G3 sekarang null
 ```
 <!-- /hasil -->
 
-### Pivot tanpa sheet: `pivot` dan `tableOf`
+---
+
+### Reaktivitas Pivot Table & Interaksi dengan Formula
 
 <!-- contoh: 08-pivot-data.js -->
 ```js
@@ -641,24 +534,9 @@ fungsi              : SUM, COUNT, COUNTA, COUNTUNIQUE, AVERAGE, MAX, MIN, MEDIAN
 ```
 <!-- /hasil -->
 
-`pivot(records, spesifikasi)` dari `@kufayeka/sheet/core` menerima array objek dari mana saja (database, API, file) dan memakai spesifikasi yang sama
-dengan 8.2. Fungsi ini murni dan tidak butuh browser, jadi bisa dipakai di server untuk laporan yang dikirim lewat email, di API yang mengembalikan
-ringkasan, atau untuk menggabungkan banyak file menjadi satu ringkasan ([Galeri](galeri.md)). Hasilnya:
+---
 
-| Kunci | Isinya |
-|---|---|
-| `cells` | tabel jadi sebagai array baris, siap ditulis ke sheet dengan `setValues` |
-| `header` | jumlah baris judul di awal `cells` |
-| `value(baris, kolom, i)` | satu angka: kelompok baris dan kolom sebagai array kunci, `i` nomor value. `[]` berarti semua |
-| `rowKeys`, `colKeys` | kunci kelompok baris dan kolom, urut seperti di tabel |
-| `rows` | baris badan tabel: `[{ cells, kind: 'row' \| 'subtotal' \| 'total', key }]` |
-
-`tableOf(wb, sheet, range)` membaca range sheet menjadi `{ fields, records }`. Baris pertama menjadi nama field, nilainya adalah hasil rumus, dan baris
-kosong dilewati. Range boleh berupa kolom utuh (`'A:K'`, sampai baris terakhir yang berisi), atau named range dengan `sheet` diisi `null`.
-
-`PIVOT_FUNCTIONS` berisi fungsi-fungsi value, misalnya untuk mengisi pilihan di form buatanmu sendiri.
-
-### Cari dan ganti
+### Find & Replace dengan Regular Expression
 
 <!-- contoh: 07-cari.js -->
 ```js
@@ -706,76 +584,39 @@ undo                  : Pipa PVC 3/4 inch
 ```
 <!-- /hasil -->
 
-`findAll(wb, sheet, cari, pilihan)` memberi semua sel yang cocok, urut dari kiri ke kanan dan dari atas ke bawah, sebagai `[{ r, c }]`. Yang dicari
-adalah teks seperti tampil di sel (`64000` cocok dengan sel berisi angka 64000), kecuali dengan `inFormulas`.
+---
 
-## 7.9 Yang sering keliru
+## 4. Referensi Lengkap API
 
-| Keliru | Benar |
-|---|---|
-| Baris judul ikut terurut | urutkan range data saja, mulai dari baris 2 (7.3) |
-| Baris total ikut terurut | biarkan total di luar range yang diurutkan (7.3) |
-| Baris yang baru diedit tidak hilang dari filter | baris disaring saat filter diubah, bukan saat nilainya berubah (7.4) |
-| `SUM` menghitung baris yang disaring | pakai `SUBTOTAL(109, ...)` untuk menjumlah yang tampil saja |
-| Pivot tidak berubah setelah data diubah | pivot dihitung ulang sendiri; pastikan data baru ada di dalam range sumbernya |
+### Konfigurasi Pivot Table (`PivotSpec`)
 
-## 7.10 Referensi
+```ts
+interface PivotSpec {
+    rows?: string[];                              // Field dimensi vertikal (grup bertingkat)
+    columns?: string[];                           // Field dimensi horizontal
+    values: Array<{                               // Agregasi nilai komputasi
+        field: string;
+        as?: string;                              // Alias label kolom
+        fn?: 'SUM' | 'COUNT' | 'COUNTA' | 'COUNTUNIQUE' | 'AVERAGE' | 'MAX' | 'MIN' | 'MEDIAN' | 'PRODUCT';
+    }>;
+    filters?: Record<string, { hidden: any[] }>;  // Pengecualian nilai record
+    sort?: Record<string,                         // Urutan pengurutan grup
+        'asc' | 'desc' | { by: string, dir: 'asc' | 'desc' }
+    >;
+    group?: Record<string, 'year' | 'quarter' | 'month' | 'week'>; // Partisi otomatis kolom tanggal
+    totals?: boolean;                             // Tampilkan Grand Total & Subtotal (default: true)
+}
+```
 
-### Pivot table
+### Opsi Operasi Find & Replace
 
-| Fungsi | Artinya |
-|---|---|
-| `addPivot(di, sumber, spesifikasi)` | buat pivot dengan sel kiri atas di `di` (`'A1'`). Mengembalikan id |
-| `setPivot(id, { source, spec, at })` | ganti sumber, spesifikasi, atau tempatnya. Boleh salah satu saja |
-| `removePivot(id)` | hapus pivot dan kosongkan selnya |
-| `pivots()` | pivot di sheet ini: `[{ id, source, spec, area }]`, dengan `area` adalah kotak yang ditempatinya sekarang |
-| `pivotAt(alamat)` | pivot yang menempati sel itu, atau `null` |
-
-| Kunci | Artinya | Contoh |
+| Opsi | Tipe | Kegunaan |
 |---|---|---|
-| `rows` | field untuk kelompok ke bawah, dari luar ke dalam. Dengan dua field atau lebih, setiap kelompok luar mendapat baris subtotal | `['Cabang', 'Sales']` |
-| `columns` | field untuk kelompok ke samping | `['Cabang']` |
-| `values` | yang dihitung di setiap kelompok: `field`, `fn` (bawaan `'SUM'`), dan `as` (nama kolomnya) | `[{ field: 'Total', as: 'Omzet' }]` |
-| `filters` | record yang tidak diikutkan, menurut nilai field | `{ Cabang: { hidden: ['Surabaya'] } }` |
-| `sort` | urutan kelompok sebuah field: menurut nama (`'asc'`, `'desc'`), atau menurut nilai (`{ by, dir }`) | `{ Kategori: { by: 'Omzet', dir: 'desc' } }` |
-| `group` | tanggal dikelompokkan: `'year'`, `'quarter'`, `'month'`, `'week'` | `{ Tanggal: 'month' }` |
-| `totals` | baris dan kolom Grand total, serta subtotal. Bawaan `true` | `false` |
+| `matchCase` | `boolean` | Pencocokan peka huruf besar/kecil (*case-sensitive*). |
+| `wholeCell` | `boolean` | Seluruh isi teks sel harus cocok persis dari awal hingga akhir. |
+| `inFormulas` | `boolean` | Mencari di dalam teks formula mentah (`'=B2*C2'`), bukan pada hasil nilainya. |
+| `regex` | `boolean` | Mengaktifkan evaluasi JavaScript RegExp (mendukung capturing group `$1`, `$2` pada `replaceIn`). |
 
-**Fungsi value:**
+---
 
-| `fn` | Hasil | | `fn` | Hasil |
-|---|---|---|---|---|
-| `SUM` | jumlah | | `MAX`, `MIN` | terbesar, terkecil |
-| `COUNT` | banyaknya angka | | `MEDIAN` | nilai tengah |
-| `COUNTA` | banyaknya yang tidak kosong | | `PRODUCT` | hasil kali |
-| `COUNTUNIQUE` | banyaknya nilai berbeda | | `AVERAGE` | rata-rata |
-
-Total dan subtotal dihitung dari record aslinya, bukan dari angka-angka di atasnya. Rata-rata di baris Grand total adalah rata-rata semua transaksi,
-bukan rata-rata dari rata-rata per minggu.
-
-**Urut menurut nilai.** `by` adalah nama value (`as`), atau nama field-nya kalau `as` tidak diisi. Dengan dua field baris, urutan menurut nilai berlaku di
-dalam setiap kelompok luar, seperti sales terbaik di setiap cabang pada pivot ketiga. Kelompok dengan nilai yang sama diurutkan menurut namanya.
-
-**Kelompok tanggal.** Field berisi tanggal (nomor hari, seperti sel tanggal) dikelompokkan menjadi `2026` (`year`), `2026-Q4` (`quarter`), `2026-10`
-(`month`), atau `2026-W43` (`week`, minggu ISO yang dimulai hari Senin). Teks-teks ini terurut sesuai waktu. Nilai yang bukan tanggal dikelompokkan apa
-adanya.
-
-**Sel kosong** dikelompokkan sebagai `(blank)`. Kombinasi baris dan kolom yang tidak punya record dibiarkan kosong, seperti Bata di Bandung pada pivot
-pertama.
-
-### Cari dan ganti
-
-| Pilihan | Artinya |
-|---|---|
-| `matchCase` | huruf besar dan kecil dibedakan |
-| `wholeCell` | seluruh isi sel harus sama, bukan sebagian |
-| `inFormulas` | cari di rumus (`=E2*G2`), bukan di hasilnya |
-| `regex` | yang dicari adalah regular expression JavaScript |
-
-`replaceIn(wb, sheet, sel, cari, ganti, pilihan)` mengganti bagian yang cocok di sel-sel hasil `findAll`, lalu menulis sel itu lagi seperti diketik.
-Dengan `regex`, `$1`, `$2`, dan seterusnya di teks pengganti adalah grup tangkapan. Semua penggantian adalah satu perubahan, jadi satu undo membatalkan
-semuanya. Fungsi ini mengembalikan jumlah sel yang berubah.
-
-Di layar: Ctrl+F untuk mencari, Ctrl+H untuk mencari dan mengganti.
-
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [6. Format](06-format.md) · Berikutnya: [8. Menjaga isi yang diketik](08-menjaga-isi.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [06. Format](06-format.md) · Berikutnya: [08. Validasi Data & Proteksi Sel](08-menjaga-isi.md)

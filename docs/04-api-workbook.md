@@ -1,69 +1,53 @@
-# 4. Mengisi dan membaca dari kode
+# 04. Manipulasi Data Programatis & API Workbook
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md) · Berikutnya: [5. Rumus](05-rumus.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [03. Komponen `<Sheet>` & Kustomisasi UI](03-komponen-sheet.md) · Berikutnya: [05. Formula Calculation Engine](05-rumus.md)
 
-Bab ini membahas pekerjaan sehari-hari FE dev: menulis ke sheet dari kode, membaca kembali sebagai data, mengisi dari data API, merapikan
-tampilan, serta mengatur baris, kolom, dan sheet. Setiap langkah adalah satu halaman React dengan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [4.1 Kapan mengisi dari kode](#41-kapan-mengisi-dari-kode)
-- [4.2 Bentuk isi yang diterima](#42-bentuk-isi-yang-diterima)
-
-**Bagian B. Langkah demi langkah**
-- [4.3 Menulis satu baris](#43-menulis-satu-baris)
-- [4.4 Membaca kembali sebagai data](#44-membaca-kembali-sebagai-data)
-- [4.5 Mengisi dari data API](#45-mengisi-dari-data-api)
-- [4.6 Gaya dan merge](#46-gaya-dan-merge)
-- [4.7 Baris dan kolom](#47-baris-dan-kolom)
-- [4.8 Sheet](#48-sheet)
-
-**Bagian C. Yang sering keliru, dan referensi**
-- [4.9 Yang sering keliru](#49-yang-sering-keliru)
-- [4.10 Referensi](#410-referensi)
+Bab ini membedah teknik manipulasi data programatis tingkat lanjut menggunakan API Workbook: penyisipan data tabular secara batch, ekstraksi data terstruktur ke format JSON (`tableOf`), pemetaan payload REST API (`populate`), pemformatan visual dan merge sel (studi kasus faktur/invoice), operasi dinamis baris dan kolom, serta manajemen siklus hidup multi-sheet.
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Pemilihan Pola Manipulasi Data
 
-## 4.1 Kapan mengisi dari kode
+Pilihlah API mutasi data yang sesuai dengan kebutuhan fungsional aplikasi Anda:
 
-| Situasi | Yang dipakai | Langkah |
+| Skenario Kebutuhan | API Rekomendasi | Karakteristik Utama |
 |---|---|---|
-| tombol "Tambah baris", templat awal, hasil hitungan aplikasimu | `setValues` | 4.3 |
-| mengirim isi sheet ke API sebagai daftar objek | `tableOf` | 4.4 |
-| menampilkan data dari API (daftar objek) sebagai tabel | `populate` | 4.5 |
-| judul tebal, angka Rupiah, sel digabung | `setStyle`, `setColProps`, `mergeCells` | 4.6 |
-| menyisipkan, menghapus, menyembunyikan, mengubah ukuran baris dan kolom | `insertRows`, `setColProps`, ... | 4.7 |
-| sheet per bulan, sheet rekap | `addSheet`, `duplicateSheet` | 4.8 |
+| Menambah baris baru, inisialisasi template dengan formula | `sheet.setValues(alamat, matriks)` | Mendukung string formula (`'=SUM(...)'`), evaluasi locale otomatis, cepat untuk matriks dimensi kecil-menengah. |
+| Mengekstraksi konten tabel sheet menjadi array objek JSON | `tableOf(wb, sheet, range)` | Memetakan baris header menjadi property keys objek secara instan. |
+| Ingesti data array objek dari REST/GraphQL API | `populate(wb, sheet, spec, data)` | Menulis data raw tanpa risiko formula injection, mendukung formatting per cell, auto-header generation. |
+| Menerapkan format visual, warna latar, borders, merge | `sheet.setStyle()`, `sheet.mergeCells()` | Menggabungkan styling modular pada range spesifik. |
+| Modifikasi layout baris/kolom (resize, hide, freeze) | `setRowProps()`, `setColProps()` | Mengatur dimensi piksel, visibilitas kolom tanpa merusak keterikatan formula. |
+| Manajemen multi-sheet (tambah, duplikasi, hapus sheet) | `wb.addSheet()`, `wb.duplicateSheet()` | Mengelola relasi data antar sheet dan formula lintas sheet. |
 
-Semua perubahan dari kode bersumber `'code'` (2.4): tidak diperiksa aturan, masuk undo, dan bisa didengar lewat `onOp`.
-
-## 4.2 Bentuk isi yang diterima
-
-`setValues(alamat, isi)` menerima isi seperti yang diketik orang: angka tetap angka, teks yang diawali `=` menjadi rumus, dan teks seperti
-`'1.250,5'` atau `'28/10/2026'` dibaca menurut locale workbook.
-
-| `isi` | Ditulis ke |
-|---|---|
-| `'Semen'`, `72000`, `true` | satu sel |
-| `'=B2*C2'` | rumus (teks yang diawali `=`) |
-| `"'=B2"` | teks apa adanya: tanda kutip satu di depan mencegahnya jadi rumus |
-| `null` | mengosongkan sel |
-| `[['a', 'b', 'c']]` | satu **baris**: ke kanan |
-| `[['a'], ['b'], ['c']]` | satu **kolom**: ke bawah |
-| `['a', 'b', 'c']` | array biasa juga ditulis **ke bawah**, satu nilai per baris |
-| `[['a', 'b'], ['c', 'd']]` | tabel: setiap array di dalamnya adalah satu baris |
-| `(r, c, sebelum) => isi` | dengan range sebagai alamat (`'A2:A9'`): isi setiap sel dari fungsi. `undefined` berarti sel itu tidak diubah |
+> **Catatan Keamanan & Transaksi**: Semua mutasi yang dieksekusi secara programatis melalui kode menggunakan identitas `source: 'code'` secara default. Operasi ini diperlakukan sebagai aksi sistem berprivilese tinggi yang melewati interceptor validasi antarmuka pengguna, dapat dibatalkan melalui single undo, dan memancarkan event `onOp`.
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Format Masukan Data `setValues`
 
-Semua contoh memakai daftar produk dari bab 2 (`buatProduk`). Baris yang baru ditandai `// baru`.
+Metode `sheet.setValues(koordinat, payload)` menerima berbagai struktur data:
 
-## 4.3 Menulis satu baris
+| Struktur Payload | Penafsiran oleh Engine |
+|---|---|
+| `'Semen'`, `72000`, `true` | Nilai primitif tunggal pada satu sel target. |
+| `'=B2*C2'` | Formula kalkulasi (setiap string dengan prefix `=`). |
+| `"'=B2"` | Raw literal string (tanda kutip tunggal `'` di awal mencegah evaluasi formula). |
+| `null` | Menghapus konten sel (clear value). |
+| `[['A', 'B', 'C']]` | Array 2D 1 baris: ditulis **horizontal ke kanan**. |
+| `[['A'], ['B'], ['C']]` | Array 2D 1 kolom: ditulis **vertikal ke bawah**. |
+| `['A', 'B', 'C']` | Array 1D sederhana: ditulis **vertikal ke bawah** (satu nilai per baris). |
+| `[['A', 'B'], ['C', 'D']]` | Matriks tabel: setiap elemen array dalam merepresentasikan satu baris data. |
+| `(r, c, currentValue) => nextValue` | Callback mapper dinamis untuk range koordinat (misal `'A2:A10'`). Mengembalikan `undefined` membiarkan sel tidak berubah. |
 
-**Tujuan:** tombol yang menambah satu produk, lengkap dengan rumusnya, dan total ikut menghitungnya.
+---
+
+## 3. Implementasi Panduan Langkah demi Langkah
+
+---
+
+### 3.1 Menyisipkan Baris Data Terhitung Secara Programatis
+
+Saat menambahkan entri baris baru ke dalam tabel yang memiliki total kumulatif di bawahnya, sisipkan baris di dalam batas range formula agar fungsi agregasi (`SUM`) secara otomatis memperluas cakupan perhitungannya:
 
 <!-- contoh: 04-03-tambah.page.tsx -->
 ```tsx
@@ -95,24 +79,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol diklik:
+![Baris baru disisipkan dan formula SUM otomatis memperbarui cakupan](img/isi-tambah.png)
 
-![Pasir masuk di baris 4, total ikut bertambah](img/isi-tambah.png)
+---
 
-**Penjelasan:**
+### 3.2 Ekstraksi Data Sheet ke Format Objek JSON (`tableOf`)
 
-- `lastFilled().r` memberi nomor baris terakhir yang berisi, dimulai dari 0. Di sini 4, yaitu baris total. Sebagai nomor di layar, itu
-  baris produk terakhir.
-- `insertRows('4')` menyisipkan baris kosong **di atas** baris 4. Isi di bawahnya turun satu, dan rumus yang membacanya ikut menyesuaikan.
-- `setValues('A4', [[...]])` mengisi satu baris: array di dalam array, satu array dalam per baris. Rumusnya ditulis sebagai teks `=C4*D4`.
-
-**Kenapa disisipkan di atas produk terakhir, bukan di atas total?** Total berisi `=SUM(E2:E4)`. Range **melebar** kalau baris disisipkan
-**di dalam** range itu (di atas baris 4), tapi **tidak** kalau disisipkan tepat di bawahnya (di atas baris 5). Excel berperilaku sama. Di foto,
-total menjadi `=SUM(E2:E5)` dan ikut menghitung pasir.
-
-## 4.4 Membaca kembali sebagai data
-
-**Tujuan:** daftar produk di sheet menjadi daftar objek, siap dikirim ke API, dan selalu sesuai dengan isi sheet.
+Gunakan utility function `tableOf(wb, sheetName, range)` untuk mengekspor data spreadsheet menjadi array of objects JSON yang siap dikirimkan ke backend:
 
 <!-- contoh: 04-04-baca-data.page.tsx -->
 ```tsx
@@ -138,19 +111,17 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Daftar produk sebagai JSON di samping sheet](img/isi-baca-data.png)
+![Ekstraksi data tabel sheet ke payload JSON terstruktur](img/isi-baca-data.png)
 
-**Penjelasan:**
+`tableOf` mengembalikan objek terstruktur:
+- `fields`: Array nama kolom yang diekstraksi dari baris pertama (`['Kode', 'Produk', 'Harga', 'Stok', 'Nilai stok']`).
+- `records`: Array objek JavaScript dengan nilai terhitung primitif (`value`), bukan string tampilan teks.
 
-- `tableOf(wb, 'Produk', 'A1:D4')` membaca sebuah range sebagai tabel: baris pertamanya (judul) menjadi nama field, dan setiap baris
-  berikutnya menjadi satu objek.
-- Nilainya adalah **value** (2.3): `72000`, bukan `'Rp 72.000'`. Itu yang biasanya dibutuhkan API.
-- Dibaca lewat `useWorkbook`, jadi JSON di samping ikut berubah setiap kali sheet diedit. `JSON.stringify` mengubah hasilnya menjadi teks,
-  supaya komponen hanya dirender ulang saat isinya benar-benar berubah.
+---
 
-## 4.5 Mengisi dari data API
+### 3.3 Mengisi Data dari REST API secara Aman (`populate`)
 
-**Tujuan:** daftar pesanan dari API ditampilkan sebagai tabel, dengan judul kolom sendiri dan satu sel yang diberi warna.
+Helper `populate(wb, sheet, spec, data)` dirancang khusus untuk memetakan data array objek eksternal ke dalam grid spreadsheet tanpa risiko eksekusi formula yang tidak disengaja:
 
 <!-- contoh: 04-05-populate.page.tsx -->
 ```tsx
@@ -192,22 +163,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Daftar pesanan dari data API](img/isi-populate.png)
+![Daftar pesanan hasil populasi data REST API](img/isi-populate.png)
 
-**Penjelasan:**
+---
 
-- `populate(wb, sheet, spec, data)` menulis data mulai dari sel `at`. Untuk daftar objek: satu baris per objek, satu kolom per field.
-- `fields` memilih field yang ditulis, dan urutannya. Field lain diabaikan.
-- `header` memberi baris judul di atasnya. Objek `{ id: 'No. PO', ... }` memberi judul per field; `true` memakai nama field apa adanya.
-- Sebuah nilai boleh berupa **cell object**: `{ value: 'Terlambat', fill: '#f4c7c3', bold: true }`. Nilainya ditulis beserta gayanya.
-- Beda dengan `setValues`: `populate` menulis data **apa adanya**. Teks `'=1+1'` tetap teks, tidak menjadi rumus, jadi aman untuk data dari
-  luar.
+### 3.4 Desain Dokumen Kompleks, Styling & Cell Merging (Studi Kasus: Faktur/Invoice)
 
-Semua pilihan `populate` ada di 4.10.
-
-## 4.6 Gaya dan merge
-
-**Tujuan:** sebuah nota yang rapi: judul digabung di tengah, warna, garis, angka Rupiah, dan total tebal.
+Spreadsheet dapat diformat menjadi dokumen faktur profesional dengan menggabungkan styling tipografi, border kustom, format perataan teks, dan penggabungan sel (*cell merging*):
 
 <!-- contoh: 04-05-invoice.page.tsx -->
 ```tsx
@@ -264,22 +226,13 @@ export default function Invoice() {
 ```
 <!-- /contoh -->
 
-![Nota yang rapi](img/invoice.png)
+![Faktur penjualan terformat dengan border ganda dan merging sel](img/invoice.png)
 
-**Penjelasan:**
+---
 
-- `setStyle(range, gaya)` menggabungkan gaya ke setiap sel di range. Gaya yang sudah ada dan tidak disebut tetap ada.
-- `mergeCells('A1:E1, A2:E2, ...')` menggabungkan setiap range menjadi satu sel. Isinya diambil dari sel kiri atas. Beberapa range sekaligus
-  dipisah koma.
-- `borders` memberi garis per sisi: `{ top, right, bottom, left }`, masing-masing `{ style, width, color }`. Di nota, garis tipis di bawah setiap
-  baris barang, dan garis ganda di atas total.
-- `format: { type: 'money', decimals: 0 }` di dalam `setStyle` memberi format Rupiah ke range itu saja (bab 6).
-- `wrap: 'wrap'` membuat teks panjang turun ke baris berikutnya di dalam sel, dan tinggi barisnya menyesuaikan.
-- Semua kunci gaya ada di 4.10.
+### 3.5 Operasi Kolom & Baris (Dimensi, Sembunyikan, dan Pembekuan)
 
-## 4.7 Baris dan kolom
-
-**Tujuan:** menyembunyikan kolom, mengubah lebar dan tinggi, dan menghapus baris dari tombol.
+Atur layout dimensi baris dan kolom serta sembunyikan kolom kalkulasi sensitif tanpa memutus integritas rantai formula:
 
 <!-- contoh: 04-07-baris-kolom.page.tsx -->
 ```tsx
@@ -309,20 +262,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tiga tombol pertama diklik:
+![Kolom harga disembunyikan dan tinggi header disesuaikan](img/isi-baris-kolom.png)
 
-![Kolom Harga tersembunyi, Kode lebih lebar, judul lebih tinggi](img/isi-baris-kolom.png)
+> **Integritas Formula pada Kolom Tersembunyi**: Menyembunyikan kolom dengan `hidden: true` tidak memengaruhi komputasi formula. Formula pada kolom E (`=C2*D2`) tetap mengevaluasi nilai sel C2 meskipun kolom C tidak tampak pada antarmuka visual.
 
-**Penjelasan:**
+---
 
-- `setColProps('C', { hidden: true })` menyembunyikan kolom C. Kolom itu tetap dihitung rumus: Nilai stok tetap benar.
-- `setColProps('A', { width: 140 })` dan `setRowProps('1', { height: 36 })` mengatur ukuran dalam piksel.
-- `deleteRows('3')` menghapus baris 3. Rumus yang membaca baris itu ikut menyesuaikan; range yang memuatnya menyusut.
-- Baris dan kolom ditulis seperti di layar: `'3'`, `'2:5'`, `'C'`, `'B:D'` (2.2).
+### 3.6 Siklus Hidup Multi-Sheet & Formula Lintas Sheet
 
-## 4.8 Sheet
-
-**Tujuan:** menyalin sheet untuk bulan berikutnya, dan menambah sheet rekap yang membaca keduanya.
+Engine mendukung pembuatan multi-sheet, duplikasi sheet independen, serta referensi formula antar sheet:
 
 <!-- contoh: 04-08-sheet.page.tsx -->
 ```tsx
@@ -354,151 +302,74 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol diklik, ada tiga tab:
+![Sistem multi-sheet dengan formula konsolidasi antar sheet](img/isi-sheet.png)
 
-![Tab Produk, Produk Nov, dan Rekap](img/isi-sheet.png)
-
-**Penjelasan:**
-
-- `wb.duplicateSheet('Produk')` membuat salinan yang berdiri sendiri, dan mengembalikan id-nya. `setSheetProps({ name })` mengganti namanya.
-- `wb.addSheet('Rekap')` menambah sheet kosong di belakang, dan mengembalikan id-nya.
-- Rumus bisa membaca sheet lain: `=SUM(Produk!E2:E4)`. Nama sheet yang mengandung spasi ditulis di antara tanda kutip satu:
-  `='Produk Nov'!E5`.
+### Kaidah Penulisan Formula Lintas Sheet
+- Format standar: `=NamaSheet!KoordinatSel` (contoh: `=Produk!E5`).
+- Nama sheet yang memuat spasi atau karakter khusus wajib dibungkus dengan tanda kutip tunggal: `='Produk Nov'!E5`.
 
 ---
 
-# Bagian C. Yang sering keliru, dan referensi
+## 4. Gotchas & Kesalahan Umum
 
-## 4.9 Yang sering keliru
-
-| Keliru | Benar |
-|---|---|
-| Baris baru di bawah tabel tidak ikut dijumlah | sisipkan di **dalam** range yang dijumlah (4.3) |
-| `setValues('A1', ['a', 'b', 'c'])` diharapkan ke kanan | array biasa ditulis **ke bawah**. Untuk ke kanan: `[['a', 'b', 'c']]` |
-| Data dari API berisi teks `'=...'` lalu menjadi rumus | pakai `populate` untuk data dari luar: ditulis apa adanya (4.5) |
-| Kode `'007'` menjadi angka `7` | tulis `"'007"` (diawali tanda kutip satu), atau pakai `populate` |
-| Menyembunyikan kolom membuat rumus salah | tidak: kolom tersembunyi tetap dihitung (4.7) |
-| Nama sheet berspasi di rumus | tulis di antara tanda kutip satu: `='Produk Nov'!E5` (4.8) |
-
-## 4.10 Referensi
-
-Semua fungsi di bawah ini ada di pegangan sheet (`wb.sheet('Produk')`), dan juga di workbook dengan nama sheet sebagai parameter pertama.
-
-### Membaca
-
-| Fungsi | Hasilnya | Dipakai untuk |
+| Kesalahan Umum | Konsekuensi | Praktik Rekomendasi |
 |---|---|---|
-| `value(alamat)` | nilai jadi: hasil rumus, atau isi apa adanya. Kosong: `null`. Error: `{ code: '#DIV/0!' }`, cek dengan `isError` | menghitung, mengirim ke API |
-| `input(alamat)` | teks yang diketik: rumus (`'=H2*I2*(1-J2)'`) atau nilai sebagai teks | formula bar, ekspor teks |
-| `display(alamat)` | `{ text, align, kind, color }`: yang tampil di layar setelah format dan locale | laporan, email, PDF |
-| `raw(alamat)` | yang disimpan: nilai, atau rumus `{ f, refs, v }` | menyalin apa adanya |
-| `cellFormat(alamat)` | format sel, atau format kolomnya. `null` kalau tidak ada | tahu sebuah angka itu uang atau tanggal |
-| `style(alamat)` | gaya yang disimpan di sel (tanpa conditional formatting) | menyalin gaya |
-| `shownStyle(alamat)` | gaya yang digambar, termasuk conditional formatting | menggambar sendiri |
-| `size()` | `{ rows, cols }` | |
-| `lastFilled()` | `{ r, c }`: baris dan kolom terakhir yang berisi. `{ r: -1, c: -1 }` kalau kosong | mencari ujung data |
-| `dataRegion(r, c)` | kotak tabel yang memuat sel itu, seperti Ctrl+A di Excel | menemukan tabel tanpa tahu ukurannya |
-| `forEachFilledRow((r, cells, styles) => …)` | dipanggil untuk setiap baris yang berisi, urut. Baris kosong dilewati | membaca seluruh data, cepat |
-| `rowContent(r)` | `{ cells, style }` satu baris, per id kolom | |
-| `wb.address(r, c)` | `'K21'` dari nomor | |
+| **Menambahkan baris baru di luar batas range agregasi `SUM`** | Baris baru tidak ikut terhitung ke dalam total. | Gunakan `insertRows` di dalam batas range data sebelum baris total, atau formulasikan range dengan buffer dinamis. |
+| **Menulis array 1 dimensi dan mengharapkan tersusun ke kanan** | Data tertulis memanjang ke bawah (vertikal). | Untuk menulis 1 baris ke kanan, bungkus dalam array 2 dimensi: `[['Kolom1', 'Kolom2', 'Kolom3']]`. |
+| **Memasukkan data eksternal mentah via `setValues`** | String yang diawali karakter `=` dievaluasi sebagai formula (*formula injection*). | Gunakan helper `populate()` untuk data API luar, atau awali string dengan kutip tunggal (`"'=Data"`). |
+| **Nilai kode leading zero (misal `'007'`) berubah menjadi numerik `7`** | Kehilangan format identifier kode unik. | Berikan prefix kutip tunggal (`"'007"`) atau gunakan tipe data string via `populate`. |
 
-| Fungsi | Artinya |
-|---|---|
-| `rowId(r)`, `colId(c)` | id baris atau kolom di nomor itu |
-| `rowIndex(id)`, `colIndex(id)` | nomor sekarang dari id itu, atau `-1` kalau sudah dihapus |
+---
 
-`tableOf(wb, sheet, range)` memberi `{ fields, records }`: baris pertama range menjadi nama field, baris lainnya menjadi objek (4.4).
+## 5. Referensi Lengkap API
 
-### Gaya
+### Pembacaan Data & Metadata Sheet
 
-| Kunci gaya | Nilai |
-|---|---|
-| `bold`, `italic`, `underline`, `strike` | `true` |
-| `color`, `fill` | warna CSS (`'#1a73e8'`): huruf, latar |
-| `fontSize` | angka (pt) |
-| `font` | nama font |
-| `align` | `'left'`, `'center'`, `'right'` |
-| `valign` | `'top'`, `'middle'`, `'bottom'` |
-| `wrap` | `'wrap'` turun baris, `'clip'` dipotong, tidak diisi: meluber ke sel kosong di sebelahnya |
-| `rotate` | derajat (-90 sampai 90), atau `'vertical'` |
-| `borders` | `{ top, right, bottom, left }`, setiap sisi `{ style: 'solid' \| 'dashed' \| 'dotted' \| 'double', width, color }` |
-| `format` | format angka (bab 6) |
-| `link` | URL: sel menjadi tautan |
-
-| Fungsi | Artinya |
-|---|---|
-| `setStyle(range, gaya)` | gabungkan gaya ke setiap sel di range |
-| `mergeCells(range)` | gabung setiap range menjadi satu sel. Isinya dari sel kiri atas |
-| `unmergeCells(alamat)` | lepas merge yang memuat sel itu |
-| `merges()` | `[{ r1, c1, r2, c2 }]` |
-
-### Baris dan kolom
-
-| Fungsi | Artinya |
-|---|---|
-| `insertRows(di, jumlah = 1)` | sisipkan baris kosong: `'4'` atau nomor `3` |
-| `deleteRows(baris)` | hapus: `'2'`, `'2:5'`, atau `(nomor, jumlah)` |
-| `moveRows(dari, jumlah, ke)` | pindahkan baris supaya berdiri sebelum nomor `ke` |
-| `insertCols`, `deleteCols`, `moveCols` | sama untuk kolom: `'C'`, `'B:D'` |
-| `setRowProps(baris, props)`, `setColProps(kolom, props)` | props digabung seperti gaya |
-| `rowProps(r)`, `colProps(c)` | props baris atau kolom |
-| `rowAxis()`, `colAxis()` | ukuran dalam piksel: `count`, `total`, `size(i)`, `start(i)`, `indexAt(px)`. Yang tersembunyi berukuran 0 |
-| `setAutoHeights(tinggi)` | tinggi baris otomatis dari teks yang turun. Dipakai grid |
-
-| Props | Artinya |
-|---|---|
-| `height` (baris), `width` (kolom) | piksel |
-| `hidden` | disembunyikan, tetap dihitung rumus |
-| `format` (kolom) | format untuk setiap sel di kolom itu yang tidak punya format sendiri |
-
-### Sheet
-
-| Fungsi | Artinya |
-|---|---|
-| `wb.sheet(nama atau id)` | pegangan sheet: semua fungsi bab ini tanpa parameter sheet, ditambah `id` dan `name` |
-| `wb.sheetIds()` | id semua sheet, urut seperti tab |
-| `wb.sheetIdByName(nama)` | id dari nama (huruf besar dan kecil tidak dibedakan), atau `null` |
-| `wb.addSheet(nama?)` | sheet baru di belakang. Mengembalikan id |
-| `wb.duplicateSheet(sheet)` | salinan yang berdiri sendiri. Mengembalikan id |
-| `wb.removeSheet(sheet)` | hapus. Rumus yang membacanya jadi `#REF!`, undo mengembalikannya |
-| `wb.hideSheet(sheet, true/false)` | sembunyikan tab. Tetap dihitung |
-| `wb.moveSheet(sheet, ke)` | pindahkan urutan tab |
-| `setSheetProps(props)`, `sheetProps()` | `name`, `hidden`, `freezeRows`, `freezeCols`, `hideGridlines` |
-| `wb.sheetShown(sheet)` | apakah sheet ini terlihat oleh orang yang membuka, menurut hak akses ([bab 10](10-hak-akses.md)) |
-
-### Pengaturan workbook (`wb.setSettings`)
-
-| Kunci | Artinya | Bawaan |
+| Metode | Output | Kegunaan |
 |---|---|---|
-| `locale` | cara angka dan tanggal ditulis dan dibaca: `'id-ID'` menulis `Rp 1.250.000` dan `27/10/2026` | `'en-US'` |
-| `currency` | mata uang format uang: `'IDR'`, `'USD'`, ... | `'USD'` |
-| `names` | named range, diisi lewat `addName` (bab 5) | |
+| `sheet.value(address)` | `any` (Number, String, Boolean, null, Error) | Nilai evaluasi primitif final. |
+| `sheet.input(address)` | `string` | Formula mentah atau teks masukan asli pengguna. |
+| `sheet.display(address)` | `{ text, align, kind, color }` | String terformat siap render visual sesuai locale. |
+| `sheet.raw(address)` | Objek internal sel | Struktur data serialisasi sel. |
+| `sheet.cellFormat(address)` | FormatConfig \| null | Aturan formatting sel atau warisan dari kolomnya. |
+| `sheet.style(address)` | CellStyle | Properti styling tersimpan pada sel. |
+| `sheet.shownStyle(address)` | CellStyle | Styling aktif gabungan (termasuk evaluasi conditional formatting). |
+| `sheet.lastFilled()` | `{ r: number, c: number }` | Indeks baris dan kolom terjauh yang memiliki isi data. |
+| `sheet.dataRegion(r, c)` | `{ r1, c1, r2, c2 }` | Menemukan batas blok data kontinu di sekitar sel target (seperti `Ctrl+A`). |
+| `sheet.forEachFilledRow(callback)` | `void` | Iterator performa tinggi yang melompati baris-baris kosong. |
 
-### `populate(wb, sheet, spec, data)`
+### Styling & Merge Cells
 
-Mengembalikan range yang ditulis (`{ r1, c1, r2, c2 }`, dalam nomor), atau `null` kalau tidak ada yang ditulis. Satu panggilan adalah satu perubahan
-dengan source `'code'`, jadi aturan untuk orang di layar (validasi, hak akses) tidak menghalanginya. Satu undo membatalkannya.
-
-| `spec` | Artinya | Bawaan |
+| Atribut Style | Tipe Nilai | Deskripsi |
 |---|---|---|
-| `at` | sel awal: `'A3'` atau `{ r, c }` | wajib |
-| `direction` | daftar ditulis ke `'down'` (bawah) atau `'right'` (kanan) | `'down'` |
-| `fields` | untuk tabel objek: field yang diambil dan urutannya | semua field, urut kemunculan |
-| `header` | untuk tabel objek: baris judul di atas data. `true` memakai nama field, array memberi judul urut seperti `fields`, objek memberi judul per field (`{ id: 'No. PO' }`) | tanpa baris judul |
-| `limit` | paling banyak berapa baris (atau kolom ke kanan) | sampai ujung sheet |
+| `bold`, `italic`, `underline`, `strike` | `boolean` | Gaya tipografi teks. |
+| `color`, `fill` | `string` (Hex CSS) | Warna teks dan warna latar sel. |
+| `fontSize`, `font` | `number`, `string` | Ukuran font (pt) dan jenis tipografi font family. |
+| `align`, `valign` | `'left' \| 'center' \| 'right'`, `'top' \| 'middle' \| 'bottom'` | Perataan horizontal dan vertikal. |
+| `wrap` | `'wrap' \| 'clip' \| 'overflow'` | Penanganan teks panjang (turun baris, potong, atau meluber). |
+| `borders` | `{ top?, right?, bottom?, left? }` | Konfigurasi garis batas per sisi (`style`, `width`, `color`). |
+| `mergeCells(range)` | - | Menggabungkan blok sel kontinu menjadi satu kesatuan. |
+| `unmergeCells(address)` | - | Memisahkan kembali sel yang telah di-merge. |
 
-Bentuk `data` yang diterima:
+### Operasi Baris & Kolom
 
-| Data | Ditulis sebagai |
-|---|---|
-| `12` | satu sel |
-| `['Sen', 'Sel', 'Rab']` | tiga sel ke bawah, atau ke kanan dengan `direction: 'right'` |
-| `[[12, 9], [15, 11]]` | blok. Setiap array di dalamnya adalah satu baris, atau satu kolom kalau `direction: 'right'` |
-| `[{ id: 'PO-2611', qty: 40 }, ...]` | tabel: satu baris per objek, satu kolom per field |
-| `{ value: 'Terlambat', fill: '#f4c7c3', bold: true }` | **cell object**: nilai beserta gayanya. Bisa diletakkan di mana pun nilai bisa diletakkan: di daftar, di blok, atau sebagai field tabel. Kunci gayanya sama dengan 4.10 (Gaya) |
+| Metode | Parameter Utama | Deskripsi |
+|---|---|---|
+| `insertRows(at, count?)` | `at: number \| string`, `count?: number` | Menyisipkan baris kosong baru. |
+| `deleteRows(rows)` | `rows: string \| number` | Menghapus baris tertentu beserta penyesuaian dependensi formula. |
+| `moveRows(from, count, to)` | `from: number`, `count: number`, `to: number` | Memindahkan posisi baris secara teratur. |
+| `insertCols`, `deleteCols`, `moveCols` | Sesuai varian kolom | Operasi penyesuaian kolom paralel. |
+| `setRowProps(row, props)` | `props: { height?, hidden? }` | Mengatur tinggi dan visibilitas baris. |
+| `setColProps(col, props)` | `props: { width?, hidden?, format? }` | Mengatur lebar, visibilitas, dan default format kolom. |
 
-Daftar objek yang semuanya punya `value` dianggap daftar cell object. Kalau tidak, daftar itu dianggap tabel.
+### Spesifikasi Opsi `populate(wb, sheet, spec, data)`
 
-Kalau datanya memang harus menjadi rumus atau dibaca menurut locale, misalnya template yang ditulis kodemu sendiri, pakai `setValues` atau `setBlock`.
-
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md) · Berikutnya: [5. Rumus](05-rumus.md)
+```ts
+interface PopulateSpec {
+    at: string | { r: number, c: number };       // Koordinat sel awal penulisan (wajib)
+    direction?: 'down' | 'right';                 // Arah penyusunan data (default: 'down')
+    fields?: string[];                            // Urutan key properti objek yang diekstraksi
+    header?: boolean | string[] | Record<string, string>; // Konfigurasi pembuatan baris label header
+    limit?: number;                               // Batas jumlah baris maksimum yang ditulis
+}
+```

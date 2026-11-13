@@ -1,91 +1,54 @@
-# 1. Mulai dalam 5 menit
+# 01. Mulai Cepat & Setup
 
-[Daftar isi](../README.md#daftar-isi) · Berikutnya: [2. Konsep dasar](02-konsep.md)
+[Daftar isi](../README.md#daftar-isi) · Bab berikutnya: [02. Konsep Arsitektur & Mental Model](02-konsep.md)
 
-Bab ini membawamu dari nol sampai punya halaman React berisi spreadsheet yang bisa diketik, dihitung, dan disimpan. Setiap langkah hanya
-menambah **satu hal baru**, dengan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [1.1 Apa yang kamu dapat](#11-apa-yang-kamu-dapat)
-- [1.2 Dua bagian: isi dan tampilan](#12-dua-bagian-isi-dan-tampilan)
-- [1.3 Bagian-bagian layar](#13-bagian-bagian-layar)
-
-**Bagian B. Langkah demi langkah**
-- [1.4 Pasang](#14-pasang)
-- [1.5 Sheet pertama](#15-sheet-pertama)
-- [1.6 Isi dari kode](#16-isi-dari-kode)
-- [1.7 Dirapikan](#17-dirapikan)
-- [1.8 Menyimpan](#18-menyimpan)
-- [1.9 Di Next.js](#19-di-nextjs)
-
-**Bagian C. Kalau ada masalah**
-- [1.10 Yang sering kelewat](#110-yang-sering-kelewat)
-- [1.11 Setelah bab ini](#111-setelah-bab-ini)
+Bab ini memandu Anda mulai dari instalasi paket, konfigurasi rendering pertama komponen `<Sheet />`, inisialisasi data programatis dan formula, pemformatan visual dan locale, hingga penanganan state persistence dan integrasi di lingkungan Next.js App Router.
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Arsitektur Dasar: Core vs Presentasi
 
-## 1.1 Apa yang kamu dapat
+Paket `@kufayeka/sheet` memisahkan layer data (state & kalkulasi) dari layer presentasi (antarmuka pengguna):
 
-Sebuah komponen React yang menampilkan spreadsheet lengkap di dalam aplikasimu sendiri:
-
-![Spreadsheet stok dengan rumus dan Rupiah](img/mulai-rapi.png)
-
-Orang bisa mengetik, memakai rumus (`=SUM`, `=VLOOKUP`, dan 120 lebih lainnya), memformat, mengurutkan, memfilter, dan mengunduh ke Excel.
-Isinya bisa kamu isi dari kode, kamu baca kembali, dan kamu simpan ke database. Contoh di seluruh dokumentasi ini memakai satu cerita yang sama:
-**sebuah toko bangunan** dengan daftar produk, harga, dan stok.
-
-## 1.2 Dua bagian: isi dan tampilan
-
-Library ini terdiri dari dua bagian yang terpisah:
-
-| Bagian | Apa itu | Dibuat dengan |
+| Lapisan | Deskripsi | Modul & Entry Point |
 |---|---|---|
-| **Workbook** | isinya: sheet, sel, nilai, rumus, gaya. Data biasa, tanpa layar | `createWorkbook()` dari `@kufayeka/sheet/core` |
-| **`<Sheet>`** | tampilannya: grid, menu, toolbar. Menampilkan sebuah workbook dan mengubahnya saat orang mengetik | komponen dari `@kufayeka/sheet` |
-
-Yang perlu diingat dari bab ini: **kamu mengisi dan membaca workbook, `<Sheet>` menampilkannya.** Workbook juga bisa dipakai tanpa layar sama
-sekali, misalnya di server. Itu dibahas di bab 2.
-
-Ada tiga hal yang di-import:
-
-| Import | Isinya |
-|---|---|
-| `import { Sheet } from '@kufayeka/sheet'` | komponen `<Sheet>`, dan pembantu React (`useWorkbook`) |
-| `import { createWorkbook } from '@kufayeka/sheet/core'` | workbook: membuat, mengisi, membaca. Jalan di browser dan di server |
-| `import '@kufayeka/sheet/style.css'` | tampilannya. Cukup sekali di aplikasi |
-
-## 1.3 Bagian-bagian layar
-
-![Bagian-bagian layar](img/bagian-layar.png)
-
-| Bagian | Isinya |
-|---|---|
-| **Menu bar** | File, Edit, View, Insert, Format, Data |
-| **Toolbar** | undo/redo, zoom, format angka (Rp, %, desimal), font, tebal/miring, warna, border, merge, rata, dan lainnya |
-| **Formula bar** | kotak nama di kiri (alamat sel aktif; ketik alamat lalu Enter untuk loncat), lalu isi sel aktif |
-| **Grid** | huruf kolom, nomor baris, dan sel |
-| **Tab sheet** | `+` untuk sheet baru, `☰` daftar semua sheet, lalu satu tab per sheet |
-
-Setiap bagian bisa disembunyikan, untuk semua orang atau untuk orang tertentu saja (bab 3 dan bab 10).
+| **Headless Workbook Engine** | Mengelola sheet, sel, kalkulasi formula, styling, history (undo/redo), dan rule keamanan. Berjalan secara isomorfik di browser maupun Node.js runtime tanpa dependensi DOM. | `createWorkbook` dari `@kufayeka/sheet/core` |
+| **Komponen Presentasi `<Sheet>`** | Antarmuka visual spreadsheet lengkap (virtualized grid, formula bar, toolbar, dialog konfigurasi, sheet tabs). Merender state workbook dan menangani interaksi pengguna. | `Sheet` dari `@kufayeka/sheet` |
+| **Stylesheet Global** | Menyediakan styling, layout grid, font, dan icon berbasis CSS Custom Properties (variabel CSS). | `@kufayeka/sheet/style.css` |
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Anatomi Antarmuka Pengguna
 
-## 1.4 Pasang
+Komponen `<Sheet />` hadir dengan antarmuka spreadsheet siap pakai yang modular:
+
+![Anatomi Antarmuka Spreadsheet](img/bagian-layar.png)
+
+- **Menu Bar**: Akses menu kontekstual standar (*File, Edit, View, Insert, Format, Data*).
+- **Toolbar**: Kontrol cepat untuk undo/redo, zoom level, format angka/mata uang, styling tipografi, alignment, border, merge cell, dan filter.
+- **Formula Bar**: Name Box di sisi kiri (menampilkan dan mengontrol koordinat sel aktif) dan input formula multiline reaktif.
+- **Virtualized Grid**: Area tabel performa tinggi dengan header kolom alfabet, header baris numerik, dan sel virtualized.
+- **Sheet Tabs**: Tab navigasi sheet aktif, tombol penambahan sheet (`+`), dan menu dropdown daftar seluruh sheet.
+
+> Seluruh elemen antarmuka di atas dapat disembunyikan atau dikustomisasi secara selektif melalui props komponen (lihat [Bab 03](03-komponen-sheet.md)) maupun dikontrol berbasis hak akses user (lihat [Bab 10](10-hak-akses.md)).
+
+---
+
+## 3. Instalasi
+
+Pasang paket `@kufayeka/sheet` ke dalam project React Anda:
 
 ```bash
 npm install @kufayeka/sheet
 ```
 
-Aplikasimu harus sudah memakai **React 18 atau lebih baru** (`react` dan `react-dom`). Library ini tidak membawa React sendiri, jadi tidak akan ada
-dua React di satu halaman.
+Pastikan project Anda telah menginstal `react` dan `react-dom` versi **>= 18.0.0**.
 
-## 1.5 Sheet pertama
+---
 
-**Tujuan:** spreadsheet kosong tampil di halaman.
+## 4. Implementasi Dasar (Blank Spreadsheet)
+
+Untuk merender spreadsheet kosong, impor komponen `Sheet` dan file CSS-nya. Pastikan container pembungkus memiliki dimensi tinggi (`height`) yang terdefinisi secara eksplisit.
 
 <!-- contoh: 01-05-kosong.page.tsx -->
 ```tsx
@@ -103,18 +66,17 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Sheet kosong](img/mulai-kosong.png)
+![Spreadsheet kosong](img/mulai-kosong.png)
 
-**Penjelasan:**
+### Catatan Teknis Layout
 
-- `<Sheet />` tanpa apa pun menampilkan spreadsheet kosong. Orang sudah bisa mengetik di dalamnya.
-- `import '@kufayeka/sheet/style.css'` memasang tampilannya. Tanpa baris ini, grid tampil berantakan.
-- **Pembungkusnya harus punya tinggi** (`height: 420`). Sheet mengisi penuh kotak pembungkusnya, jadi kotak tanpa tinggi membuat sheet tidak
-  terlihat. Tinggi bisa juga `100vh`, atau `flex: 1` di dalam kolom flex yang punya tinggi.
+Komponen `<Sheet />` menerapkan layout fleksibel yang mengisi 100% dimensi parent container (`width: 100%`, `height: 100%`). Jika container tidak memiliki nilai tinggi yang terdefinisi (misalnya `height: auto` default pada elemen `<div>`), spreadsheet akan terender dengan tinggi 0 piksel. Gunakan nilai tinggi absolut (seperti `height: 420px`), viewport unit (`height: 100vh`), atau CSS Flexbox/Grid (`flex: 1`).
 
-## 1.6 Isi dari kode
+---
 
-**Tujuan:** sheet tampil dengan isi daftar produk, termasuk rumus.
+## 5. Inisialisasi Data & Formula dari Kode
+
+Workbook dapat dibuat secara terprogram menggunakan `createWorkbook()`, diisi dengan matriks data serta rumus kalkulasi, kemudian di-passing ke `<Sheet workbook={wb} />`.
 
 <!-- contoh: 01-06-isi.page.tsx -->
 ```tsx
@@ -148,23 +110,20 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-E5 dipilih, sehingga formula bar memperlihatkan rumusnya:
+![Sheet terisi data produk dan kalkulasi formula](img/mulai-isi.png)
 
-![Sheet berisi daftar produk](img/mulai-isi.png)
+### Detail Mekanisme
 
-**Penjelasan:**
+1. **Inisialisasi Workbook**: `createWorkbook()` menghasilkan instance workbook baru dengan sheet default bernama `'Sheet1'`.
+2. **Batch Data Insertion**: Metode `sheet.setValues(koordinat, dataMatrix)` menyisipkan data mulai dari koordinat awal yang ditentukan (`'A1'`). Format matriks `Array<Array<any>>` memetakan array luar sebagai baris dan array dalam sebagai kolom.
+3. **Formula Parsing**: String yang diawali dengan karakter sama dengan (`=`) otomatis dievaluasi oleh formula engine internal (misalnya `=C2*D2` dan `=SUM(D2:D4)`). Hasil kalkulasi diperbarui secara reaktif setiap kali nilai dependensi selnya berubah.
+4. **Stable State Instantiation**: Bungkus inisialisasi instance workbook dengan lazy initializer pada React State (`useState(buatProduk)`). Jangan panggil `useState(buatProduk())` secara langsung agar instance workbook tidak terbuat ulang pada setiap siklus re-render.
 
-- `createWorkbook()` membuat workbook kosong dengan satu sheet bernama `Sheet1`.
-- `wb.sheet('Sheet1').setValues('A1', [...])` mengisi sel mulai dari A1. Array di dalam array: setiap array dalam adalah satu baris.
-- Teks yang diawali `=` adalah **rumus**: `=C2*D2` (harga kali stok), `=SUM(E2:E4)` (jumlah). Sheet menghitungnya sendiri, dan menghitung ulang
-  saat isinya berubah.
-- `useState(buatProduk)` membuat workbook **sekali saja**. Tulis nama fungsinya tanpa tanda kurung: kalau ditulis `useState(buatProduk())`,
-  workbook baru dibuat di setiap render dan isi yang diketik orang hilang.
-- `<Sheet workbook={wb} />` menampilkan workbook itu. Apa pun yang diketik orang langsung masuk ke `wb`.
+---
 
-## 1.7 Dirapikan
+## 6. Formatting, Styling, & Pengaturan Kolom
 
-**Tujuan:** angka dengan titik ribuan dan Rupiah, judul tebal, kolom nama lebih lebar, judul tetap di atas saat digulir.
+Tampilan sel, lebar kolom, pembekuan baris (freeze pane), dan locale mata uang dapat dikonfigurasi secara deklaratif melalui API workbook:
 
 <!-- contoh: 01-07-rapi.page.tsx -->
 ```tsx
@@ -206,24 +165,24 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Sheet yang sudah dirapikan](img/mulai-rapi.png)
+![Spreadsheet terformat dengan styling dan locale Indonesia](img/mulai-rapi.png)
 
-**Penjelasan:**
+### Rangkuman Konfigurasi API
 
-| Baris baru | Hasilnya |
+| Pemanggilan API | Fungsi |
 |---|---|
-| `wb.setSettings({ locale: 'id-ID', currency: 'IDR' })` | angka memakai cara Indonesia (1.250,5) dan mata uang Rupiah |
-| `s.setSheetProps({ name: 'Produk', freezeRows: 1 })` | tab bernama Produk, baris 1 tetap di atas saat digulir (garis tebal di bawahnya) |
-| `s.setStyle('A1:E1', { bold: true, fill: '#eef2f7' })` | judul tebal dengan latar abu-abu muda |
-| `s.setColProps('C', { format: { type: 'money', decimals: 0 } })` | kolom C tampil sebagai Rupiah tanpa desimal |
-| `s.setColProps('B', { width: 180 })` | kolom B selebar 180 piksel |
-| `fileName="Stok toko"` | nama file saat orang memilih File → Download |
+| `wb.setSettings({ locale: 'id-ID', currency: 'IDR' })` | Menetapkan locale formatting angka ke standar Indonesia (`1.250,50`) dan simbol mata uang default `IDR`. |
+| `s.setSheetProps({ name: 'Produk', freezeRows: 1 })` | Mengubah label tab sheet menjadi `'Produk'` dan membekukan baris ke-1 (header tetap terlihat saat scroll vertikal). |
+| `s.setStyle('A1:E1', { bold: true, fill: '#eef2f7' })` | Menerapkan visual styling (font tebal dan background fill warna abu-abu muda). |
+| `s.setColProps('C', { format: { type: 'money', decimals: 0 } })` | Menetapkan formatter numerik kolom C sebagai mata uang tanpa angka desimal di belakang koma. |
+| `s.setColProps('B', { width: 180 })` | Menentukan lebar tetap kolom B menjadi 180 piksel. |
+| `fileName="Stok toko"` | Menentukan nama file default saat pengguna mengekspor dokumen via menu *File → Download*. |
 
-Nilai di sel tidak berubah: E2 tetap berisi angka 30240000. Format hanya mengubah cara angka itu ditampilkan. Semua pilihan format ada di bab 6.
+---
 
-## 1.8 Menyimpan
+## 7. Persistensi State & Reactive Change Detection
 
-**Tujuan:** tombol Simpan yang aktif hanya saat ada perubahan, lalu isi sheet disimpan sebagai JSON.
+Untuk menghubungkan spreadsheet dengan siklus hidup persistensi (misalnya penyimpanan ke `localStorage` atau API backend), gunakan hook `useWorkbook` untuk mendeteksi perubahan transaksional:
 
 <!-- contoh: 01-08-simpan.page.tsx -->
 ```tsx
@@ -288,29 +247,20 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah stok Semen diubah dari 420 menjadi 400, tombolnya menjadi **Simpan**, dan totalnya ikut berubah:
+![Perubahan data memicu status unsaved dan mengaktifkan tombol simpan](img/mulai-simpan.png)
 
-![Ada perubahan yang belum disimpan](img/mulai-simpan.png)
+### Mekanisme Lifecycle Penyimpanan
 
-**Penjelasan:**
+- **`useWorkbook(wb, selector)`**: Hook optimasi reaktif yang berlangganan pada stream event workbook. Selector `(w) => w.unsaved()` hanya memicu re-render komponen induk saat status modifikasi dokumen berubah antara `true` dan `false`.
+- **`wb.toJSON()`**: Melakukan serialisasi komprehensif seluruh dokumen workbook (data, styling, konfigurasi kolom, rule validasi, dan formula) menjadi payload JSON murni yang portabel.
+- **`wb.saved()`**: Mereset dirty flag pada workbook engine, menyelaraskan status internal bahwa seluruh mutasi telah tersimpan.
+- **`createWorkbook(jsonDoc)`**: Melakukan deserialisasi payload JSON kembali ke instance workbook hidup dengan mempertahankan seluruh struktur dan kalkulasi.
 
-- `useWorkbook(wb, (w) => w.unsaved())` membaca sesuatu dari workbook, dan membuat komponenmu dirender ulang setiap kali nilai itu berubah.
-  Di sini nilainya `true` begitu orang mengubah sesuatu.
-- `wb.toJSON()` mengambil seluruh isi workbook sebagai objek JSON biasa: sel, rumus, gaya, ukuran kolom, semuanya.
-- `wb.saved()` menandai bahwa semua sudah tersimpan, sehingga `unsaved()` kembali `false` dan tombolnya kembali menjadi Tersimpan.
-- `createWorkbook(json)` membuka kembali JSON yang tersimpan. Saat halaman dimuat ulang, isinya kembali seperti terakhir disimpan.
-- Workbook sekarang dibuat di **`useEffect`**, bukan di `useState`, karena `localStorage` hanya ada di browser. Selama belum siap, halaman
-  menampilkan "Memuat…".
+---
 
-Di contoh ini isinya disimpan di browser. Menyimpan ke server, termasuk hanya mengirim bagian yang berubah, dibahas di bab 9.
+## 8. Panduan Integrasi Next.js (App Router & SSR)
 
-## 1.9 Di Next.js
-
-`<Sheet>` adalah client component. File `@kufayeka/sheet` sudah diawali `"use client"`, jadi bisa dipakai langsung di App Router.
-
-Satu hal yang wajib diperhatikan: Next.js merender halaman **dua kali**, sekali di server lalu sekali lagi di browser. Workbook berisi id acak,
-jadi kalau dibuat di kedua tempat, isinya berbeda dan React memberi peringatan *hydration mismatch*. Karena itu, di Next.js workbook dibuat di
-`useEffect`, seperti di 1.8:
+Modul `@kufayeka/sheet` telah dilengkapi direktif `"use client"` secara internal. Namun, karena instance workbook menghasilkan identifier acak internal untuk manajemen entitas baris/kolom, inisialisasi data harus dilakukan pada sisi browser guna mencegah terjadinya **Hydration Mismatch**:
 
 <!-- contoh: 01-09-next.page.tsx -->
 ```tsx
@@ -345,38 +295,30 @@ export default function Page() {
 ```
 <!-- /contoh -->
 
-**Penjelasan:**
-
-- `'use client'` di baris pertama, karena halaman ini memakai state.
-- `useState<Workbook | null>(null)` lalu `useEffect(() => setWb(buatProduk()), [])`: workbook dibuat setelah halaman tampil di browser.
-- Selama `wb` masih `null`, tampilkan teks memuat.
-
-Vite, Create React App, atau React tanpa server rendering: `useState(buatProduk)` seperti di 1.6 sudah cukup.
+> **Pola Rekomendasi**:
+> 1. Tandai file halaman atau komponen wrapper dengan `'use client'`.
+> 2. Tetapkan initial state `const [wb, setWb] = useState<Workbook | null>(null)`.
+> 3. Instansiasi workbook di dalam hook `useEffect(() => { setWb(buatProduk()); }, [])`.
+> 4. Tampilkan fallback skeleton atau indikator loading sederhana sampai workbook terpasang di browser.
+> Pada lingkungan Single Page Application tanpa SSR (seperti Vite atau Create React App), inisialisasi langsung via `useState(buatProduk)` dapat digunakan tanpa `useEffect`.
 
 ---
 
-# Bagian C. Kalau ada masalah
+## 9. Troubleshooting & Gotchas
 
-## 1.10 Yang sering kelewat
-
-| Gejala | Penyebab | Solusi |
+| Isu / Gejala | Penyebab Utama | Solusi |
 |---|---|---|
-| Sheet tidak terlihat | pembungkusnya tidak punya tinggi | beri tinggi: `height: 420`, `100vh`, atau `flex: 1` di dalam kolom flex yang punya tinggi |
-| Tampilan berantakan, tanpa garis | CSS belum di-import | `import '@kufayeka/sheet/style.css'` sekali di aplikasi |
-| Isi yang diketik hilang saat komponen dirender ulang | `createWorkbook()` dipanggil langsung di badan komponen | `useState(buatProduk)`, tanpa tanda kurung |
-| Peringatan *hydration mismatch* di Next.js | workbook dibuat di server dan di browser | buat workbook di `useEffect` (1.9) |
-| `localStorage is not defined` | kode browser dijalankan saat server rendering | pindahkan ke `useEffect` (1.8) |
-| Angka tampil `1250.5`, bukan `1.250,5` | locale bawaan `en-US` | `wb.setSettings({ locale: 'id-ID', currency: 'IDR' })` |
+| **Spreadsheet tidak tampil (tinggi 0px)** | Parent container tidak memiliki nilai `height` eksplisit. | Tetapkan properti tinggi pada container: `height: 500px`, `height: 100vh`, atau `flex: 1` dalam flex container dengan dimensi pasti. |
+| **Grid tampil tanpa layout atau border sel rusak** | Stylesheet paket belum diimpor ke bundler. | Tambahkan `import '@kufayeka/sheet/style.css';` pada root layout atau entry point komponen aplikasi Anda. |
+| **Input pengguna hilang saat re-render komponen** | `createWorkbook()` dipanggil langsung di badan render fungsi React. | Gunakan lazy state initializer: `useState(initFn)` (berikan referensi fungsi tanpa tanda kurung pemanggilan `()`). |
+| **Hydration Mismatch error pada Next.js** | Workbook diinisialisasi secara sinkron pada fase SSR server. | Tunda pembuatan instance ke browser runtime menggunakan `useEffect` (lihat bagian [Integrasi Next.js](#8-panduan-integrasi-nextjs-app-router--ssr)). |
+| **Pemisah desimal tidak sesuai (`.` alih-alih `,`)** | Locale default engine menggunakan `en-US`. | Panggil `wb.setSettings({ locale: 'id-ID', currency: 'IDR' })` setelah inisialisasi workbook. |
 
-## 1.11 Setelah bab ini
+---
 
-Kamu sudah bisa menampilkan, mengisi, merapikan, dan menyimpan sebuah spreadsheet. Bab berikutnya:
+## 10. Navigasi Dokumentasi Lanjutan
 
-| Kalau kamu perlu | Baca |
-|---|---|
-| memahami workbook, sel, dan perubahan dengan benar | [bab 2. Konsep dasar](02-konsep.md) |
-| mengatur `<Sheet>`: event, ukuran, bagian layar, tema | bab 3 |
-| mengisi sheet dari data API | bab 4 |
-| menyimpan ke server dengan benar | bab 9 |
-
-[Daftar isi](../README.md#daftar-isi) · Berikutnya: [2. Konsep dasar](02-konsep.md)
+- Untuk memahami struktur internal data, siklus evaluasi sel, dan model mutasi transaksional, lanjutkan ke **[02. Konsep Arsitektur & Mental Model](02-konsep.md)**.
+- Untuk mengontrol toolbar, events, pergerakan kursor, dan manipulasi imperatif lewat React Ref, pelajari **[03. Komponen `<Sheet>` & Kustomisasi UI](03-komponen-sheet.md)**.
+- Untuk manipulasi data batch dan integrasi API REST/GraphQL, baca **[04. Manipulasi Data Programatis](04-api-workbook.md)**.
+- Untuk arsitektur persistensi data multi-user ke PostgreSQL / MySQL, pelajari **[09. Persistensi State & Sinkronisasi Server](09-menyimpan.md)**.

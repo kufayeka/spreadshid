@@ -1,60 +1,62 @@
-# 8. Menjaga isi yang diketik
+# 08. Validasi Data & Proteksi Sel
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Memuat dan menyimpan](09-menyimpan.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [07. Operasi Data](07-data.md) · Berikutnya: [09. Persistensi State & Sinkronisasi Server](09-menyimpan.md)
 
-Bab ini membahas cara menjaga supaya yang diketik orang masuk akal: pilihan dari daftar, angka dengan batas, kolom yang hanya menerima bilangan
-bulat, sel yang tidak boleh diubah, dan aturan bisnis yang membaca sel lain. Setiap langkah adalah satu halaman React dengan foto hasilnya.
-
-**Bagian A. Pengenalan (tanpa kode)**
-- [8.1 Empat cara menjaga isi](#81-empat-cara-menjaga-isi)
-- [8.2 Kapan diperiksa](#82-kapan-diperiksa)
-
-**Bagian B. Langkah demi langkah**
-- [8.3 Pilihan dari daftar (dropdown)](#83-pilihan-dari-daftar-dropdown)
-- [8.4 Angka dengan batas](#84-angka-dengan-batas)
-- [8.5 Tipe kolom](#85-tipe-kolom)
-- [8.6 Sel yang tidak boleh diubah](#86-sel-yang-tidak-boleh-diubah)
-- [8.7 Aturan yang membaca sel lain: `beforeOp`](#87-aturan-yang-membaca-sel-lain-beforeop)
-
-**Bagian C. Contoh lengkap, yang sering keliru, dan referensi**
-- [8.8 Contoh lengkap](#88-contoh-lengkap)
-- [8.9 Yang sering keliru](#89-yang-sering-keliru)
-- [8.10 Referensi](#810-referensi)
+Bab ini mengupas empat lapis sistem pertahanan dan integritas data pada `@kufayeka/sheet`: **Data Validation** (dropdown list, batas rentang nilai, format email/URL, regex), penegakan skema tipe data kolom (**Column Schema Types**), penguncian sel dan proteksi hak akses (**Cell Protection / Read-only Mode**), serta interceptor mutasi transaksional tingkat lanjut (**`beforeOp`**).
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Empat Lapisan Pertahanan Data
 
-## 8.1 Empat cara menjaga isi
+Sistem proteksi data bekerja dalam hierarki berlapis:
 
-| Cara | Untuk | Disimpan di file? | Diperiksa ulang di server? | Langkah |
-|---|---|---|---|---|
-| **Validasi data** | dropdown, checkbox, angka atau tanggal dengan batas, panjang teks, email | ya, ikut file (dan Excel) | ya | 8.3, 8.4 |
-| **Tipe kolom** | jenis nilai satu kolom, seperti kolom tabel database: bilangan bulat, desimal, tanggal, salah satu dari daftar | tidak, dipasang kodemu setiap kali dibuka | ya | 8.5 |
-| **Aturan sel** | sel yang hanya boleh dibaca, atau isinya disembunyikan | tidak, dipasang kodemu | ya | 8.6 |
-| **`beforeOp`** | aturan bisnis yang membaca sel lain ("qty tidak boleh melebihi stok"), atau mengubah isian (kode jadi huruf besar) | tidak, fungsi di kodemu | tidak, jalankan juga di server kalau perlu | 8.7 |
+```text
+┌────────────────────────────────────────────────────────┐
+│           Input Pengguna (Antarmuka Grid / API)        │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Lapis 1: Data Validation (Dropdown List, Min/Max)     │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Lapis 2: Column Schema Types (Int, Date, Scale)       │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Lapis 3: Cell Locking / ACL (Read-only, Hidden)       │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│  Lapis 4: Transactional Interceptor (Hook beforeOp)    │
+└───────────────────────────┬────────────────────────────┘
+                            │ lolos validasi
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│             Aplikasi Mutasi State ke Workbook          │
+└────────────────────────────────────────────────────────┘
+```
 
-Mulailah dari atas. Kalau validasi data sudah cukup, tidak perlu yang lain. `beforeOp` adalah pintu terakhir untuk yang tidak bisa ditulis dengan
-tiga cara lainnya.
-
-Untuk mengatur **siapa** boleh mengubah apa (kasir, gudang, pemilik), pakai hak akses ([bab 10](10-hak-akses.md)). Aturan sel di 8.6 adalah
-bagian per sel dari hak akses itu, tanpa membedakan orang.
-
-## 8.2 Kapan diperiksa
-
-Semua pemeriksaan di bab ini berlaku untuk perubahan dari **orang** (`source: 'user'`, bab 2): yang diketik, di-paste, di-fill, atau di-drag.
-Perubahan dari kodemu sendiri tidak diperiksa, karena kodemu dipercaya. Kalau sebuah perubahan dari kode mewakili isian orang, misalnya dari
-formulir di luar sheet, tambahkan `{ source: 'user' }`.
-
-Perubahan yang ditolak tidak masuk ke sheet: sel tetap berisi nilai lama, pesannya tampil di layar, dan event `reject` memberi tahu aplikasimu.
+| Lapisan Proteksi | Titik Evaluasi | Karakteristik Utama |
+|---|---|---|
+| **1. Data Validation** | UI & File Ekspor | Menampilkan panduan visual (dropdown popup, checkbox, tanda segitiga invalid). Aturan ini ikut tersimpan saat diekspor ke file Excel `.xlsx`. |
+| **2. Column Types** | Parsing Input | Menolak tipe yang tidak kompatibel (misal: desimal pada kolom `int`). Memancarkan event `cellError`. |
+| **3. Cell Locking** | Interaksi Pengguna | Menolak edit langsung pada sel tertentu (read-only) atau menyembunyikan rumus/nilai sensitif. |
+| **4. `beforeOp` Hook** | Pipeline Mutasi Transaksional | Middleware kustom yang dapat memvalidasi lintas sel, mengubah nilai (auto-uppercase), membuang field terlarang, atau melempar rejection error. |
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 2. Implementasi Panduan Langkah demi Langkah
 
-## 8.3 Pilihan dari daftar (dropdown)
+---
 
-**Tujuan:** sel yang isinya dipilih dari daftar, dan tanda di sel yang isinya salah.
+### 2.1 Menu Pilihan Dropdown & Validasi Format Teks
+
+Membuat menu pilihan dropdown dari list nilai statis atau referensi range lain, serta validasi pola teks (seperti email):
 
 <!-- contoh: 07-validasi.page.js -->
 ```jsx
@@ -70,24 +72,13 @@ export default function HalamanPesanan() {
 ```
 <!-- /contoh -->
 
-Sel C4 dipilih, lalu Alt+↓ membuka daftarnya:
+![Dropdown kode produk dan indikator validasi email yang salah](img/dropdown.png)
 
-![Dropdown kode produk, dan tanda di email yang salah](img/dropdown.png)
+---
 
-Yang perlu diketahui:
+### 2.2 Batasan Nilai Numerik & Penolakan Aksi
 
-- **Aturan diperiksa untuk yang datang dari orang**: diketik, di-paste, di-fill, atau ditulis kode dengan `{ source: 'user' }`. Kode yang menulis tanpa
-  `source` (bawaannya `'code'`) tidak diperiksa. Isi dari kode tetap ditandai kalau melanggar, seperti D4 di contoh.
-- **`reject: true`** (bawaan): yang melanggar ditolak. Sel tetap berisi nilai lama, pesannya tampil di layar, dan `wb.on('reject')` menerimanya.
-  **`reject: false`**: nilainya disimpan tetapi sel diberi tanda segitiga merah, seperti email di E3.
-- **`message`**: pesan penolakanmu sendiri, dalam bahasa aplikasimu. `{cell}` diganti alamat selnya. Tanpa `message`, pesannya dibuat dari aturan, dalam
-  bahasa Inggris.
-- **`help`**: teks bantuan yang tampil saat sel di range itu dipilih.
-- Kalau dua aturan menimpa sel yang sama, aturan yang terakhir dibuat yang berlaku.
-
-## 8.4 Angka dengan batas
-
-**Tujuan:** stok harus 0 sampai 10.000. Yang di luar itu ditolak dengan pesan sendiri.
+Membatasi rentang nilai yang diizinkan untuk mencegah anomali data (misal: stok tidak boleh melebihi batas fisik gudang):
 
 <!-- contoh: 08-04-batas.page.tsx -->
 ```tsx
@@ -113,20 +104,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Orang mengetik 20000 di D2:
+![Input stok di luar batas memicu pesan penolakan](img/jaga-batas.png)
 
-![Stok di luar batas ditolak](img/jaga-batas.png)
+---
 
-**Penjelasan:**
+### 2.3 Skema Tipe Kolom (Column Schema Enforcement)
 
-- `addValidation(range, aturan)` memasang aturan di D2:D4. `kind: 'number'` dengan `op: 'between'` dan batas `a`, `b`.
-- `message` adalah pesanmu sendiri. `{cell}` diganti alamat selnya.
-- D2 tetap 420. Tanpa `message`, pesannya pesan bawaan.
-- Semua jenis aturan (tanggal, panjang teks, email, checkbox) ada di 8.10.
-
-## 8.5 Tipe kolom
-
-**Tujuan:** kolom Stok hanya menerima bilangan bulat, seperti kolom `INTEGER` di tabel database.
+Tipe kolom memastikan konsistensi struktur data dengan memvalidasi dan menolak masukan yang salah tipe:
 
 <!-- contoh: 08-05-tipe.page.tsx -->
 ```tsx
@@ -149,22 +133,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Orang mengetik 12,5 di D3:
+![Desimal ditolak pada kolom bertipe bilangan bulat int](img/jaga-tipe.png)
 
-![Desimal ditolak di kolom bilangan bulat](img/jaga-tipe.png)
+---
 
-**Penjelasan:**
+### 2.4 Proteksi Sel & Read-Only Access
 
-- `setTypes({ headerRow: 1, fields: { Stok: { kind: 'int' } } })` memberi tipe ke kolom yang **judulnya** Stok. Kalau kolomnya dipindah, tipenya
-  ikut.
-- Pesannya menyebut sel dan nama kolomnya: `Expected a whole number in D3 (Stok)`. Event `cellError` juga memberi tahu aplikasimu.
-- Tipe kolom cocok kalau isi sheet nantinya masuk ke tabel database: tipenya bisa disamakan dengan tipe kolom database. Semua jenis tipe ada di
-  8.10.
-- Tipe tidak disimpan di file. Pasang lagi setiap kali workbook dibuka.
-
-## 8.6 Sel yang tidak boleh diubah
-
-**Tujuan:** kasir hanya boleh mengubah stok: harga beli disembunyikan, kolom lain hanya dibaca, dan produk yang dihentikan terkunci seluruhnya.
+Sel kalkulasi atau master data dapat dikunci secara permanen agar tidak dapat dimodifikasi pengguna:
 
 <!-- contoh: 10-aturan.page.js -->
 ```jsx
@@ -181,22 +156,13 @@ export default function HalamanKasir() {
 ```
 <!-- /contoh -->
 
-Orang mengetik di kolom yang dilindungi:
+![Kolom terlindung menolak modifikasi pengguna](img/aturan.png)
 
-![Kolom terlindung dan pesan penolakan](img/aturan.png)
+---
 
-**Penjelasan:**
+### 2.5 Interceptor Transaksional via `beforeOp` Hook
 
-- `wb.setRules([...])` memasang aturan sel untuk orang yang sedang membuka. Setiap aturan berisi `range` atau `columns` (judul kolom), dan `mode`:
-  `'readonly'` (hanya baca) atau `'hidden'` (`•••`).
-- `when` membuat aturan hanya berlaku di baris yang rumusnya `TRUE`: di sini baris yang statusnya Dihentikan. Rumusnya ditulis untuk baris
-  pertama range, lalu bergeser ke setiap baris.
-- Sel yang dilindungi diberi gembok kecil di pojok (bawaan). Tandanya bisa diganti dengan prop `marks` ([10.25](10-hak-akses.md#1025-variasi-tanda)).
-- Aturan sel sama untuk semua orang. Untuk aturan yang berbeda per orang atau per role, pakai hak akses ([bab 10](10-hak-akses.md)).
-
-## 8.7 Aturan yang membaca sel lain: `beforeOp`
-
-**Tujuan:** qty yang dipesan tidak boleh melebihi stok di baris yang sama.
+Hook `beforeOp` bertindak sebagai middleware penilai di level core engine sebelum suatu mutasi diaplikasikan:
 
 <!-- contoh: 08-07-beforeop.page.tsx -->
 ```tsx
@@ -234,33 +200,15 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Orang mengetik 100 di C3, padahal stok cat hanya 64:
-
-![Qty melebihi stok ditolak](img/jaga-beforeop.png)
-
-**Penjelasan:**
-
-- `createWorkbook(null, { beforeOp })` memasang fungsi yang dipanggil untuk **setiap** perubahan, sebelum diterapkan.
-- Fungsinya menerima op (2.4) dan konteks (`source`, `workbook`). Di sini hanya perubahan sel dari orang, di kolom C, yang diperiksa.
-- `{ reject: 'alasan' }` menolak seluruh perubahan, dan alasannya tampil di layar.
-- `beforeOp` tidak berjalan di server sendirian. Kalau aturan ini penting, jalankan pemeriksaan yang sama di server sebelum menyimpan.
-
-| Dikembalikan | Akibatnya |
-|---|---|
-| `op` | diloloskan apa adanya |
-| salinan op yang diubah | yang diterapkan adalah salinan itu (contoh: kode produk jadi huruf besar) |
-| `null` atau `false` | op itu dibuang diam-diam, op lain di perubahan yang sama tetap jalan |
-| `{ reject: 'alasan' }` | **seluruh** perubahan ditolak, event `reject` membawa alasannya, dan alasannya tampil di layar |
-
-Kapan memakai `beforeOp` dan kapan memakai fitur bawaan:
+![Validasi dinamis beforeOp menolak kuantitas melebihi batas stok](img/jaga-beforeop.png)
 
 ---
 
-# Bagian C. Contoh lengkap, yang sering keliru, dan referensi
+## 3. Eksekusi Programatis via Core Engine
 
-## 8.8 Contoh lengkap
+Di bawah ini adalah eksekusi pengujian aturan validasi dan interceptor mutasi pada lingkungan Node.js:
 
-### Validasi data, dengan hasilnya
+### Validasi Data Programatis
 
 <!-- contoh: 07-validasi.js -->
 ```js
@@ -345,7 +293,9 @@ dari kode    : 9999 | ditandai: between 1 and 500
 ```
 <!-- /hasil -->
 
-### Tipe kolom
+---
+
+### Penegakan Tipe Data Kolom
 
 <!-- contoh: 10-tipe.js -->
 ```js
@@ -424,15 +374,9 @@ checkValue    : null "a whole number" "a number with at most 2 digits after the 
 ```
 <!-- /hasil -->
 
-Tipe dipasang per sheet dengan salah satu dari dua cara:
+---
 
-- **Menurut judul kolom**: `setTypes({ headerRow: 1, fields: { Stok: { kind: 'int' }, ... } })`. Kolom yang judulnya sama dengan nama field mendapat
-  tipe itu, jadi tetap benar walaupun kolomnya dipindah. `fromApiMakerType(Type, library)` membuat `fields` dari sebuah Type Nexa API Maker.
-- **Menurut huruf kolom**: `setTypes({ columns: { B: { kind: 'int' } } })`.
-
-`setTypes(null)` membuang tipe sheet itu.
-
-### Aturan sel
+### Proteksi Baris, Kolom, & Pesan Akses
 
 <!-- contoh: 10-aturan.js -->
 ```js
@@ -505,7 +449,9 @@ manajer       : Rp 64.000 | mode F2 null
 ```
 <!-- /hasil -->
 
-### `beforeOp`: meloloskan, mengubah, membuang, menolak
+---
+
+### Middleware Mutasi `beforeOp` Hook
 
 <!-- contoh: 04-10-beforeop.ts -->
 ```ts
@@ -559,93 +505,33 @@ dari kode                  : 999
 ```
 <!-- /hasil -->
 
-`beforeOp(op, ctx)` menerima op (4.12) dan `ctx` berisi `{ source, user, workbook }`. Kembalikan salah satu dari empat:
+---
 
-## 8.9 Yang sering keliru
+## 4. Referensi Lengkap API
 
-| Keliru | Benar |
-|---|---|
-| Isian dari kode tidak diperiksa | memang tidak; tambahkan `{ source: 'user' }` kalau mewakili isian orang (8.2) |
-| Tipe kolom hilang setelah dibuka ulang | tipe dan aturan sel tidak disimpan; pasang lagi setiap kali dibuka |
-| Memakai `beforeOp` untuk batas angka sederhana | pakai validasi data (8.4): ikut file, ikut Excel, dan diperiksa server |
-| Aturan sel diharapkan berbeda per kasir | aturan sel sama untuk semua orang; pakai hak akses (bab 8) |
-| `beforeOp` dianggap aman dari browser yang diakali | jalankan pemeriksaan yang sama di server |
+### Jenis Aturan Validasi Data (`ValidationRule`)
 
-## 8.10 Referensi
-
-### Validasi data
-
-| `kind` | Isinya | Pilihan |
+| `kind` | Kegunaan | Parameter Opsi |
 |---|---|---|
-| `list` | dropdown dari daftar tetap | `values: ['Jakarta', 'Bandung']` |
-| `listFrom` | dropdown dari isi range lain, termasuk sheet lain | `source: 'Produk!A2:A50'`. Sel kosong di range dilewati |
-| `checkbox` | kotak centang. Isinya `true` atau `false` | |
-| `number` | angka dengan syarat | `op`: `between`, `notBetween`, `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, lalu `a`, `b` |
-| `date` | tanggal dengan syarat | `op` sama dengan angka. `a` boleh nomor hari atau `'today'` |
-| `textLength` | panjang teks dengan syarat | `op` sama dengan angka |
-| `text` | teks dengan syarat | `op`: `contains`, `notContains` (dengan `a`), `email`, `url` |
+| `'list'` | Pilihan dropdown statis | `values: string[]` |
+| `'listFrom'` | Pilihan dropdown dinamis dari range | `source: string` (contoh: `'Produk!A2:A50'`) |
+| `'checkbox'` | Kotak centang boolean | Nilai tersimpan: `true` atau `false` |
+| `'number'` | Rentang angka numerik | `op: 'between' \| 'gt' \| 'gte' \| 'lt' \| 'lte' \| 'eq'`, `a?: number`, `b?: number` |
+| `'date'` | Batasan kalender | Sama dengan `number`, parameter `a` dapat berupa serial day atau `'today'` |
+| `'textLength'` | Batasan jumlah karakter string | Sama dengan `number` |
+| `'text'` | Pola teks spesifik | `op: 'contains' \| 'notContains' \| 'email' \| 'url'`, `a?: string` |
 
-| Fungsi | Artinya |
-|---|---|
-| `addValidation(range, aturan)` | tambah aturan. Mengembalikan id |
-| `setValidation(range, aturan)` | pasang aturan menggantikan aturan yang menimpa range itu (yang dilakukan tombol Done di dialog) |
-| `removeValidation(range)` | buang aturan yang menimpa range |
-| `validationAt(alamat)` | aturan sebuah sel, atau `null` |
-| `choicesAt(alamat)` | pilihan dropdown sebuah sel |
-| `invalidAt(alamat)` | apa yang dilanggar nilai sel itu (teks), atau `null` kalau sesuai |
+### Tipe Kolom yang Didukung (`ColumnType`)
 
-Untuk aturan yang lebih dari ini, misalnya "Qty tidak boleh melebihi stok di sheet Produk", pakai `beforeOp` ([8.7](08-menjaga-isi.md#87-aturan-yang-membaca-sel-lain-beforeop))
-atau aturan dan tipe kolom ([bab 8](08-menjaga-isi.md)).
-
-### Tipe kolom
-
-| `kind` | Sel menerima | Contoh salah |
+| Nilai `type` | Aturan Validasi | Contoh Masukan Valid / Invalid |
 |---|---|---|
-| `string` | teks apa saja. Angka yang diketik tetap teks, jadi `0081` tetap `0081` | |
-| `string` dengan `enum: [...]` | salah satu nilai di daftar | `Pasir` kalau tidak ada di daftar |
-| `int` | bilangan bulat | `12,5` |
-| `number` | angka | `banyak` |
-| `decimal` dengan `scale` | angka dengan desimal paling banyak `scale` digit | `72.000,5` dengan `scale: 0` |
-| `boolean` | `TRUE` atau `FALSE` | `ya` |
-| `date` | tanggal (satu hari penuh) | `minggu depan` |
-| `datetime` | tanggal dan jam | |
-| `json` | apa saja, tidak diperiksa | |
+| `'string'` | Menerima string bebas (menjaga leading zero). | Valid: `'0081'` |
+| `'string'` (`enum`) | Membatasi nilai hanya pada opsi terdaftar. | Ditolak jika nilai di luar array enum. |
+| `'int'` | Hanya menerima bilangan bulat. | Valid: `420`. Ditolak: `12.5` |
+| `'decimal'` | Bilangan desimal dengan batas skala digit (`scale`). | `scale: 0` menolak desimal pecahan. |
+| `'boolean'` | Hanya menerima nilai boolean. | Valid: `true`, `false`, `'TRUE'`, `'FALSE'` |
+| `'date'` | Serial integer kalender atau format string tanggal locale. | Ditolak jika format string bukan tanggal valid. |
 
-Yang perlu diketahui:
+---
 
-- **Sel kosong selalu boleh.** Apakah sebuah kolom wajib diisi ditentukan saat data disimpan, bukan di sheet.
-- **Yang salah ditolak**, nilainya tidak masuk, dan event `cellError` (prop `onCellError` di `<Sheet>`) menerima `{ address, field, value, expected }`
-  untuk ditampilkan dengan caramu sendiri. Pesan `expected` dalam bahasa Inggris.
-- **Ketikan dibaca menurut locale dulu**, baru diperiksa. Dengan `id-ID`, `72.000` di kolom `decimal` adalah 72000.
-- `typeAt(alamat)` memberi tipe sebuah sel, termasuk nama field-nya.
-- `checkValue(tipe, nilai)` menjalankan pemeriksaan yang sama tanpa sheet, misalnya di server. Hasilnya `null` kalau cocok, atau teks yang diharapkan.
-
-### Aturan sel (`setRules`)
-
-| Kunci aturan | Artinya | Bawaan |
-|---|---|---|
-| `sheet` | nama atau id sheet | semua sheet |
-| `range` | sel yang diatur, misalnya `'A2:I1000'`. Mengikuti baris yang disisipkan | seluruh sheet |
-| `columns` | hanya kolom tertentu, menurut judulnya (`'Harga beli'`) atau hurufnya (`'E'`) | semua kolom |
-| `headerRow` | baris tempat judul kolom, dihitung dari 1 | `1` |
-| `when` | hanya di baris yang rumusnya `TRUE`. Ditulis untuk baris pertama range (atau baris di bawah judul), lalu bergeser ke baris lain | selalu |
-| `mode` | `'readonly'`: boleh dilihat, tidak boleh diubah. `'hidden'`: isinya tampil `•••` dan tidak bisa dibaca, disalin, atau dicari | |
-| `message` | pesan untuk orang yang perubahannya ditolak | pesan bawaan dalam bahasa Inggris |
-
-Yang perlu diketahui:
-
-- **Hanya untuk orang.** Perubahan dari orang (diketik, di-paste, di-fill, dihapus, atau ditulis kode dengan `{ source: 'user' }`) diperiksa. Kode
-  aplikasimu sendiri tidak dihalangi.
-- **`when` dihitung terus.** Begitu status sebuah produk diubah menjadi "Dihentikan", barisnya langsung terkunci, seperti G3 di contoh.
-- **`hidden` hanya di layar.** Nilai asli tetap ada di workbook dan rumus tetap menghitungnya. Kalau nilainya sama sekali tidak boleh sampai ke browser,
-  jangan kirim nilainya. `viewFor` di server membuang nilai itu sebelum dikirim ([bab 9](09-menyimpan.md)).
-- **Judul kolom tetap tampil.** Baris judul (`headerRow`) tidak ikut disembunyikan atau dikunci oleh aturan `columns`.
-- **Menghapus baris yang memuat sel terlindung** ditolak, begitu juga menghapus kolomnya.
-- `setRules(daftar)` mengganti seluruh aturan. `setRules([])` membuang semuanya.
-
-| Fungsi | Artinya |
-|---|---|
-| `wb.setRules(daftar)` | pasang aturan untuk orang yang membuka sheet |
-| `modeAt(alamat)` | `{ mode, message }` untuk sel itu, atau `null` kalau bebas |
-
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [7. Data](07-data.md) · Berikutnya: [9. Memuat dan menyimpan](09-menyimpan.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [07. Operasi Data](07-data.md) · Berikutnya: [09. Persistensi State & Sinkronisasi Server](09-menyimpan.md)

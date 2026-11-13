@@ -1,110 +1,95 @@
-# 2. Konsep dasar
+# 02. Konsep Arsitektur & Mental Model
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai dalam 5 menit](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)
+[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [01. Mulai Cepat & Setup](01-mulai-cepat.md) · Berikutnya: [03. Komponen `<Sheet>` & Kustomisasi UI](03-komponen-sheet.md)
 
-Bab ini menjelaskan **workbook**: apa isinya, bagaimana membaca dan mengubahnya, dan bagaimana perubahannya bisa diikuti. Sengaja **tanpa
-`<Sheet>`** sampai langkah terakhir: semua contoh adalah komponen React biasa (label, tombol, tabel) yang membaca workbook. Dengan begitu
-terlihat jelas bahwa workbook adalah data, dan `<Sheet>` hanyalah salah satu cara menampilkannya.
+Bab ini membedah arsitektur internal **Workbook Engine**: struktur representasi data, sistem koordinat sel, siklus nilai sel (*value*, *input*, *display*), identitas entitas baris/kolom yang stabil (*rowId* vs *rowIndex*), mutasi berbasis operasi transaksional (*ops*), serta integrasi reaktif dengan React.
 
-**Bagian A. Pengenalan (tanpa kode)**
-- [2.1 Workbook adalah data](#21-workbook-adalah-data)
-- [2.2 Alamat sel](#22-alamat-sel)
-- [2.3 Isi sel: value, input, display](#23-isi-sel-value-input-display)
-- [2.4 Perubahan dan undo](#24-perubahan-dan-undo)
-
-**Bagian B. Langkah demi langkah**
-- [2.5 Membaca satu nilai](#25-membaca-satu-nilai)
-- [2.6 Mengubah dari kode](#26-mengubah-dari-kode)
-- [2.7 Tiga sisi isi sel](#27-tiga-sisi-isi-sel)
-- [2.8 Seluruh sheet sebagai tabel](#28-seluruh-sheet-sebagai-tabel)
-- [2.9 Nomor bergeser, id tetap](#29-nomor-bergeser-id-tetap)
-- [2.10 Mendengar perubahan](#210-mendengar-perubahan)
-- [2.11 Undo dan redo](#211-undo-dan-redo)
-- [2.12 Sekarang dengan `<Sheet>`](#212-sekarang-dengan-sheet)
-
-**Bagian C. Yang sering keliru, dan referensi**
-- [2.13 Yang sering keliru](#213-yang-sering-keliru)
-- [2.14 Referensi](#214-referensi)
+Semua contoh awal dalam bab ini sengaja dibangun menggunakan elemen antarmuka React standar (tombol, label, tabel HTML biasa) tanpa merender komponen grid `<Sheet />`, guna menggarisbawahi bahwa **Workbook adalah entitas data mandiri (Headless Engine)** yang dapat diakses, dimanipulasi, dan diproses tanpa ketergantungan pada layer visual.
 
 ---
 
-# Bagian A. Pengenalan
+## 1. Arsitektur Headless Workbook
 
-## 2.1 Workbook adalah data
+![Arsitektur Headless Workbook, Sheet, dan Komponen](img/konsep-workbook.svg)
 
-![Workbook, Sheet, dan komponenmu](img/konsep-workbook.svg)
+Secara arsitektural, sebuah **Workbook** adalah struktur data komposit yang menaungi satu atau beberapa **Sheet**. Setiap sheet menyimpan matriks sel yang merepresentasikan nilai primitif, formula kalkulasi, styling, metadata validasi, dan riwayat revisi.
 
-Sebuah **workbook** berisi satu atau beberapa **sheet**. Setiap sheet berisi sel, dan setiap sel berisi angka, teks, atau rumus, ditambah
-gayanya. Workbook tidak punya layar sama sekali. Ia hanya data, dibuat dengan `createWorkbook()`.
+Workbook tidak memiliki dependensi terhadap DOM maupun React. Instance workbook dibuat melalui factory function `createWorkbook()` dari `@kufayeka/sheet/core` dan dapat berjalan secara isomorfik di client browser maupun server Node.js.
 
-Ada dua pihak yang bisa memakai workbook yang sama:
+Pada aplikasi frontend, terdapat dua konsumer utama dari instance workbook yang sama:
+- **Komponen `<Sheet />`**: Merender spreadsheet virtualized dan menyalurkan interaksi keyboard/mouse pengguna ke dalam mutasi workbook.
+- **Komponen Kustom Aplikasi**: Membaca agregasi nilai (misal: widget KPI di dashboard, total harga pada header modal) dan menjalankan mutasi terprogram (misal: tombol aksi sinkronisasi API).
 
-- **`<Sheet>`** menampilkannya sebagai grid, dan mengubahnya saat orang mengetik.
-- **Komponenmu sendiri** membaca nilai darinya (total di header, tombol yang aktif atau tidak) dan mengubahnya (tombol "isi dari API").
+Keduanya selalu sinkron secara deterministik karena mengacu pada *single source of truth* yang sama.
 
-Keduanya selalu melihat isi yang sama, karena hanya ada satu workbook. Ketik di sheet, dan label totalmu ikut berubah (2.12).
+---
 
-Workbook juga bisa dipakai tanpa React sama sekali, misalnya di server, dengan kode yang persis sama.
+## 2. Sistem Koordinat Sel (Addressing System)
 
-## 2.2 Alamat sel
+Engine mendukung dua paradigma pengalamatan sel secara seragam di seluruh pemanggilan API:
 
-Ada dua cara menyebut sel, dan semua fungsi menerima keduanya.
+### A. Format Notasi String (Human-Readable Coordinate)
+Format standar yang lazim digunakan pada formula spreadsheet:
 
-**Dengan alamat**, seperti yang terlihat di layar. Ini cara yang paling mudah dibaca:
+| Notasi | Target Elemen | Kegunaan Umum |
+|---|---|---|
+| `'C2'` | Sel tunggal pada kolom C baris 2 | Akses nilai atau input individual |
+| `'A1:E1'` | Range sel kontinu berbentuk persegi | Styling header baris atau kalkulasi agregasi |
+| `'A1:E1, A5:E5'` | Range komposit diskontinu | Styling multi-rentang sekaligus |
+| `'B'`, `'B:D'` | Kolom utuh | Mengatur lebar kolom, format kolom, atau insert/delete kolom |
+| `'2'`, `'2:5'` | Baris utuh (indeks 1-based di layar) | Mengatur tinggi baris, hidden status, atau insert/delete baris |
 
-| Ditulis | Artinya |
-|---|---|
-| `'C2'` | satu sel |
-| `'A1:E1'` | sebuah range |
-| `'A1:E1, A5:E5'` | beberapa range sekaligus (untuk memberi gaya, menghapus, dan sejenisnya) |
-| `'B'`, `'B:D'` | kolom (untuk lebar kolom, menyisipkan kolom) |
-| `'2'`, `'2:5'` | baris, dengan nomor seperti di layar (untuk tinggi baris, menyisipkan baris) |
+### B. Format Indeks Numerik Nol-Dasar (0-Indexed Coordinate)
+Format berbasis integer yang optimal untuk iterasi loop programatis:
 
-**Dengan nomor**, mulai dari **0** seperti indeks array. Cocok untuk looping:
-
-| Di layar | Nomor |
-|---|---|
-| A1 | baris `0`, kolom `0` |
-| C2 | baris `1`, kolom `2` |
-| E5 | baris `4`, kolom `4` |
-
-Hampir semua fungsi workbook menerima nama sheet sebagai parameter pertama: `wb.value('Produk', 'C2')`. Supaya tidak menulis nama sheet terus,
-ambil sheet-nya sekali dengan `wb.sheet('Produk')`, lalu pakai fungsinya tanpa parameter sheet: `wb.sheet('Produk').value('C2')`.
-
-## 2.3 Isi sel: value, input, display
-
-Satu sel bisa dilihat dari tiga sisi. Contohnya sel E2 di daftar produk, yang berisi rumus `=C2*D2` dengan format Rupiah:
-
-| Sisi | Fungsi | Hasil untuk E2 | Dipakai untuk |
+| Koordinat Layar | Indeks Baris (`r`) | Indeks Kolom (`c`) | Representasi Programatis |
 |---|---|---|---|
-| **value** | `value('E2')` | `30240000` | logika aplikasi: menghitung, membandingkan, mengirim ke server. Rumus sudah dihitung |
-| **input** | `input('E2')` | `'=C2*D2'` | yang muncul saat sel diedit: rumus apa adanya |
-| **display** | `display('E2')` | `{ text: 'Rp 30.240.000', align: 'right', ... }` | yang tampil di layar, sudah diformat |
+| `A1` | `0` | `0` | `sheet.value(0, 0)` |
+| `C2` | `1` | `2` | `sheet.value(1, 2)` |
+| `E5` | `4` | `4` | `sheet.value(4, 4)` |
 
-Sel kosong memberi value `null`. Rumus yang gagal memberi error, misalnya `{ code: '#DIV/0!' }`.
-
-## 2.4 Perubahan dan undo
-
-Setiap perubahan pada workbook dicatat sebagai sebuah **op** (operasi): "sel D2 dari 420 menjadi 400", "B2 jadi tebal", "satu baris disisipkan".
-Setiap op membawa **sumbernya**, yaitu siapa yang mengubah:
-
-| Sumber (`source`) | Artinya |
-|---|---|
-| `'code'` | kodemu. Ini bawaan setiap fungsi yang mengubah workbook |
-| `'user'` | orang di layar. Semua yang diketik lewat `<Sheet>` memakai ini |
-| `'undo'`, `'redo'` | dari tombol atau tombol keyboard undo dan redo |
-| `'remote'` | dari komputer lain atau server, misalnya saat mengedit bersama |
-
-Karena semua perubahan tercatat, workbook bisa **undo** dan **redo**, dan aplikasimu bisa **mendengar** setiap perubahan, misalnya untuk menandai
-"belum disimpan" atau mencatat riwayat.
-
-Sumber `'user'` juga yang diperiksa oleh aturan dan hak akses (bab 8 dan bab 10). Kodemu sendiri dianggap dipercaya.
+### Scope Sheet
+Seluruh fungsi workbook menerima nama sheet sebagai parameter pertama (`wb.value('Produk', 'C2')`). Untuk menghindari repetisi nama sheet pada blok kode yang berfokus pada satu sheet, dapatkan sheet handle melalui `wb.sheet('Produk')`:
+```ts
+const s = wb.sheet('Produk');
+const val = s.value('C2');
+```
 
 ---
 
-# Bagian B. Langkah demi langkah
+## 3. Siklus & Aspek Nilai Sel: Value, Input, Display
 
-Semua contoh di bagian ini memakai daftar produk dari bab 1, dibuat oleh satu fungsi bersama:
+Setiap sel di dalam sheet dievaluasi melalui tiga dimensi data yang berbeda sesuai konteks penggunaannya:
+
+| Dimensi | API Getter | Contoh Nilai Sel `E2` | Konteks Penggunaan |
+|---|---|---|---|
+| **Value** | `sheet.value('E2')` | `30240000` (Number) | **Logika komputasi aplikasi**: evaluasi agregat, komparasi logika, pengiriman payload ke database. Formula telah dievaluasi tuntas ke nilai primitifnya. |
+| **Input** | `sheet.input('E2')` | `'=C2*D2'` (String) | **Formula bar & in-place cell editor**: representasi raw string yang diketik oleh pengguna sebelum diproses formula parser. |
+| **Display** | `sheet.display('E2')` | `{ text: 'Rp 30.240.000', align: 'right', kind: 'number' }` | **Render visual**: teks terformat akhir yang mematuhi konvensi locale, alignment bawaan tipe data, dan rule styling. |
+
+> - Sel kosong selalu menghasilkan `value: null`.
+> - Formula yang mengalami kesalahan kalkulasi menghasilkan objek error terstruktur, misalnya `{ code: '#DIV/0!' }` atau `{ code: '#REF!' }`.
+
+---
+
+## 4. Mutasi Transaksional & Sistem Operasi (Ops)
+
+Setiap modifikasi terhadap workbook dicatat sebagai **Operation Unit (`op`)** atomik—misalnya `setCellValue`, `setCellStyle`, atau `insertRow`. Setiap op membawa atribut **`source`** yang mengidentifikasi asal mutasi:
+
+| Nilai `source` | Asal Mutasi | Perilaku Keamanan & Validasi |
+|---|---|---|
+| `'code'` | Mutasi programatis dari aplikasi via API workbook. | Bypass validasi user secara default, dicatat ke riwayat undo. |
+| `'user'` | Input interaktif pengguna melalui antarmuka visual `<Sheet />`. | Melewati interceptor validasi, aturan hak akses (ACL), dan skema proteksi sel. |
+| `'undo'`, `'redo'` | Navigasi riwayat aksi pengguna via shortcut keyboard atau toolbar. | Diterapkan secara simetris dari stack histori perubahan. |
+| `'remote'` | Sinkronisasi mutasi eksternal (kolaborasi realtime via WebSocket atau sync engine). | Diaplikasikan ke state lokal tanpa memicu duplikasi event loop. |
+
+Berkat model pencatatan op ini, engine workbook mampu mengelola tumpukan **Undo/Redo** secara deterministik, menghasilkan patch perbedaan data (delta diffing) untuk pengiriman ke server, serta memancarkan event reaktif ke UI aplikasi.
+
+---
+
+## 5. Implementasi & Pola Integrasi Step-by-Step
+
+Semua contoh di bawah menggunakan dataset produk yang diekspor dari helper berikut:
 
 <!-- contoh: data/produk.js -->
 ```js
@@ -141,11 +126,11 @@ export function buatProduk() {
 ```
 <!-- /contoh -->
 
-Di setiap contoh, baris yang **baru** dibanding langkah sebelumnya ditandai `// baru`.
+---
 
-## 2.5 Membaca satu nilai
+### 5.1 Membaca Nilai secara Reaktif (`useWorkbook`)
 
-**Tujuan:** menampilkan total nilai stok di sebuah label biasa.
+Komponen React di luar spreadsheet dapat membaca nilai tertentu dari workbook secara reaktif menggunakan hook `useWorkbook`:
 
 <!-- contoh: 02-05-baca.page.tsx -->
 ```tsx
@@ -169,16 +154,11 @@ export default function Halaman() {
 
 ![Label total nilai stok](img/konsep-baca.png)
 
-**Penjelasan:**
+---
 
-- `useState(buatProduk)` membuat workbook sekali, sama seperti di bab 1. Tidak ada `<Sheet>`.
-- `useWorkbook(wb, (w) => ...)` membaca sesuatu dari workbook. Fungsi kedua menerima workbook dan mengembalikan yang ingin ditampilkan.
-- `w.display('Produk', 'E5').text` adalah teks sel E5 seperti di layar, yaitu `Rp 60.190.000`. E5 berisi rumus `=SUM(E2:E4)`, yang sudah dihitung.
-- `data-siap` hanya penanda untuk pengambilan foto dokumentasi ini. Tidak perlu ditulis di aplikasimu.
+### 5.2 Mengubah Data dari Kode Eksternal
 
-## 2.6 Mengubah dari kode
-
-**Tujuan:** sebuah tombol mengubah stok semen, dan total di label ikut berubah sendiri.
+Mutasi terprogram dapat dipicu melalui tombol atau event handler React biasa menggunakan metode `sheet.setValues()`:
 
 <!-- contoh: 02-06-ubah.page.tsx -->
 ```tsx
@@ -204,20 +184,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol diklik:
+![Stok diubah dari tombol dan total ikut diperbarui](img/konsep-ubah.png)
 
-![Stok diubah dari tombol, total ikut berubah](img/konsep-ubah.png)
+---
 
-**Penjelasan:**
+### 5.3 Perbandingan Value, Input, dan Display
 
-- `wb.sheet('Produk').setValues('D2', 400)` mengubah sel D2 menjadi 400.
-- Rumus `=C2*D2` di E2 dan `=SUM(E2:E4)` di E5 dihitung ulang. Hanya rumus yang terkena yang dihitung, bukan seluruh sheet.
-- `useWorkbook` melihat bahwa nilai yang dibacanya berubah, lalu merender ulang komponen. Kamu tidak perlu `setState` sendiri.
-- `w.value('Produk', 'D2')` memberi angka `400`, bukan teks. Gunakan `value` untuk logika, `display` untuk ditampilkan.
-
-## 2.7 Tiga sisi isi sel
-
-**Tujuan:** melihat value, input, dan display dari beberapa sel sekaligus.
+Contoh berikut mendemonstrasikan perbedaan nyata ketiga aspek data pada sel formula berformat mata uang:
 
 <!-- contoh: 02-07-isi-sel.page.tsx -->
 ```tsx
@@ -252,22 +225,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Value, input, dan display](img/konsep-isi-sel.png)
+![Perbandingan Value, Input, dan Display pada sel formula](img/konsep-isi-sel.png)
 
-**Penjelasan:**
+---
 
-| Sel | Yang terlihat di foto |
-|---|---|
-| E2 (rumus) | value adalah hasil hitungannya, input adalah rumusnya, display adalah hasilnya dalam Rupiah |
-| C2 (angka) | value adalah angka, input adalah angka itu sebagai teks, display dalam Rupiah |
-| B2 (teks) | ketiganya sama |
+### 5.4 Ekstraksi Seluruh Sheet ke Tabel HTML
 
-- `useWorkbook(wb)` **tanpa fungsi baca** mengembalikan workbook-nya sendiri, dan merender ulang komponen di setiap perubahan apa pun. Cocok untuk
-  komponen yang membaca banyak sel sekaligus.
-
-## 2.8 Seluruh sheet sebagai tabel
-
-**Tujuan:** menampilkan seluruh daftar produk sebagai tabel HTML biasa, dengan looping baris dan kolom.
+Data workbook dapat diiterasi secara langsung ke elemen HTML kustom menggunakan helper batas sel `sheet.lastFilled()`:
 
 <!-- contoh: 02-08-tabel.page.tsx -->
 ```tsx
@@ -302,18 +266,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-![Daftar produk sebagai tabel HTML](img/konsep-tabel.png)
+![Seluruh sheet dirender ke dalam tabel HTML](img/konsep-tabel.png)
 
-**Penjelasan:**
+---
 
-- `lastFilled()` memberi baris dan kolom terakhir yang berisi, dengan nomor mulai dari 0: di sini `{ r: 4, c: 4 }`. Jumlah barisnya `r + 1`.
-- `w.display('Produk', r, c)` menunjuk sel dengan **nomor**, bukan alamat (2.2). `display(0, 0)` adalah A1.
-- `d.align` memberi perataan yang dipakai sheet: angka rata kanan, teks rata kiri.
-- Ini menunjukkan bahwa workbook bisa ditampilkan dengan cara apa pun: tabel laporan, kartu, grafik. `<Sheet>` hanya satu pilihan.
+### 5.5 Stabilitas Identitas: Row ID vs Row Index
 
-## 2.9 Nomor bergeser, id tetap
-
-**Tujuan:** memahami kenapa sebuah baris sebaiknya disimpan dengan id-nya, bukan dengan nomornya.
+Dalam spreadsheet dinamis, baris dapat disisipkan, dihapus, atau diurutkan (*sorted*). Mengandalkan nomor indeks baris (`rowIndex`) untuk mereferensikan entitas data adalah antipattern yang rentan bug. Engine menyediakan identifier permanen yang stabil (`rowId`):
 
 <!-- contoh: 02-09-id.page.tsx -->
 ```tsx
@@ -348,25 +307,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah tombol diklik, produk baru masuk di baris 3:
+![Baris total bergeser secara dinamis tanpa merusak referensi](img/konsep-id.png)
 
-![Baris total pindah dari nomor 5 ke nomor 6](img/konsep-id.png)
+---
 
-**Penjelasan:**
+### 5.6 Berlangganan Event Transaksional (`wb.on`)
 
-- Setiap baris dan kolom punya **id tetap**, sebuah teks acak yang tidak pernah berubah. Nomornya bisa berubah, misalnya saat baris
-  disisipkan di atasnya.
-- `rowId(4)` mengambil id baris ke-5 (total) sekali saja. Setelah satu baris disisipkan, `rowIndex(idTotal)` memberi nomor barunya: 5, yaitu
-  baris ke-6 di layar.
-- Rumus totalnya juga ikut menyesuaikan sendiri: dari `=SUM(E2:E4)` menjadi `=SUM(E2:E5)`, karena rumus menyimpan referensinya sebagai id.
-- Hal yang sama berlaku untuk penyimpanan ke server, komentar, aturan, dan validasi: semuanya menempel ke baris lewat id, jadi ikut pindah.
-
-Kapan memakai id: setiap kali kamu perlu mengingat sebuah baris **lebih lama dari satu kali render**, misalnya baris yang sedang dipilih, atau
-baris yang menunggu jawaban dari server.
-
-## 2.10 Mendengar perubahan
-
-**Tujuan:** mencatat setiap perubahan, dengan sumbernya.
+Anda dapat menangkap seluruh aliran mutasi internal melalui event dispatcher `wb.on('op', handler)`. Ini sangat berguna untuk audit trail, sinkronisasi realtime, atau auto-save:
 
 <!-- contoh: 02-10-event.page.tsx -->
 ```tsx
@@ -402,25 +349,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah keempat tombol diklik berurutan:
+![Log audit trail menangkap mutasi op beserta sumber perubahannya](img/konsep-event.png)
 
-![Daftar perubahan dengan sumbernya](img/konsep-event.png)
+---
 
-**Penjelasan:**
+### 5.7 Manajemen Riwayat: Undo & Redo API
 
-- `wb.on('op', fn)` memanggil `fn` setiap kali workbook berubah. `e.source` adalah sumbernya (2.4), `e.ops` daftar perubahannya.
-- `wb.on` **mengembalikan fungsi untuk berhenti mendengar**. Mengembalikannya dari `useEffect` membuat pendengarnya dilepas saat komponen hilang.
-- Baris di foto, satu per tombol:
-  1. `code: cells`: isi sel diubah oleh kode.
-  2. `code: styles`: gaya diubah oleh kode.
-  3. `user: cells`: isi sel diubah dengan `{ source: 'user' }`, seolah-olah oleh orang di layar.
-  4. `undo: cells`: perubahan terakhir dibatalkan.
-
-Event lain yang bisa didengar ada di 2.14. Untuk hal yang lebih sederhana, seperti "ada perubahan atau tidak", `useWorkbook` sudah cukup (1.8).
-
-## 2.11 Undo dan redo
-
-**Tujuan:** tombol Undo dan Redo milik aplikasimu sendiri, yang hanya aktif saat bisa dipakai.
+Workbook mengelola state snapshot internal yang memungkinkan eksekusi undo dan redo programatis dengan integritas data penuh:
 
 <!-- contoh: 02-11-undo.page.tsx -->
 ```tsx
@@ -449,20 +384,13 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Setelah "Kurangi 10" diklik dua kali, lalu Undo sekali:
+![Kontrol Undo dan Redo programatis](img/konsep-undo.png)
 
-![Stok 410, Undo dan Redo sama-sama aktif](img/konsep-undo.png)
+---
 
-**Penjelasan:**
+### 5.8 Mengintegrasikan Workbook ke Komponen Grid `<Sheet />`
 
-- `wb.undo()` dan `wb.redo()` membatalkan dan mengulang perubahan, sama seperti Ctrl+Z dan Ctrl+Y di sheet.
-- `canUndo()` dan `canRedo()` dibaca dengan `useWorkbook`, sehingga tombolnya aktif dan nonaktif sendiri.
-- Di foto, stok 420 dikurangi dua kali menjadi 400, lalu undo mengembalikannya ke 410. Masih ada yang bisa di-undo dan di-redo, jadi kedua tombol
-  aktif.
-
-## 2.12 Sekarang dengan `<Sheet>`
-
-**Tujuan:** workbook yang sama ditampilkan oleh `<Sheet>`, dan label total di luar sheet ikut berubah saat orang mengetik.
+Setelah memahami bahwa workbook adalah data terstruktur murni, merender antarmuka visual spreadsheet hanyalah masalah memasangkan workbook instance tersebut ke prop `<Sheet workbook={wb} />`:
 
 <!-- contoh: 02-12-sheet.page.tsx -->
 ```tsx
@@ -487,89 +415,64 @@ export default function Halaman() {
 ```
 <!-- /contoh -->
 
-Stok semen diketik 400 di sheet, lalu Enter:
-
-![Label total di luar sheet ikut berubah](img/konsep-sheet.png)
-
-**Penjelasan:**
-
-- Satu tambahan dari 2.5: `<Sheet workbook={wb} />`.
-- Orang mengetik di sheet, sheet mengubah `wb`, lalu `useWorkbook` di label total melihat perubahan itu. Total di atas sheet berubah dari
-  Rp 60.190.000 menjadi Rp 58.750.000.
-- Semua yang dipelajari di bab ini berlaku apa adanya saat ada `<Sheet>`. Bab berikutnya membahas `<Sheet>` itu sendiri.
+![Perubahan di dalam grid spreadsheet memperbarui widget label eksternal secara reaktif](img/konsep-sheet.png)
 
 ---
 
-# Bagian C. Yang sering keliru, dan referensi
+## 6. Antipattern & Panduan Best Practices
 
-## 2.13 Yang sering keliru
-
-| Keliru | Benar |
-|---|---|
-| Menghitung dengan `display(...).text` | `display` adalah teks (`'Rp 72.000'`). Untuk menghitung, pakai `value` |
-| Nomor baris dimulai dari 1 | nomor di kode dimulai dari **0**: A1 adalah `(0, 0)`. Alamat teks (`'A1'`) tetap seperti di layar |
-| Menyimpan nomor baris untuk dipakai nanti | nomornya bisa bergeser. Simpan id-nya (`rowId`), lalu cari nomornya saat dibutuhkan (`rowIndex`) |
-| `useWorkbook(wb, (w) => [w.value('A1'), w.value('A2')])` di komponen yang berat | array baru di setiap pembacaan membuat komponen dirender di setiap perubahan workbook. Pakai dua `useWorkbook` yang masing-masing memberi satu nilai |
-| Lupa melepas `wb.on(...)` | kembalikan fungsi dari `wb.on` di `useEffect` (2.10) |
-| Mengira perubahan dari kode diperiksa aturan | sumber `'code'` tidak diperiksa (2.4). Tambahkan `{ source: 'user' }` kalau perubahan itu mewakili orang |
-
-## 2.14 Referensi
-
-### Membaca
-
-| Fungsi | Hasilnya |
-|---|---|
-| `wb.value(sheet, sel)` | nilai sebenarnya: angka, teks, `true`/`false`, `null`, atau error |
-| `wb.input(sheet, sel)` | yang muncul saat sel diedit: rumus atau angka sebagai teks |
-| `wb.display(sheet, sel)` | yang tampil: `{ text, align, kind }` |
-| `wb.sheet(nama).lastFilled()` | `{ r, c }`: baris dan kolom terakhir yang berisi, mulai dari 0; `{ r: -1, c: -1 }` kalau kosong |
-| `wb.sheet(nama).rowId(r)`, `colId(c)` | id tetap baris atau kolom nomor `r` / `c` |
-| `wb.sheet(nama).rowIndex(id)`, `colIndex(id)` | nomor sekarang dari sebuah id; `-1` kalau sudah dihapus |
-
-`sel` boleh berupa alamat (`'C2'`) atau dua nomor (`1, 2`).
-
-### Mengubah
-
-| Fungsi | Artinya |
-|---|---|
-| `wb.sheet(nama).setValues(sel, nilai)` | mengisi satu sel, atau banyak sel dengan array di dalam array |
-| `wb.sheet(nama).setStyle(range, gaya)` | memberi gaya |
-| `wb.sheet(nama).insertRows(baris)` | menyisipkan baris |
-| `wb.undo()`, `wb.redo()` | membatalkan dan mengulang |
-| `wb.canUndo()`, `wb.canRedo()` | bisa di-undo / di-redo atau tidak |
-
-Setiap fungsi yang mengubah menerima parameter terakhir `{ source: 'user' }` untuk menandai perubahan itu sebagai perubahan orang (2.4). Semua
-fungsi untuk mengisi dan mengubah dibahas di bab 4.
-
-### React
-
-| Pembantu | Artinya |
-|---|---|
-| `useWorkbook(wb, (w) => ...)` | membaca sesuatu, dan merender ulang komponen saat nilai itu berubah |
-| `useWorkbook(wb)` | workbook-nya sendiri; merender ulang di setiap perubahan |
-
-### Event (`wb.on(nama, fn)`)
-
-| Event | Isinya | Kapan |
+| Praktik Keliru | Solusi yang Benar | Alasan Teknis |
 |---|---|---|
-| `op` | `{ ops, source }` | setiap perubahan yang diterapkan |
-| `reject` | `{ reason, op, source }` | perubahan ditolak oleh aturan, validasi, atau hak akses (bab 8, bab 10) |
-| `saved` | `{ version }` | setelah `wb.saved()` (1.8, bab 9) |
-| `cellError` | `{ address, field, value, expected }` | nilai tidak cocok dengan tipe kolomnya (bab 8) |
-| `access` | `{ owner, roles, ui, message }` | aturan akses diganti (bab 10) |
-| `layout` | | ukuran baris atau kolom berubah |
+| **Menjalankan komputasi numerik memakai `display(...).text`** | Gunakan `sheet.value(sel)` | `display` menghasilkan string terformat (misal `'Rp 72.000'`), sedangkan `value` memberikan nilai primitif numerik (`72000`) atau boolean yang valid untuk kalkulasi. |
+| **Mengasumsikan indeks koordinat numerik dimulai dari 1** | Indeks numerik berbasis 0: koordinat `A1` adalah `(r: 0, c: 0)` | Pengalamatan teks (`'A1'`) menggunakan standar 1-based, namun API numerik `(r, c)` mengikuti konvensi indeks array JavaScript (0-based). |
+| **Menyimpan indeks baris `r` di dalam state eksternal untuk jangka panjang** | Simpan `rowId`, lalu lookup posisinya via `s.rowIndex(id)` | Indeks baris dapat bergeser sewaktu-waktu akibat sorting, filter, atau penyisipan baris oleh pengguna. |
+| **Mengembalikan objek/array baru pada selector `useWorkbook`** (misal: `useWorkbook(wb, w => [w.value('A1'), w.value('A2')])`) | Pisahkan menjadi selector primitif mandiri atau bungkus perbandingan kesetaraan kustom | `useWorkbook` memeriksa referensi kesetaraan (`Object.is`). Mengembalikan array baru selalu memicu re-render yang tidak perlu pada setiap event op. |
+| **Lupa melepaskan listener `wb.on`** | Return fungsi cleanup yang dihasilkan oleh `wb.on` di dalam `useEffect` | Mencegah memory leak dan eksekusi callback pada komponen yang telah di-unmount. |
+| **Mengasumsikan mutasi dari kode diperiksa oleh aturan validasi pengguna** | Tambahkan `{ source: 'user' }` jika mutasi programatis harus tunduk pada validasi user | Secara default mutasi dengan `source: 'code'` memiliki privilese sistem dan melewati interceptor validasi pengguna. |
 
-`wb.on` mengembalikan fungsi untuk berhenti mendengar.
+---
 
-### Pilihan `createWorkbook(isi, pilihan)`
+## 7. Referensi Lengkap API
 
-`isi` adalah JSON yang pernah disimpan (`wb.toJSON()`), atau `null` untuk workbook kosong. `pilihan` boleh dikosongkan:
-
-| Pilihan | Isinya | Artinya |
+### Metode Pembacaan Data
+| Metode | Signature Return | Deskripsi |
 |---|---|---|
-| `user` | `{ id, name }` | siapa yang sedang bekerja: dicatat di setiap op, dan menjadi nama penulis komentar |
-| `beforeOp` | fungsi | memeriksa setiap op sebelum diterapkan, dan bisa mengubah, membuang, atau menolaknya ([8.7](08-menjaga-isi.md#87-aturan-yang-membaca-sel-lain-beforeop)) |
-| `now` | `() => Date` | jam untuk `NOW()` dan `TODAY()`; berguna untuk tes |
-| `undoLimit` | angka | berapa perubahan yang diingat undo (bawaan 200) |
+| `wb.value(sheet, cell)` | `any` (Number, String, Boolean, null, Error) | Mengembalikan nilai primitif terhitung. |
+| `wb.input(sheet, cell)` | `string` | Mengembalikan representasi raw input (rumus teks atau string masukan). |
+| `wb.display(sheet, cell)` | `{ text: string, align: 'left' \| 'right' \| 'center', kind: string }` | Mengembalikan representasi visual sel terformat. |
+| `sheet.lastFilled()` | `{ r: number, c: number }` | Mengembalikan koordinat baris dan kolom terjauh yang terisi data (0-based). Menghasilkan `{ r: -1, c: -1 }` jika kosong. |
+| `sheet.rowId(r)` / `colId(c)` | `string` | Mendapatkan identifier unik permanen untuk baris `r` atau kolom `c`. |
+| `sheet.rowIndex(id)` / `colIndex(id)` | `number` | Mencari indeks numerik terkini dari sebuah `rowId` / `colId`. Mengembalikan `-1` jika baris/kolom telah dihapus. |
 
-[Daftar isi](../README.md#daftar-isi) · Sebelumnya: [1. Mulai dalam 5 menit](01-mulai-cepat.md) · Berikutnya: [3. Komponen `<Sheet>`](03-komponen-sheet.md)
+### Metode Mutasi & Transaksi
+| Metode | Argumen Utama | Deskripsi |
+|---|---|---|
+| `sheet.setValues(cell, data, options?)` | `cell: string \| [r, c]`, `data: any`, `options?: { source?: OpSource }` | Menulis data satu sel atau matriks batch ke sheet. |
+| `sheet.setStyle(range, styleObject, options?)` | `range: string`, `style: CellStyle` | Mengaplikasikan visual styling (bold, fill, color, border, alignment). |
+| `sheet.insertRows(atRow, count?, options?)` | `atRow: number`, `count?: number` | Menyisipkan sejumlah baris baru pada indeks tertentu. |
+| `wb.undo()` / `wb.redo()` | - | Menavigasikan tumpukan riwayat aksi mundur atau maju. |
+| `wb.canUndo()` / `wb.canRedo()` | - | Boolean flag ketersediaan stack undo/redo. |
+
+### React Integration Hooks
+| Hook | Kegunaan |
+|---|---|
+| `useWorkbook(wb, selector)` | Berlangganan reaktif pada nilai spesifik dari workbook. Komponen hanya me-render ulang saat output selector berubah. |
+| `useWorkbook(wb)` | Berlangganan secara menyeluruh pada instance workbook; me-render ulang pada setiap mutasi op. |
+
+### Event Lifecycle Listener (`wb.on(eventName, callback)`)
+| Nama Event | Tipe Payload | Waktu Emisi |
+|---|---|---|
+| `'op'` | `{ ops: Op[], source: OpSource }` | Terpancar setiap kali satu atau sekumpulan op berhasil diaplikasikan ke workbook. |
+| `'reject'` | `{ reason: string, op: Op, source: OpSource }` | Terpancar saat suatu op ditolak oleh interceptor validasi atau aturan hak akses (ACL). |
+| `'saved'` | `{ version: number }` | Terpancar setelah pemanggilan `wb.saved()`. |
+| `'cellError'` | `{ address: string, field: string, value: any, expected: string }` | Terpancar saat nilai sel melanggar konstrain skema kolom. |
+| `'access'` | `{ owner: string, roles: Record<string, any>, ui: any, message: string }` | Terpancar saat konfigurasi izin akses dokumen diperbarui. |
+| `'layout'` | `{ sheet: string }` | Terpancar saat dimensi baris atau kolom mengalami perubahan ukuran. |
+
+### Opsi Konfigurasi Factory `createWorkbook(doc?, options?)`
+| Opsi | Tipe Data | Deskripsi |
+|---|---|---|
+| `user` | `{ id: string, name: string }` | Identitas pengguna aktif. Disematkan pada metadata setiap op dan authorship komentar sel. |
+| `beforeOp` | `(op: Op, wb: Workbook) => boolean \| Op \| Op[]` | Interceptor mutasi sebelum diaplikasikan. Dapat mengizinkan, memodifikasi, atau menolak op (lihat [Bab 08](08-menjaga-isi.md#87-aturan-yang-membaca-sel-lain-beforeop)). |
+| `now` | `() => Date` | Factory function penentu waktu sistem untuk formula waktu dinamis (`NOW()`, `TODAY()`); esensial untuk deterministic testing. |
+| `undoLimit` | `number` | Batas maksimum tumpukan riwayat undo yang disimpan di memori (default: `200`). |
