@@ -80,6 +80,7 @@ Library menyediakan tiga entry point modular:
 11. [11. Komentar Sel & Interoperabilitas Excel](docs/11-komentar-excel.md): Threaded comments pada sel, import dan export file `.xlsx`, serta pemrosesan CSV.
 12. [12. Visualisasi Data & Dashboard](docs/12-dashboard.md): Floating charts (Bar, Line, Pie, Bullet, Waterfall, Kurva S), in-cell sparklines, dan arsitektur dashboard analitik.
 13. [13. Optimasi Performa & Referensi API](docs/13-referensi.md): Virtualization untuk dataset besar (>100.000 baris), katalog lengkap fungsi API, dan tipe TypeScript.
+14. [14. Pivot Table](docs/14-pivot.md): Pivot lewat menu, kode React, server, dan file; kasus dari toko, HR, sekolah, helpdesk, keuangan, restoran; hak akses, dashboard, dan studi kasus Kurva S.
 
 - [Galeri: Studi Kasus Sistem Konstruksi](docs/galeri.md): Implementasi dunia nyata yang menggabungkan seluruh fitur spreadsheet ke dalam alur kerja manajemen proyek.
 

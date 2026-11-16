@@ -19,7 +19,7 @@ import { makeRule, ruleRect, ruleAt, choicesOf, breaks } from './validation.js';
 import { makeConditional, conditionalStyleOf } from './conditional.js';
 import { outlineOf, MAX_LEVEL } from './outline.js';
 import { addressable, cellOf, rangeOf } from './addressing.js';
-import { tableOf, pivot } from './pivot.js';
+import { tableOf, pivot, isPercentShow } from './pivot.js';
 import { chartSeries, splitRangeText, CHART_TYPES, CHART_DEFAULTS } from './chart.js';
 import { resolveAccess, actionsOfOp } from './policy.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
@@ -652,6 +652,10 @@ export function createWorkbook(doc, options) {
         access = resolveAccess(policy, who);
         hasPolicy = !!policy;
         rules = resolveRules(api, hostRules.concat(access.ranges));
+        // A pivot reads the cells this person may not see as empty (tableOf), so what it shows depends on who has the workbook open. Every pivot is
+        // worked out again for the new person; otherwise the table written for the one before (all the margins of a manager, say) would stay on
+        // the screen of someone who may not read them.
+        rewriteAllPivots();
         revision++;
         emit('access', accessInfo());
         emit('layout', {});
@@ -1280,7 +1284,8 @@ export function createWorkbook(doc, options) {
         if (!p.spec || !(p.spec.values || []).length) return { error: 'Pivot table: add Rows and Values in its editor' };
         try {
             const { records } = tableOf(api, src.s, src.rect);
-            return pivot(records, p.spec);
+            // the names of the days of the week (group 'weekday') in the workbook's language: Senin in id-ID
+            return pivot(records, p.spec, { locale: settings.locale });
         } catch (err) { return { error: 'Pivot table: ' + err.message }; }
     }
 
@@ -1295,13 +1300,17 @@ export function createWorkbook(doc, options) {
         const entries = [];
         const put = (r, c, value, style) => { if (r < size.rows && c < size.cols) entries.push({ r, c, value, style }); };
         const kinds = out.rows ? out.rows.map((x) => x.kind) : [];
+        // the columns that hold a value shown as a share (percent of total, running total in %, ...): written with a percent format, 25.0%
+        const lead = out.columns ? cols - out.columns.length : cols;
+        const percentCol = (j) => j >= lead && isPercentShow(out.values[out.columns[j - lead]].show);
         for (let i = 0; i < rows; i++) {
             const kind = i < (out.header || 0) ? 'header' : kinds[i - (out.header || 0)];
             for (let j = 0; j < cols; j++) {
                 const v = cells[i][j];
                 // what a pivot writes is data: a text stays a text (a group named "=1" is no formula)
                 const value = v === null || v === undefined || v === '' ? null : typeof v === 'string' ? "'" + v : v;
-                const style = kind === 'header' ? { bold: true, fill: '#e8f0fe' } : kind === 'total' ? { bold: true, fill: '#f1f3f4' } : kind === 'subtotal' ? { bold: true } : null;
+                let style = kind === 'header' ? { bold: true, fill: '#e8f0fe' } : kind === 'total' ? { bold: true, fill: '#f1f3f4' } : kind === 'subtotal' ? { bold: true } : null;
+                if (kind !== 'header' && percentCol(j)) style = { ...(style || {}), format: { type: 'percent', decimals: 1 } };
                 put(a.r + i, a.c + j, value, style);
             }
         }
@@ -1323,6 +1332,18 @@ export function createWorkbook(doc, options) {
         for (let r = rect.r1; r <= rect.r2; r++) for (let c = rect.c1; c <= rect.c2; c++) entries.push({ r, c, value: null, style: null });
         pivotWriting = true;
         try { setBlock(s, entries, { source: 'remote' }); } finally { pivotWriting = false; }
+    }
+
+    // Every pivot of the workbook written again from its data, as the person who has it open may read that data (setAccess).
+    function rewriteAllPivots() {
+        if (pivotWriting || !anyPivots()) return;
+        for (const s of [...sheetOrder]) {
+            for (const p of pivotsOf(s)) {
+                writePivot(s, p);
+                const now = pivotsOf(s).find((x) => x.id === p.id) || p;
+                pivotWritten.set(p.id, { key: JSON.stringify([s, p.at, p.source, p.spec]), s, rect: pivotArea(s, now) });
+            }
+        }
     }
 
     // After a change: a pivot made or changed is written, one whose data was touched is worked out again, one taken away (or undone) is cleared.

@@ -128,13 +128,43 @@ export interface Group { level: number; from: number; to: number; folded: boolea
 export interface Groups { groups: Group[]; maxLevel: number }
 
 export type PivotFunction = 'SUM' | 'COUNT' | 'COUNTA' | 'COUNTUNIQUE' | 'AVERAGE' | 'MAX' | 'MIN' | 'MEDIAN' | 'PRODUCT';
+/** Excel's "Show Values As": a share of a total, a running total, the change from the item before, a rank. */
+export type PivotShow = 'percentOfTotal' | 'percentOfRow' | 'percentOfColumn' | 'runningTotal' | 'percentRunningTotal' | 'difference' | 'percentDifference' | 'rank';
+export type PivotDateGroup = 'year' | 'quarter' | 'month' | 'week' | 'day' | 'weekday';
+export type PivotLabelOp = 'equals' | 'notEquals' | 'beginsWith' | 'notBeginsWith' | 'endsWith' | 'notEndsWith' | 'contains' | 'notContains'
+    | 'greaterThan' | 'greaterOrEqual' | 'lessThan' | 'lessOrEqual' | 'between' | 'notBetween';
+export type PivotValueOp = '=' | '<>' | '>' | '>=' | '<' | '<=' | 'between' | 'notBetween';
+export interface PivotValue {
+    /** A field of the data, or the name of a calculated field. */
+    field: string;
+    /** How it is summed up (SUM by default). A calculated field is always worked out from SUMs. */
+    fn?: PivotFunction;
+    /** The title of its column. */
+    as?: string;
+    /** How it is shown (Excel's Show Values As). Shares are written with a percent format. */
+    show?: PivotShow;
+    /** The field a running total, a difference or a rank walks along: a row or column field (the last row field when left out). */
+    base?: string;
+}
+/** A field's filter, as Excel's: hidden values and a label condition leave records out; a value condition and top n leave out whole groups. */
+export interface PivotFilter {
+    hidden?: CellValue[];
+    /** Label Filters (and Date Filters on a date): a condition on the field's value. `to` is the end of between. */
+    label?: { op: PivotLabelOp; value: CellValue; to?: CellValue };
+    /** Value Filters: a condition on a group's total of a value (by: its `as`, or its field). The field must be a row or column field. */
+    value?: { by: string; op: PivotValueOp; value: number; to?: number };
+    /** Top 10: the n biggest groups (the smallest with bottom) by a value, within each outer group. The field must be a row or column field. */
+    top?: { n: number; by: string; bottom?: boolean };
+}
 export interface PivotSpec {
     rows?: string[];
     columns?: string[];
-    values: Array<{ field: string; fn?: PivotFunction; as?: string }>;
-    filters?: Record<string, { hidden: CellValue[] }>;
+    values: PivotValue[];
+    /** Calculated fields (Excel's): a formula over other fields, each standing for its SUM. Fields with spaces in [brackets] or 'quotes'. */
+    calculated?: Array<{ name: string; formula: string }>;
+    filters?: Record<string, PivotFilter>;
     sort?: Record<string, 'asc' | 'desc' | { by: string; dir?: 'asc' | 'desc' }>;
-    group?: Record<string, 'year' | 'quarter' | 'month' | 'week'>;
+    group?: Record<string, PivotDateGroup>;
     totals?: boolean;
 }
 export interface PivotInfo { id: string; source: string; spec: PivotSpec; area: Rect | null }
@@ -218,7 +248,12 @@ export interface PivotResult {
     rowKeys: CellValue[][];
     colKeys: CellValue[][];
     rows: Array<{ cells: CellResult[]; kind: 'row' | 'subtotal' | 'total'; key: CellValue[] }>;
+    /** For each column after the row labels: the index (in spec.values) of the value it holds. */
+    columns: number[];
+    /** The summed-up number of a cell (keys: [] is "all"). A day of the week (group 'weekday') is its number, 1 Monday to 7 Sunday. */
     value(rowKey: CellValue[], colKey: CellValue[], i: number): CellResult;
+    /** What the table shows in that cell: the same as value(), unless the value has a `show`. */
+    shown(rowKey: CellValue[], colKey: CellValue[], i: number): CellResult;
 }
 
 export interface CommentItem { id: string; by: { id: string | null; name: string }; text: string; at: string; edited?: string }
@@ -577,8 +612,15 @@ export function replaceIn(wb: Workbook, sheet: SheetRef, at: Array<{ r: number; 
 export function sortRange(wb: Workbook, sheet: SheetRef, range: string | Rect, by: string | number, dir: 'asc' | 'desc'): Op[] | null;
 
 export function tableOf(wb: Workbook, sheet: SheetRef | null, where: string | Rect): { fields: string[]; records: Array<Record<string, CellResult>> };
-export function pivot(records: Array<Record<string, unknown>>, spec: PivotSpec): PivotResult;
+/** options.locale: the language of the names of the days of the week (group 'weekday'), 'en-US' by default. */
+export function pivot(records: Array<Record<string, unknown>>, spec: PivotSpec, options?: { locale?: string }): PivotResult;
 export const PIVOT_FUNCTIONS: Record<PivotFunction, (values: unknown[]) => CellResult>;
+export const PIVOT_SHOW: PivotShow[];
+export const PIVOT_DATE_GROUPS: PivotDateGroup[];
+export const PIVOT_LABEL_OPS: PivotLabelOp[];
+export const PIVOT_VALUE_OPS: PivotValueOp[];
+/** A calculated field's formula read: the fields it uses. Throws with a plain reason when it cannot be read. */
+export function parseCalculated(formula: string): { tree: unknown; fields: string[] };
 /** The categories and series of a block of cells, read as Excel reads a selection for a chart. */
 export function chartSeries(block: Array<Array<{ value: unknown; text: string; format?: object | null }>>, spec?: ChartSpec): ChartModel;
 export const CHART_TYPES: ChartType[];

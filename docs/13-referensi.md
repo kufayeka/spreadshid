@@ -1,6 +1,6 @@
 # 13. Optimasi Performa & Referensi API Lengkap
 
-[Daftar Isi](../README.md#daftar-isi) · Sebelumnya: [12. Visualisasi Data & Dashboard Interaktif](12-dashboard.md)
+[Daftar Isi](../README.md#daftar-isi) · Sebelumnya: [12. Visualisasi Data & Dashboard Interaktif](12-dashboard.md) · Berikutnya: [14. Pivot Table](14-pivot.md)
 
 Bab penutup ini menguraikan karakteristik performa `@kufayeka/sheet` saat menangani dataset masif (100.000+ baris dan ratusan ribu formula), panduan optimasi arsitektur untuk meminimalkan latensi dan konsumsi memori, serta katalog referensi lengkap untuk seluruh API core engine, komponen React, dan definisi tipe TypeScript.
 
@@ -390,4 +390,4 @@ export function Lembar({ id }: { id: string }) {
 
 ---
 
-[Daftar Isi](../README.md#daftar-isi) · Sebelumnya: [12. Visualisasi Data & Dashboard Interaktif](12-dashboard.md)
+[Daftar Isi](../README.md#daftar-isi) · Sebelumnya: [12. Visualisasi Data & Dashboard Interaktif](12-dashboard.md) · Berikutnya: [14. Pivot Table](14-pivot.md)

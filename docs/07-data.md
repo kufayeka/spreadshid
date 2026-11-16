@@ -158,7 +158,7 @@ export default function Halaman() {
 
 ### 2.4 Analisis Data Multidimensi (Pivot Table)
 
-Engine Pivot Table mengagregasikan ratusan baris data mentah secara dinamis tanpa perlu menulis rumus manual:
+Engine Pivot Table mengagregasikan ratusan baris data mentah secara dinamis tanpa perlu menulis rumus manual. Panduan lengkapnya (setiap parameter, tiga cara membuat, kasus dari sederhana sampai lanjutan, hak akses, dan file) ada di **[bab 14](14-pivot.md)**.
 
 <!-- contoh: 08-pivot.page.js -->
 ```jsx

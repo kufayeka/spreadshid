@@ -22,7 +22,7 @@ export { fromApiMakerType, fieldType, checkValue } from './types.js';
 export { mergePatch, checkPatch, viewFor } from './server.js';
 export { copyBlock, pasteClip, pasteText, fillBlock } from './transfer.js';
 export { findAll, replaceIn, sortRange } from './search.js';
-export { tableOf, pivot, PIVOT_FUNCTIONS } from './pivot.js';
+export { tableOf, pivot, PIVOT_FUNCTIONS, PIVOT_SHOW, PIVOT_DATE_GROUPS, PIVOT_LABEL_OPS, PIVOT_VALUE_OPS, parseCalculated } from './pivot.js';
 export { exportXlsx, importXlsx, importXlsxInto, importCsvInto, exportCsv, parseCsv, codeOfFormat } from './excel/index.js';
 export { resolveAccess, ACTIONS, ACTION_INFO, UI_ITEMS, validateAccess, parseWhere } from './policy.js';
 export { accessColor, accessPlaces } from './access-setup.js';

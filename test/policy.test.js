@@ -1,7 +1,7 @@
 // Access control as rows of a table (policy.js): who / effect / action / where / when / message. The most specific row wins (user > role > everyone),
 // deny wins within a level, and what nobody allows is not given. The same rows decide in the browser (setAccess) and on the server (viewFor, checkPatch).
 //   node test/policy.test.js
-import { createWorkbook, resolveAccess, validateAccess, parseWhere, viewFor, checkPatch } from '../src/core/index.js';
+import { createWorkbook, resolveAccess, validateAccess, parseWhere, viewFor, checkPatch, mergePatch } from '../src/core/index.js';
 
 let failures = 0;
 const check = (label, ok, actual) => { if (!ok) failures++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (!ok && actual !== undefined ? '   ' + JSON.stringify(actual) : '')); };
@@ -119,6 +119,41 @@ const told = resolveAccess([
 check('a refused action tells its own row\'s message', told.refusalFor('sheets.add') === 'No new sheets' && told.refusalFor('format.bold') === 'Formatting is locked',
     [told.refusalFor('sheets.add'), told.refusalFor('format.bold')]);
 check('an action refused by no deny row keeps the sheet\'s own words', resolveAccess([{ who: 'user:4', effect: 'allow', action: 'read' }], '4').refusalFor('sort') === 'You cannot sort here');
+
+// A pivot never tells a person what its hidden data holds: not on their screen, not in what the server sends them, and what they save does not
+// overwrite the stored full table with their own smaller one.
+{
+    const sales = () => {
+        const wb = createWorkbook();
+        wb.sheet('Sheet1').setSheetProps({ name: 'Sales' });
+        wb.setValues('Sales', 'A1', [['Rep', 'Region', 'Revenue', 'Margin'], ['Rudi', 'West', 12, 24], ['Tomi', 'East', 15, 22]]);
+        const sum = wb.sheet(wb.addSheet('Summary'));
+        sum.addPivot('A1', 'Sales!A1:D3', { rows: ['Region'], values: [{ field: 'Revenue', as: 'Revenue' }, { field: 'Margin', as: 'Margin' }] });
+        return wb;
+    };
+    const rules = [
+        { who: '*', effect: 'allow', action: 'read' },
+        { who: 'role:rep', effect: 'allow', action: 'edit', where: 'Sales!C2:C100' },
+        { who: 'role:rep', effect: 'deny', action: 'read', where: 'Sales!D1:D100' }
+    ];
+    const rep = { user: 'rudi', roles: ['rep'] };
+    const margins = (wb) => [1, 2, 3].map((r) => wb.value('Summary', r, 2));
+
+    const onScreen = sales();
+    onScreen.setAccess(rules, rep);
+    check('a pivot is worked out again for the person the access is set for', margins(onScreen).every((v) => v === 0), margins(onScreen));
+
+    const stored = sales().toJSON();
+    const sent = createWorkbook(viewFor(stored, { access: rules, who: rep }));
+    check('the server does not send the margins a pivot holds', margins(sent).every((v) => v === null || v === 0), margins(sent));
+
+    sent.setAccess(rules, rep);
+    sent.setValues('Sales', 'C2', 20, { source: 'user' });
+    const after = createWorkbook(mergePatch(stored, sent.pendingPatch(), { access: rules, who: rep }));
+    check('a save by that person keeps the full pivot, worked out again with their change',
+        after.value('Summary', 1, 1) === 15 && after.value('Summary', 2, 1) === 20 && margins(after).join() === '22,24,46',
+        [after.value('Summary', 1, 1), after.value('Summary', 2, 1), margins(after)]);
+}
 
 console.log(failures ? failures + ' FAILED' : 'ALL OK');
 process.exit(failures ? 1 : 0);

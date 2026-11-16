@@ -393,6 +393,13 @@
 .ks-pivot-item select { font: inherit; padding: 2px 4px; }
 /* a group field's order, sort and date groups: a line of their own under its name */
 .ks-pivot-opts { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+/* the text fields of the editor (a condition's value, the top n, a calculated field's name and formula) share a line with its selects */
+.ks-pivot-opts input { font: inherit; flex: 1 1 70px; min-width: 0; padding: 2px 6px; border: 1px solid #dadce0; border-radius: 4px; }
+.ks-pivot-opts select { font: inherit; padding: 2px 4px; }
+/* "Calculated" in place of a calculated value's function: it is always worked out from sums */
+.ks-pivot-note { align-self: center; color: #5f6368; font-size: 12px; font-style: italic; }
+/* a filter's conditions, above its list of values */
+.ks-pivot-conditions { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border: 1px solid #dadce0; border-radius: 4px; }
 .ks-pivot-add { font: inherit; padding: 5px 8px; border: 1px dashed #dadce0; border-radius: 4px; background: var(--ks-bg); color: var(--ks-accent); }
 .ks-pivot-filter { display: flex; flex-direction: column; gap: 4px; }
 .ks-check-row { display: flex; align-items: center; gap: 6px; }

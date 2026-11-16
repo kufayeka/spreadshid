@@ -49,7 +49,18 @@ export function mergePatch(doc, patch, what) {
     const goneRows = new Set(patch.rows.delete);
     for (const sheet of out.sheets) sheet.rows = sheet.rows.filter((r) => !goneRows.has(r.id));
     if (patch.workbook && typeof patch.workbook.version === 'number') out.version = patch.workbook.version;
-    return out;
+    return withFreshPivots(out);
+}
+
+// The tables of a document's pivots worked out again from all of its data. A person who may not read some of a pivot's data saves their own smaller
+// table, which keepHeld replaces with the stored one, the one from before their change; so after every merge the pivots are written again from
+// everything, and the stored document always holds the tables its data gives today, whoever saved it.
+function withFreshPivots(doc) {
+    const hasPivots = (doc.sheets || []).some((sheet) => sheet.props && Array.isArray(sheet.props.pivots) && sheet.props.pivots.length);
+    if (!hasPivots) return doc;
+    const wb = createWorkbook(doc);
+    wb.setAccess(null);                                   // no access rows: every cell is read, and every pivot written again (setAccess)
+    return wb.toJSON();
 }
 
 /**
@@ -137,9 +148,10 @@ function workbookFor(doc, what) {
 
 /**
  * The cells a person is not given (policy.js): the hidden and invisible ones, and the formulas that read one of them (whose answer is given instead,
- * so the person sees the right total without the cells it is made of). Returns Map(rowId -> Map(colId -> 'gone' | value)).
+ * so the person sees the right total without the cells it is made of), and the pivots that read one of them (see holdPivotsThatRead). doc is the
+ * stored document the person's workbook was made from. Returns Map(rowId -> Map(colId -> 'gone' | value)).
  */
-function heldCells(wb) {
+function heldCells(wb, doc) {
     const held = new Map();
     const hold = (rid, cid, what) => { if (!held.has(rid)) held.set(rid, new Map()); held.get(rid).set(cid, what); };
     for (const s of wb.sheetIds()) {
@@ -187,7 +199,46 @@ function heldCells(wb) {
         });
     }
     hiddenBySheet.clear();
+    holdPivotsThatRead(wb, doc, hold);
     return held;
+}
+
+// A pivot reads the cells a person may not see as empty, so their workbook (made with their access) holds the table worked out from what they may
+// read, while the stored document holds the table worked out from everything (the margins of all salesmen, say). A pivot whose two tables differ
+// reads hidden cells: every cell of it, as far as either table reaches, is held. viewFor sends the person their own table (an empty cell is not sent),
+// and keepHeld puts the stored table back into what they save, so their smaller table never overwrites the full one. A pivot that reads nothing
+// hidden is the same in both and is left alone, so it is saved as anyone changes it.
+function holdPivotsThatRead(wb, doc, hold) {
+    const full = createWorkbook(doc);
+    for (const s of wb.sheetIds()) {
+        if (!wb.sheetShown(s)) continue;
+        const storedAreas = new Map(full.pivots(s).map((p) => [p.id, p.area]));
+        for (const p of wb.pivots(s)) {
+            const mine = p.area, stored = storedAreas.get(p.id);
+            if (!mine && !stored) continue;
+            const both = [mine, stored].filter(Boolean);
+            const rect = {
+                r1: Math.min(...both.map((a) => a.r1)), c1: Math.min(...both.map((a) => a.c1)),
+                r2: Math.max(...both.map((a) => a.r2)), c2: Math.max(...both.map((a) => a.c2))
+            };
+            let differs = false;
+            for (let r = rect.r1; r <= rect.r2 && !differs; r++) {
+                for (let c = rect.c1; c <= rect.c2 && !differs; c++) {
+                    if (JSON.stringify(wb.value(s, r, c)) !== JSON.stringify(full.value(s, r, c))) differs = true;
+                }
+            }
+            if (!differs) continue;
+            for (let r = rect.r1; r <= rect.r2; r++) {
+                for (let c = rect.c1; c <= rect.c2; c++) {
+                    const rid = wb.rowId(s, r), cid = wb.colId(s, c);
+                    if (!rid || !cid) continue;
+                    const value = wb.value(s, r, c);
+                    // a pivot writes a text as data (a quote before it), so a group called "=1" is never read as a formula
+                    hold(rid, cid, { value: typeof value === 'string' ? "'" + value : value });
+                }
+            }
+        }
+    }
 }
 const hiddenBySheet = new Map();
 
@@ -199,7 +250,7 @@ const hiddenBySheet = new Map();
  */
 export function viewFor(doc, what) {
     const wb = workbookFor(doc, what);
-    const held = heldCells(wb);
+    const held = heldCells(wb, doc);
     const out = clone(doc);
     // the sheets a person does not see are not sent at all (ui.sheets), nor comments they may not read
     out.sheets = (out.sheets || []).filter((sheet) => wb.sheetShown(sheet.id));
@@ -230,7 +281,7 @@ function keepHeld(doc, patch, what) {
             if (was && was.props && was.props.comments) s.props.comments = clone(was.props.comments); else delete s.props.comments;
         }
     }
-    const held = heldCells(wb);
+    const held = heldCells(wb, doc);
     if (!held.size) return out;
     const stored = new Map();
     for (const sheet of doc.sheets || []) for (const row of sheet.rows || []) stored.set(row.id, row);

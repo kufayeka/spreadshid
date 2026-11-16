@@ -38,6 +38,18 @@ const dragFrom = (r1, c1, r2, c2) => async ({ js, mouse, wait }) => {
     const a = await cellAt(js, r1, c1), b = await cellAt(js, r2, c2);
     await mouse('mouseMoved', a.x, a.y); await mouse('mousePressed', a.x, a.y); await mouse('mouseMoved', b.x, b.y, { buttons: 1 }); await mouse('mouseReleased', b.x, b.y); await wait(300);
 };
+// chapter 14: something on the screen found by its text and clicked as a person clicks it (a menu of the menu bar, an item of a menu, a button)
+const clickText = (selector, text) => async ({ js, click, wait }) => {
+    const at = await js(`(function(){ var e = Array.from(document.querySelectorAll(${JSON.stringify(selector)})).find(function (x) { return x.textContent.trim() === ${JSON.stringify(text)}; }); if (!e) return null; var b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+    if (!at) throw new Error('nothing "' + text + '" in ' + selector);
+    await click(at.x, at.y); await wait(350);
+};
+// a select of the pivot editor set to a value, as a person picks it from its list
+const pick = (label, value) => async ({ js, wait }) => {
+    await js(`(function(){ var e = document.querySelector('select[aria-label="${label}"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(400);
+};
+const steps = (...acts) => async (p) => { for (const act of acts) await act(p); };
 // a picture of chapter 13: the page's top 1000 x 330 (menus, toolbar, formula bar and the first rows)
 const akses = (name, page, act) => ({ name, page, act, clip: { x: 0, y: 0, width: 1000, height: 330 } });
 
@@ -98,6 +110,21 @@ export const SHOTS = [
     { name: 'layar-sederhana', page: '03-08-bagian-layar.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 220 } },
     { name: 'layar-tema', page: '03-09-tema.page.tsx', act: dragFrom(1, 2, 3, 2), clip: { x: 0, y: 0, width: 1000, height: 300 } },
     { name: 'layar-dua-sheet', page: '03-10-dua-sheet.page.tsx', act: enter(1, 3, '400'), clip: { x: 0, y: 0, width: 1366, height: 330 } },
+    // chapter 14, pivot tables
+    { name: 'pivot-menu-dialog', page: '14-01-menu.page.tsx', act: steps(clickText('.ks-menubar-item', 'Insert'), clickText('.ks-menu-item', 'Pivot table')), clip: { x: 0, y: 0, width: 1366, height: 620 } },
+    { name: 'pivot-menu-hasil', page: '14-01-menu.page.tsx', act: steps(clickText('.ks-menubar-item', 'Insert'), clickText('.ks-menu-item', 'Pivot table'), clickText('.ks-dialog button', 'Create'),
+        pick('Add to Rows', 'Menu'), pick('Add to Values', 'Total')), clip: { x: 0, y: 0, width: 1366, height: 460 } },
+    { name: 'pivot-kode-fakultas', page: '14-02-kode.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    { name: 'pivot-kode-bulan', page: '14-02-kode.page.tsx', act: press('.sudut-bulan'), clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    // the editor with what Excel's has besides: the panel scrolled to Values and Calculated fields, then a filter opened (its conditions)
+    { name: 'pivot-panel-nilai', page: '14-20-panel.page.tsx', act: steps(async ({ js, click, wait }) => { const p = await cellAt(js, 1, 0); await click(p.x, p.y); await wait(500); },
+        async ({ js, wait }) => { await js("document.querySelector('.ks-pivot section[aria-label=\"Values\"]').scrollIntoView({ block: 'start' }); 0"); await wait(300); }), clip: { x: 0, y: 0, width: 1366, height: 760 } },
+    { name: 'pivot-panel-filter', page: '14-20-panel.page.tsx', act: steps(async ({ js, click, wait }) => { const p = await cellAt(js, 1, 0); await click(p.x, p.y); await wait(500); },
+        async ({ js, wait }) => { await js("document.querySelector('.ks-pivot section[aria-label=\"Filters\"]').scrollIntoView({ block: 'start' }); 0"); await wait(300); },
+        clickText('.ks-pivot-filter button', 'top 2'),
+        async ({ js, wait }) => { await js("document.querySelector('.ks-pivot section[aria-label=\"Filters\"]').scrollIntoView({ block: 'start' }); 0"); await wait(300); }), clip: { x: 0, y: 0, width: 1366, height: 760 } },
+    { name: 'pivot-dashboard', page: '14-14-dashboard.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 520 } },
+    { name: 'pivot-kurva-s', page: '14-15-kurva-s.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 560 } },
     // chapter 2: plain React around a workbook, a sheet only at the end
     { name: 'konsep-baca', page: '02-05-baca.page.tsx', clip: { x: 0, y: 0, width: 520, height: 70 } },
     { name: 'konsep-ubah', page: '02-06-ubah.page.tsx', act: press('.ubah'), clip: { x: 0, y: 0, width: 520, height: 110 } },
