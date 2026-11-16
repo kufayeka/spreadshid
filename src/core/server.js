@@ -5,7 +5,7 @@
 import { createWorkbook } from './workbook.js';
 import { checkValue as checkTypeOf } from './types.js';
 import { isStoredFormula, resolveRef } from './refs.js';
-import { actionsOfOp, refusalOf } from './policy.js';
+import { actionsOfOp } from './policy.js';
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
@@ -274,7 +274,7 @@ function sortedRows(doc, patch) {
 function refusedActions(doc, patch, wb, who) {
     const out = [];
     const me = who && typeof who === 'object' ? who.user : typeof who === 'string' ? who.replace(/^user:/, '') : null;
-    const ask = (op, sheet) => { for (const a of actionsOfOp(op, me)) if (a !== 'edit' && !wb.can(a)) out.push({ sheet, address: null, reason: refusalOf(a, wb.access().message) }); };
+    const ask = (op, sheet) => { for (const a of actionsOfOp(op, me)) if (a !== 'edit' && !wb.can(a)) out.push({ sheet, address: null, reason: wb.refusal(a) }); };
     const storedSheets = new Map((doc.sheets || []).map((s) => [s.id, s]));
     const storedRows = new Map(), storedCols = new Map();
     for (const sheet of doc.sheets || []) { for (const row of sheet.rows || []) storedRows.set(row.id, row); for (const col of sheet.columns || []) storedCols.set(col.id, col); }

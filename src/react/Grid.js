@@ -4,7 +4,6 @@ import { cycleReference } from '../core/formula/formula.js';
 import { Icon } from './icons.js';
 import { Gutter, gutterSize } from './Outline.js';
 import { parseAddressText } from './FormulaBar.js';
-import { refusalOf } from '../core/policy.js';
 import { rectsOf, selectCell, extendTo, addCell, selectRows, selectCols, selectAll, focusOf, stepActive } from '../core/selection.js';
 import { layoutOf, HEADER_HEIGHT, ROW_HEADER_WIDTH } from './geometry.js';
 import { createAxis } from '../core/axis.js';
@@ -471,7 +470,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
         if (rects.length !== 1) { e.preventDefault(); return; } // as in Google Sheets: a copy is one rectangle
         e.preventDefault();
         // the access policy may keep the sheet's content in it (no copy out)
-        if (!wb.can('copy')) { if (onError) onError(refusalOf('copy', wb.access().message), { kind: 'refused', action: 'copy' }); return; }
+        if (!wb.can('copy')) { if (onError) onError(wb.refusal('copy'), { kind: 'refused', action: 'copy' }); return; }
         const clip = copyBlock(wb, sheetId, rects[0], cut);
         e.clipboardData.setData('text/plain', clipText(clip));
         rememberCopy(clip);
@@ -482,7 +481,7 @@ export function Grid({ workbook: wb, sheetId, revision, sel, setSel, editing, se
     function onPaste(e) {
         if (editing) return; // the editor pastes into its text
         e.preventDefault();
-        if (!wb.can('paste')) { if (onError) onError(refusalOf('paste', wb.access().message), { kind: 'refused', action: 'paste' }); return; }
+        if (!wb.can('paste')) { if (onError) onError(wb.refusal('paste'), { kind: 'refused', action: 'paste' }); return; }
         const only = valuesOnly.current ? 'values' : 'all';
         valuesOnly.current = false;
         const target = rects[rects.length - 1];

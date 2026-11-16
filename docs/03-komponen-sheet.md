@@ -448,7 +448,8 @@ export default function Halaman() {
 | `onOp` | `(payload: { ops: Op[], source: OpSource }) => void` | `undefined` | Callback setiap kali mutasi data berhasil diaplikasikan ke workbook. |
 | `onSelectionChange` | `(selection: SheetSelection) => void` | `undefined` | Callback saat area seleksi sel/range kursor berubah. |
 | `onReject` | `(payload: { reason: string, op: Op, source: OpSource }) => void` | `undefined` | Callback saat aksi pengguna ditolak oleh aturan validasi atau hak akses. |
-| `onNotice` | `(notice: SheetNotice) => string \| null \| undefined` | `undefined` | Interceptor pesan feedback sebelum ditampilkan ke layar (dapat dimodifikasi atau diredam). |
+| `onNotice` | `(notice: SheetNotice) => string \| null \| undefined` | `undefined` | Menerima setiap pesan sheet (`refused`, `error`, `info`, `warning`) sebelum ditampilkan, lalu boleh mengganti teksnya atau meredamnya (lihat [Bab 02 bagian 5.9](02-konsep.md#59-notifikasi-milik-aplikasi-sendiri-notices-dan-onnotice)). |
+| `notices` | `boolean` | `true` | `false`: popup bawaan tidak pernah tampil; `onNotice` tetap menerima semua pesan. |
 | `onCellError` | `(payload: { address: string, field: string, value: any, expected: string }) => void` | `undefined` | Callback saat nilai masukan melanggar tipe skema kolom. |
 | `fileName` | `string` | `'Spreadsheet'` | Nama file default saat dokumen diunduh melalui menu *File → Download*. |
 | `access` | `SheetAccessConfig` | `{}` | Konfigurasi granular kontrol modul UI dan pembatasan hak akses sel/baris. |

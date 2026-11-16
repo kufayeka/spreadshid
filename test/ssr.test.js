@@ -6,9 +6,10 @@ import { renderToString } from 'react-dom/server';
 
 assert.strictEqual(typeof globalThis.window, 'undefined', 'this test runs where there is no window');
 const { Sheet, VERSION } = await import('../dist/index.js');
+// On a server the sheet always draws its loading skeleton, never the grid: a workbook is full of random ids, so a grid drawn on the server
+// would never match the one the browser draws, and React would stop with a hydration error. The browser draws the real sheet right after.
 const html = renderToString(createElement(Sheet, { style: { height: 400 } }));
-assert.ok(/role="grid"/.test(html), 'the grid is in the HTML: ' + html);
-assert.ok(html.includes('data-sheet-version="' + VERSION + '"'));
+assert.ok(html.includes('ks-loading') && !/role="grid"/.test(html), 'only the skeleton is in the server HTML: ' + html.slice(0, 300));
 const core = await import('../dist/core.js');
 assert.strictEqual(core.VERSION, VERSION, 'the core is its own entry, with no React');
 console.log('ok   the sheet imports and renders on a server, with no window');

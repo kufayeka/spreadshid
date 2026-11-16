@@ -92,7 +92,7 @@ function cellModeOf(row) {
  * @param {string|{ user?: string, roles?: string[] }} who
  */
 export function resolveAccess(rows, who) {
-    if (!rows) return { owner: true, roles: [], can: () => true, ui: allShown(), ranges: [], message: null };
+    if (!rows) return { owner: true, roles: [], can: () => true, refusalFor: (action) => refusalOf(action, null), ui: allShown(), ranges: [], message: null };
     const person = whoTexts(who);
     const mine = [];
     for (const row of rows) { const level = levelFor(row, person); if (level) mine.push({ ...row, level, action: String(row.action || '').trim() }); }
@@ -111,6 +111,17 @@ export function resolveAccess(rows, who) {
         return best ? (deny ? 'deny' : allow ? 'allow' : null) : null;
     };
     const can = (action) => decide(action, false) === 'allow';
+    // The sentence for a refused action is the message of the row that refused it: the deny rows of the level that decided, the first of them with
+    // a message. A refusal that no deny row made (nothing allows the action) falls back to the rows' general message, then to the sheet's own words.
+    const refusalFor = (action) => {
+        let best = 0;
+        for (const r of mine) {
+            if (r.where && !r.action.startsWith('view.')) continue;
+            if (names(r.action, action) && r.level > best) best = r.level;
+        }
+        const own = mine.find((r) => r.level === best && r.effect === 'deny' && r.message && !(r.where && !r.action.startsWith('view.')) && names(r.action, action));
+        return refusalOf(action, own ? own.message : message);
+    };
     // the owner: a row for their own user that allows everything, everywhere, and no row for their user that takes something back. Rows for a role
     // or for everyone do not count here, as they do not count against a user's own rows anywhere else
     const own = mine.filter((r) => r.level === 3);
@@ -138,9 +149,9 @@ export function resolveAccess(rows, who) {
         const said = r.message || (mode === 'readonly' ? message || 'You can only view this here' : undefined);
         ranges.push({ sheet: w.sheet || undefined, range: w.range || undefined, columns: w.columns || undefined, when: r.when || undefined, mode, message: said, level: r.level, deny: r.effect === 'deny', cap: r.effect === 'deny' && r.action === 'edit' });
     }
-    if (owner) return { owner: true, roles: person.roles.slice(), can: () => true, ui: allShown(), ranges: [], message };
+    if (owner) return { owner: true, roles: person.roles.slice(), can: () => true, refusalFor, ui: allShown(), ranges: [], message };
     ranges.push({ mode: 'invisible', level: 0.5, message: message || undefined });
-    return { owner: false, roles: person.roles.slice(), can, ui, ranges, message };
+    return { owner: false, roles: person.roles.slice(), can, refusalFor, ui, ranges, message };
 }
 
 const allShown = () => ({ menubar: true, toolbar: true, formulaBar: true, headers: true, gridlines: true, tabs: true, area: null, hide: [], disallowed: 'grey', sheets: null });

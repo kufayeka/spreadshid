@@ -107,6 +107,7 @@ export const SHOTS = [
     { name: 'konsep-event', page: '02-10-event.page.tsx', act: press('.isi', '.tebal', '.orang', '.undo'), clip: { x: 0, y: 0, width: 760, height: 200 } },
     { name: 'konsep-undo', page: '02-11-undo.page.tsx', act: press('.kurang', '.kurang', '.undo'), clip: { x: 0, y: 0, width: 520, height: 110 } },
     { name: 'konsep-sheet', page: '02-12-sheet.page.tsx', act: async (p) => { await typeAt(1, 3, '400')(p); await p.key('Enter', 'Enter', 13); await p.wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    { name: 'konsep-notifikasi', page: '02-13-notifikasi.page.tsx', act: async (p) => { await typeAt(1, 2, '80000')(p); await p.key('Enter', 'Enter', 13); await p.wait(400); }, clip: { x: 0, y: 0, width: 1366, height: 300 } },
     // chapter 1, one picture per step
     { name: 'mulai-kosong', page: '01-05-kosong.page.tsx', clip: { x: 0, y: 0, width: 1000, height: 420 } },
     { name: 'mulai-isi', page: '01-06-isi.page.tsx', act: async ({ js, click, wait }) => { const p = await cellAt(js, 4, 4); await click(p.x, p.y); await wait(300); }, clip: { x: 0, y: 0, width: 1000, height: 300 } },

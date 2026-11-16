@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './icons.js';
 import { rectText } from './FormulaBar.js';
-import { refusalOf } from '../core/policy.js';
 
 // when a comment was written, as a person says it: "13:05" today, "26 Oct 13:05" before
 export function when(at, locale) {
@@ -109,7 +108,7 @@ export function CommentCard({ workbook: wb, sheetId: s, at, revision, start, fra
     function send() {
         const words = text.trim();
         if (!words) return;
-        if (!can(action)) { onError(refusalOf(action, wb.access().message), { kind: 'refused', action }); return; }
+        if (!can(action)) { onError(wb.refusal(action), { kind: 'refused', action }); return; }
         // a reply goes to the discussion of the cell as it is now (it may have been started by someone else since the card opened)
         const now = wb.commentAt(s, at.r, at.c);
         const ok = run(() => (now ? wb.replyComment(s, now.id, words, how) : wb.addComment(s, at.r, at.c, words, how)));

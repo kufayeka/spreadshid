@@ -257,11 +257,11 @@ export interface AccessUi {
  * { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Stok!col:Qty', when: '=$G2<>"Approved"', message: 'Already approved' }
  */
 export interface AccessRow {
-    /** 'user:rina', 'role:kasir' or '*' (everyone). */
-    who: string;
+    /** 'user:rina', 'role:kasir' or '*' (everyone). A bare 'rina' matches nobody: the editor suggests the right forms, and the console warns about a row that has none of them (rows read from a database are plain strings, so the type cannot refuse them). */
+    who: AccessWho | (string & {});
     effect: 'allow' | 'deny';
     /** 'read', 'edit', 'see', an action of ACTIONS ('format.bold', 'sort' ...), a group ('format'), 'ui.toolbar', 'view.area', 'view.sheet' or '*'. */
-    action: string;
+    action: AccessAction | (string & {});
     /** 'Stok!A1:F100', 'Stok!col:Qty', 'Stok' (a whole sheet), 'A1:F100'; empty: everywhere. */
     where?: string | null;
     /** A formula written for the first row of the range, true where the row holds ('=$G2="Approved"'). */
@@ -269,6 +269,23 @@ export interface AccessRow {
     /** What the person is told when this refuses something. */
     message?: string | null;
 }
+/** Who an access row is for: everyone, one user, or everyone with a role. */
+export type AccessWho = '*' | `user:${string}` | `role:${string}`;
+/** Every action an access row can name, one by one (the same list as ACTIONS in policy.js). */
+export type AccessActionName =
+    | 'read' | 'edit' | 'see'
+    | 'format.bold' | 'format.italic' | 'format.underline' | 'format.strike' | 'format.color' | 'format.fill' | 'format.borders' | 'format.align' | 'format.wrap'
+    | 'format.rotate' | 'format.size' | 'format.font' | 'format.number' | 'format.link' | 'format.merge' | 'format.conditional' | 'format.clear'
+    | 'rows.insert' | 'rows.delete' | 'rows.resize' | 'rows.hide' | 'rows.group'
+    | 'cols.insert' | 'cols.delete' | 'cols.resize' | 'cols.hide' | 'cols.group'
+    | 'sheets.add' | 'sheets.delete' | 'sheets.rename' | 'sheets.move' | 'sheets.hide'
+    | 'view.freeze' | 'view.gridlines' | 'view.area' | 'view.sheet'
+    | 'sort' | 'filter' | 'validation' | 'names' | 'settings' | 'pivot' | 'chart'
+    | 'copy' | 'paste' | 'download' | 'import'
+    | 'comment.read' | 'comment.create' | 'comment.reply' | 'comment.edit' | 'comment.delete' | 'comment.moderate'
+    | 'access';
+/** What an access row names: one action, a whole group of them, a part of the screen ('ui.toolbar', 'ui.tool.bold'), or '*' for everything. */
+export type AccessAction = AccessActionName | 'format' | 'rows' | 'cols' | 'sheets' | 'view' | 'comment' | `ui.${string}` | '*';
 /** The person who opens: 'rina' (a user), or { user: 'rina', roles: ['kasir'] }. */
 export type Who = string | { user?: string; roles?: string[] };
 export interface AccessInfo { owner: boolean; roles: string[]; ui: AccessUi; message: string | null }
@@ -495,6 +512,8 @@ export interface Workbook extends WithSheet<Omit<SheetFns, 'setValues'>> {
     setAccess(rows: AccessRow[] | null, who?: Who): void;
     access(): AccessInfo;
     can(action: string): boolean;
+    /** The sentence told when this action is refused: the message of the access row that refused it, or the sheet's own words. */
+    refusal(action: string): string;
     shows(id: string): boolean;
 }
 
@@ -581,7 +600,7 @@ export function exportCsv(wb: Workbook, sheet: SheetRef, options?: { delimiter?:
 export function parseCsv(text: string, delimiter?: string): string[][];
 export function codeOfFormat(format: Format, settings?: Settings): string;
 
-export function resolveAccess(rows: AccessRow[] | null, who?: Who): AccessInfo & { can(action: string): boolean };
+export function resolveAccess(rows: AccessRow[] | null, who?: Who): AccessInfo & { can(action: string): boolean; refusalFor(action: string): string };
 export const ACTIONS: string[];
 export const ACTION_INFO: Array<{ id: string; label: string; group: string }>;
 export const UI_ITEMS: Array<{ id: string; label: string; group: string }>;

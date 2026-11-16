@@ -1,6 +1,6 @@
 import { SheetLoading } from './SheetLoading.js';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { createWorkbook, VERSION, accessPlaces } from '../core/index.js';
+import { createWorkbook, VERSION, accessPlaces, validateAccess } from '../core/index.js';
 import { selectCell, stepActive, rectsOf } from '../core/selection.js';
 import { addressOf } from '../core/formula/address.js';
 import { parseAddressText } from './FormulaBar.js';
@@ -24,7 +24,6 @@ import { FilterMenu } from './FilterMenu.js';
 import { sortRange } from '../core/search.js';
 import { parseRangeText } from '../core/validation.js';
 import { copyBlock, pasteClip } from '../core/transfer.js';
-import { refusalOf } from '../core/policy.js';
 import { useAutoHeights } from './autoHeights.js';
 
 /**
@@ -84,7 +83,8 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {(sheetId: string) => void} [onSheetChange]
  * @property {(event: { ops: object[], source: string }) => void} [onOp]
  * @property {(event: { reason: string, op: object, source: string }) => void} [onReject]
- * @property {(notice: { kind: string, reason: string, address?: string, action?: string, source?: string, op?: object }) => string|null|undefined|void} [onNotice]
+ * @property {(notice: { kind: string, reason: string, address?: string, action?: string, source?: string, op?: object, index?: number, row?: object, problems?: string[] }) => string|null|undefined|void} [onNotice]
+ * @property {boolean} [notices]
  * @property {(event: { address: string, field?: string, value: any, expected: string }) => void} [onCellError]
  * @property {(sel: SheetSelection) => void} [onSelectionChange]
  * @property {string} [fileName]
@@ -106,8 +106,9 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {(event: { ops: object[], source: string }) => void} [props.onOp]  Every change applied (by a person, by code, by undo), as ops: what the host
  *   saves, sends to others, or keeps as history.
  * @param {(event: { reason: string, op: object, source: string }) => void} [props.onReject]  A change was refused (by the rules, the types, or beforeOp).
- * @param {(notice: object) => string|null|undefined|void} [props.onNotice]  Every message of the sheet before it shows (refused, error, info): a text
- *   shows that instead, null shows nothing (the host shows it its own way), nothing keeps the sheet's own text.
+ * @param {(notice: object) => string|null|undefined|void} [props.onNotice]  Every message of the sheet before it shows (refused, error, info,
+ *   warning): a text shows that instead, null shows nothing (the host shows it its own way), nothing keeps the sheet's own text.
+ * @param {boolean} [props.notices]  false: the sheet never shows its own popup (onNotice still hears every message). True by default.
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
  * @param {(sel: SheetSelection) => void} [props.onSelectionChange]  The selection changed (see SheetSelection).
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
@@ -127,9 +128,21 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
 export const Sheet = /** @type {import('react').ForwardRefExoticComponent<SheetProps & import('react').RefAttributes<SheetHandle>>} */ (forwardRef(function Sheet(props, ref) {
     // workbook={null} means the host is still fetching it: the skeleton is shown until it comes, then the real sheet in its place
     // (undefined, no workbook at all, still means a workbook of the sheet's own)
-    if (props.workbook === null || props.loading) return <SheetLoading className={props.className} style={props.style} label={props.loadingLabel} />;
+    //
+    // The real sheet is only drawn in the browser. A workbook is full of random ids (the UUIDs of its sheets, columns and rows), so a workbook
+    // made while the server renders the page is never the same as the one made again in the browser, and React would stop with a hydration
+    // error. On the server, and on the browser's first render that hydrates the server's HTML, the skeleton is drawn instead (the same on
+    // both sides); right after that React draws again with the real sheet. A sheet that appears later, with no server HTML to match, is drawn
+    // at once, without the skeleton.
+    const inBrowser = useSyncExternalStore(subscribeToNothing, () => true, () => false);
+    if (!inBrowser || props.workbook === null || props.loading) return <SheetLoading className={props.className} style={props.style} label={props.loadingLabel} />;
     return <SheetView {...props} ref={ref} />;
 }));
+
+// Whether the page is in the browser never changes, so there is nothing to listen to.
+function subscribeToNothing() {
+    return () => {};
+}
 
 const SheetView = forwardRef(function SheetView(props, ref) {
     // a workbook of its own when the host gives none (made once, on the first render)
@@ -222,7 +235,7 @@ const SheetView = forwardRef(function SheetView(props, ref) {
     // Insert > Sparkline: one sparkline per row of the selection (one per column when the selection is one row), in the cells just right of it
     // (below it for a row); its editor opens on its first cell
     function insertSparkline() {
-        if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: refusalOf('chart', wb.access().message) }); return; }
+        if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: wb.refusal('chart') }); return; }
         const d = rectsOf(sel)[rectsOf(sel).length - 1];
         const oneRow = d.r1 === d.r2 && d.c2 > d.c1;
         const at = oneRow ? { r1: d.r2 + 1, c1: d.c1, r2: d.r2 + 1, c2: d.c2 } : { r1: d.r1, c1: d.c2 + 1, r2: d.r2, c2: d.c2 + 1 };
@@ -235,7 +248,7 @@ const SheetView = forwardRef(function SheetView(props, ref) {
     }
     // Insert > Chart: a column chart of the selection (or of the filled block around the active cell), on the cells to the right of it, selected
     function insertChart() {
-        if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: refusalOf('chart', wb.access().message) }); return; }
+        if (!wb.can('chart')) { tell({ kind: 'refused', action: 'chart', reason: wb.refusal('chart') }); return; }
         const b = rectsOf(sel)[rectsOf(sel).length - 1];
         const data = b.r1 === b.r2 && b.c1 === b.c2 ? wb.dataRegion(sheetId, b.r1, b.c1) : b;
         const c1 = data.c2 + 2, r1 = data.r1;
@@ -262,7 +275,7 @@ const SheetView = forwardRef(function SheetView(props, ref) {
     function writeComment() {
         const { r, c } = sel.active;
         const action = wb.hasComment(sheetId, r, c) ? 'comment.reply' : 'comment.create';
-        if (!wb.can('comment.read') || !wb.can(action)) { tell({ kind: 'refused', action, reason: refusalOf(action, wb.access().message) }); return; }
+        if (!wb.can('comment.read') || !wb.can(action)) { tell({ kind: 'refused', action, reason: wb.refusal(action) }); return; }
         setHoverAt(null);
         setCard({ s: sheetId, r, c, start: Date.now() });
     }
@@ -328,9 +341,18 @@ const SheetView = forwardRef(function SheetView(props, ref) {
     // Every message the sheet has for the person goes through here: a change refused (by the access rows, the host's rules, a validation, a type,
     // beforeOp), an error, or a plain information. The host hears of it first (onNotice) and decides what shows: its own text, nothing (null),
     // or, when it says nothing, the sheet's own text. A host that shows messages its own way returns null and puts them where it likes.
+    //
+    // notices={false} turns the sheet's own popup off for good: onNotice still hears everything, and the host shows it its own way.
+    // A warning is meant for the developer, not for the person at the sheet (an access row that can never match, for example): it never pops
+    // up in the sheet, it goes to the console unless onNotice took it (returned null).
     const tell = (n) => {
         const own = latest.current.onNotice ? latest.current.onNotice(n) : undefined;
         if (own === null || own === false) return;
+        if (n.kind === 'warning') {
+            if (typeof console !== 'undefined') console.warn('[@kufayeka/sheet] ' + n.reason, n.row !== undefined ? n.row : '');
+            return;
+        }
+        if (latest.current.notices === false) return;
         setNotice(typeof own === 'string' ? own : n.reason);
     };
     const tellError = (reason, more) => tell({ kind: 'error', reason, ...(more || {}) });
@@ -342,6 +364,20 @@ const SheetView = forwardRef(function SheetView(props, ref) {
         ];
         return () => offs.forEach((off) => off());
     }, [wb]);
+    // An access row with a mistyped who ('4' instead of 'user:4') or action ('sheet.add' instead of 'sheets.add') never matches anything, and
+    // nothing would ever say so: the person simply gets less than the host meant. Every such row is told once, as a warning notice, each time the
+    // host gives new rows. The checks are validateAccess's own.
+    useEffect(() => {
+        if (!accessRows) return;
+        const problemsByRow = new Map();
+        for (const { row, problem } of validateAccess(accessRows)) {
+            if (!problemsByRow.has(row)) problemsByRow.set(row, []);
+            problemsByRow.get(row).push(problem);
+        }
+        for (const [index, problems] of problemsByRow) {
+            tell({ kind: 'warning', reason: 'Access row ' + index + ' does not work: ' + problems.join('; ') + '.', index, row: accessRows[index], problems });
+        }
+    }, [accessRows]);
     useEffect(() => { if (props.onSelectionChange && !dragging.current) props.onSelectionChange(selectionOf(wb, sheetId, sel)); }, [sel, sheetId]);
     // a notice goes after a while, a longer one (what an import left out) later
     useEffect(() => { if (!notice) return undefined; const t = setTimeout(() => setNotice(null), Math.min(12000, 4000 + notice.length * 40)); return () => clearTimeout(t); }, [notice]);

@@ -30,8 +30,12 @@ export interface SheetAccess {
 
 /** A message of the sheet (onNotice). */
 export interface SheetNotice {
-    /** refused: a change was not let through (access, rules, validation, types, beforeOp); error: something went wrong; info: just so you know. */
-    kind: 'refused' | 'error' | 'info';
+    /**
+     * refused: a change was not let through (access, rules, validation, types, beforeOp); error: something went wrong; info: just so you know;
+     * warning: a mistake of the developer (an access row that can never match). A warning never pops up in the sheet: it goes to the console
+     * unless onNotice returns null.
+     */
+    kind: 'refused' | 'error' | 'info' | 'warning';
     /** The sheet's own text: the rule's message when it has one. */
     reason: string;
     /** The cell it is about, when there is one ('B4'). */
@@ -42,6 +46,12 @@ export interface SheetNotice {
     source?: Source;
     /** The refused op, when the refusal came from the workbook. */
     op?: Op;
+    /** warning about an access row: its place in access.rows (counted from 0). */
+    index?: number;
+    /** warning about an access row: the row itself. */
+    row?: AccessRow;
+    /** warning about an access row: every problem it has, one sentence each ('who is "user:<name>", "role:<name>" or "*"'). */
+    problems?: string[];
 }
 
 /** What is selected, as the host gets it (onSelectionChange, ref.getSelection()). */
@@ -80,12 +90,17 @@ export interface SheetProps {
     onOp?: (event: { ops: Op[]; source: Source }) => void;
     onReject?: (event: { op: Op; reason: string; source: Source }) => void;
     /**
-     * Every message the sheet has for the person, before it shows: a change refused, an error, an information.
+     * Every message the sheet has for the person, before it shows: a change refused, an error, an information, and the developer's warnings.
      * Return a text to show that instead, null to show nothing (your app shows it its own way), or nothing to keep the sheet's own text.
      * @example
      * onNotice={(n) => (n.kind === 'refused' ? null : undefined)}   // refusals go to your own toast, the rest stays
      */
     onNotice?: (notice: SheetNotice) => string | null | undefined | void;
+    /**
+     * false: the sheet never shows its own popup. onNotice still hears every message, so your app shows them its own way.
+     * True by default.
+     */
+    notices?: boolean;
     onCellError?: (event: { address: string; field?: string; value: unknown; expected: string }) => void;
     /** Called when the selection changes. A mouse drag calls it once, when the mouse is let go; a click, the arrow keys and select() call it at once. */
     onSelectionChange?: (selection: SheetSelection) => void;

@@ -21,7 +21,7 @@ import { outlineOf, MAX_LEVEL } from './outline.js';
 import { addressable, cellOf, rangeOf } from './addressing.js';
 import { tableOf, pivot } from './pivot.js';
 import { chartSeries, splitRangeText, CHART_TYPES, CHART_DEFAULTS } from './chart.js';
-import { resolveAccess, actionsOfOp, refusalOf } from './policy.js';
+import { resolveAccess, actionsOfOp } from './policy.js';
 import { filterRect, hiddenByFilter, filterValues as valuesOfFilter, dataRegion as regionAround } from './filter.js';
 import { parseInput } from './input.js';
 import { createAxis } from './axis.js';
@@ -1579,7 +1579,7 @@ export function createWorkbook(doc, options) {
             }
             // writing cells is decided per cell (an 'edit' range opens cells to a person who may not edit elsewhere): see cellMode
             asked.delete('edit');
-            for (const a of asked) if (!access.can(a)) { emit('reject', { op: accepted[0], reason: refusalOf(a, access.message), source }); return null; }
+            for (const a of asked) if (!access.can(a)) { emit('reject', { op: accepted[0], reason: access.refusalFor(a), source }); return null; }
         }
         // a person's change must keep the host's rules and the policy's ranges (read-only and hidden cells), and a person who may not edit writes only
         // in the ranges open to them; the host's own code is not stopped by them
@@ -2213,7 +2213,10 @@ export function createWorkbook(doc, options) {
         // the host's rules and types
         setRules, setTypes, modeAt, typeAt,
         // access control
-        setAccess, access: accessInfo, can: (action) => access.can(action), shows, sheetShown,
+        setAccess, access: accessInfo, can: (action) => access.can(action),
+        // the sentence a person is told when an action is refused: the message of the access row that refused it
+        refusal: (action) => access.refusalFor(action),
+        shows, sheetShown,
         // data validation
         addValidation, setValidation, removeValidation, validationAt, choicesAt, invalidAt,
         // groups of rows and columns

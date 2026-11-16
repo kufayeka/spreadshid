@@ -423,6 +423,127 @@ export default function Halaman() {
 
 ![Perubahan di dalam grid spreadsheet memperbarui widget label eksternal secara reaktif](img/konsep-sheet.png)
 
+### 5.9 Notifikasi Milik Aplikasi Sendiri (`notices` dan `onNotice`)
+
+Setiap kali sheet punya sesuatu untuk disampaikan, misalnya perubahan yang ditolak, error, atau informasi, pesannya selalu lewat satu jalur yang sama sebelum tampil:
+
+```
+ sel terkunci, aksi ditolak, error, info, baris akses salah tulis
+                       │
+                       ▼
+             onNotice(notice)  ← aplikasi mendengar lebih dulu
+                       │
+         ┌─────────────┼──────────────────┐
+     return null    return 'teks'     tidak return apa-apa
+         │             │                  │
+   tidak tampil    tampil dengan     tampil dengan teks
+                   teks itu          bawaan sheet
+```
+
+Kalau aplikasi punya sistem notifikasi sendiri (toast, snackbar, panel pesan), matikan popup bawaan dengan **`notices={false}`**. `onNotice` tetap menerima semua pesan, sehingga aplikasi bisa menampilkannya dengan caranya sendiri.
+
+Contoh berikut memakai aturan akses toko: kasir boleh mengubah stok, tetapi harga hanya boleh diubah manajer. Saat kasir mengetik di kolom Harga, pesan dari baris aturan muncul sebagai toast milik aplikasi di pojok kanan bawah.
+
+<!-- contoh: 02-13-notifikasi.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { SheetNotice } from '@kufayeka/sheet';
+import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatProduk } from './data/produk.js';
+
+// 2.13 Notifikasi sendiri: popup bawaan sheet dimatikan (notices={false}), semua pesannya masuk ke onNotice
+// dan ditampilkan sebagai toast milik aplikasi, di pojok kanan bawah, bertumpuk, lalu hilang sendiri.
+
+// Kasir boleh mengubah stok, tetapi harga hanya boleh diubah manajer, dan kasir tidak boleh membuat sheet baru.
+const ATURAN: AccessRow[] = [
+    { who: '*', effect: 'allow', action: '*' },
+    { who: 'role:kasir', effect: 'deny', action: 'edit', where: 'Produk!C2:C4', message: 'Harga hanya bisa diubah oleh manajer' },
+    { who: 'role:kasir', effect: 'deny', action: 'sheets.add', message: 'Sheet baru hanya dibuat oleh manajer' }
+];
+
+type Toast = { id: number; kind: SheetNotice['kind']; text: string };
+
+const WARNA: Record<SheetNotice['kind'], string> = { refused: '#da1e28', error: '#a2191f', info: '#0f62fe', warning: '#8e6a00' };
+
+let nomor = 0;
+
+export default function Halaman() {
+    const [wb] = useState(buatProduk);
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    function padaPesan(n: SheetNotice) {
+        // warning = kesalahan developer (misalnya baris akses yang salah tulis): ke console, bukan ke kasir
+        if (n.kind === 'warning') {
+            console.error('Aturan akses baris', n.index, 'salah:', n.problems, n.row);
+            return;
+        }
+        // setiap tombol yang ditekan di sel terkunci ditolak lagi: pesan yang sama tidak ditumpuk, hanya diperpanjang
+        const id = ++nomor;
+        setToasts((daftar) => [...daftar.filter((t) => t.text !== n.reason), { id, kind: n.kind, text: n.reason }]);
+        setTimeout(() => setToasts((daftar) => daftar.filter((t) => t.id !== id)), 4000);
+    }
+
+    return (
+        <div data-siap style={{ height: 300, position: 'relative' }}>
+            <Sheet
+                workbook={wb}
+                access={{ rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }}
+                notices={false}                                                     // baru: popup bawaan mati
+                onNotice={padaPesan}                                                // baru: semua pesan ke sini
+            />
+            <div style={{ position: 'absolute', right: 16, bottom: 16, display: 'grid', gap: 8 }}>
+                {toasts.map((t) => (
+                    <div key={t.id} className="toast" role="alert" style={{
+                        padding: '10px 14px', borderRadius: 4, color: '#fff', background: WARNA[t.kind],
+                        font: '14px system-ui', boxShadow: '0 2px 8px rgba(0,0,0,.25)'
+                    }}>
+                        {t.text}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Kasir mengetik di kolom Harga: pesan baris aturan muncul sebagai toast aplikasi di kanan bawah, popup bawaan sheet tidak muncul](img/konsep-notifikasi.png)
+
+#### Isi sebuah notice (`SheetNotice`)
+
+| Field | Tipe | Isi |
+|---|---|---|
+| `kind` | `'refused' \| 'error' \| 'info' \| 'warning'` | Jenis pesan. Lihat tabel berikutnya. |
+| `reason` | `string` | Kalimat yang akan ditampilkan. Kalau baris aturan punya `message`, isinya kalimat itu. |
+| `address` | `string?` | Sel yang dimaksud, misalnya `'C2'`. |
+| `action` | `string?` | Aksi yang ditolak: `'edit'`, `'copy'`, `'paste'`, `'sheets.add'`, dan seterusnya. |
+| `source` | `Source?` | Asal perubahan yang ditolak (`'user'`, `'code'`, ...). |
+| `op` | `Op?` | Op yang ditolak, kalau penolakannya datang dari workbook. |
+| `index` | `number?` | Hanya untuk `warning` baris akses: urutan baris di `access.rows`, dihitung dari 0. |
+| `row` | `AccessRow?` | Hanya untuk `warning` baris akses: barisnya sendiri. |
+| `problems` | `string[]?` | Hanya untuk `warning` baris akses: semua kesalahannya, satu kalimat per kesalahan. |
+
+#### Jenis notice
+
+| `kind` | Kapan | Untuk siapa | Tanpa `onNotice` |
+|---|---|---|---|
+| `refused` | Perubahan ditolak oleh hak akses, rules, validasi, tipe kolom, atau `beforeOp`. | Pengguna | Popup bawaan |
+| `error` | Ada yang gagal, misalnya file impor tidak terbaca. | Pengguna | Popup bawaan |
+| `info` | Informasi saja, misalnya bagian yang dilewati saat impor. | Pengguna | Popup bawaan |
+| `warning` | Kesalahan developer: baris `access.rows` yang tidak akan pernah cocok, misalnya `who: '4'` (seharusnya `'user:4'`) atau `action: 'sheet.add'` (seharusnya `'sheets.add'`). Dicek setiap kali `access.rows` berganti. | Developer | `console.warn`, **tidak pernah** sebagai popup |
+
+#### Apa yang dikembalikan `onNotice`
+
+| Nilai kembali | Hasil |
+|---|---|
+| `null` | Pesan tidak ditampilkan oleh sheet. `warning` juga tidak dikirim ke console. |
+| `'teks lain'` | Popup bawaan menampilkan teks itu, bukan `reason`. Tidak berlaku kalau `notices={false}`. |
+| tidak ada (`undefined`) | Sheet bertindak seperti biasa: popup untuk `refused`, `error`, dan `info`; console untuk `warning`. |
+
+> `notices={false}` hanya mematikan **popup**. `warning` yang tidak ditangani `onNotice` tetap ditulis ke console, supaya salah tulis aturan tidak hilang tanpa jejak.
+
 ---
 
 ## 6. Antipattern & Panduan Best Practices
@@ -464,6 +585,12 @@ export default function Halaman() {
 |---|---|
 | `useWorkbook(wb, selector)` | Berlangganan reaktif pada nilai spesifik dari workbook. Komponen hanya me-render ulang saat output selector berubah. |
 | `useWorkbook(wb)` | Berlangganan secara menyeluruh pada instance workbook; me-render ulang pada setiap mutasi op. |
+
+### Pesan dari `<Sheet />`
+| Prop | Tipe | Deskripsi |
+|---|---|---|
+| `onNotice` | `(notice: SheetNotice) => string \| null \| undefined` | Menerima setiap pesan sheet (`refused`, `error`, `info`, `warning`) sebelum tampil. Lihat [5.9](#59-notifikasi-milik-aplikasi-sendiri-notices-dan-onnotice). |
+| `notices` | `boolean` (default `true`) | `false`: popup bawaan sheet tidak pernah tampil; `onNotice` tetap menerima semua pesan. |
 
 ### Event Lifecycle Listener (`wb.on(eventName, callback)`)
 | Nama Event | Tipe Payload | Waktu Emisi |
