@@ -75,7 +75,7 @@ Library menyediakan tiga entry point modular:
 6. [06. Format Sel & Internasionalisasi](docs/06-format.md): Number formatting (mata uang, persen, desimal), format pattern kustom, locale `id-ID`, dan conditional formatting.
 7. [07. Operasi Data](docs/07-data.md): Sorting multi-level, filtering data, hierarki baris bertingkat (folding/grup), pivot table, serta find & replace.
 8. [08. Validasi Data & Proteksi Sel](docs/08-menjaga-isi.md): Dropdown list, validasi rentang angka, enforcement tipe kolom, sel terkunci, dan interceptor `beforeOp`.
-9. [09. Persistensi State & Sinkronisasi Server](docs/09-menyimpan.md): Lifecycle integrasi backend, auto-save debounce, serialisasi dokumen, incremental patch, dan integrasi database.
+9. [09. Persistensi State & Sinkronisasi Server](docs/09-menyimpan.md): Lifecycle integrasi backend, auto-save debounce, serialisasi dokumen, incremental patch, integrasi database, dan menyimpan sebagai file (berversi) di File service API Maker.
 10. [10. Kontrol Akses & Perizinan (ACL/RBAC)](docs/10-hak-akses.md): Proteksi granular berbasis role/akun, masking tampilan (`viewFor`), validasi mutation server (`checkPatch`), dan mode perancang akses.
 11. [11. Komentar Sel & Interoperabilitas Excel](docs/11-komentar-excel.md): Threaded comments pada sel, import dan export file `.xlsx`, serta pemrosesan CSV.
 12. [12. Visualisasi Data & Dashboard](docs/12-dashboard.md): Floating charts (Bar, Line, Pie, Bullet, Waterfall, Kurva S), in-cell sparklines, dan arsitektur dashboard analitik.

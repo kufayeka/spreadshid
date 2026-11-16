@@ -1461,4 +1461,302 @@ export default function Kasir() {
 
 ---
 
+## 7. Menyimpan sebagai File di File Service API Maker
+
+Bagian ini untuk aplikasi yang backend-nya **API Maker** dengan **File service** aktif. Workbook disimpan sebagai sebuah file di drive project (misalnya `Keuangan / Anggaran 2026.spreadshid`), lengkap dengan riwayat versinya. Tidak perlu membuat tabel atau route sendiri.
+
+Semua route dan jawaban di bagian ini sudah dicoba pada Runner API Maker sungguhan, dengan route template File service dan PostgreSQL.
+
+### 7.1 Kapan cara ini cocok
+
+| Situasi | Cara yang dipakai |
+|---|---|
+| Workbook adalah **dokumen**: dibuka, diubah, disimpan seperti file (anggaran, RAB, laporan bulanan, template) | **File service** (bagian ini) |
+| Semua orang yang boleh membuka file **boleh melihat seluruh isinya** | **File service** |
+| Butuh riwayat versi dengan catatan ("Revisi harga besi"), bisa membuka versi lama | **File service**: setiap simpan adalah satu versi |
+| Ada kolom atau sel yang **dirahasiakan dari sebagian orang** (gaji, margin) | **Bukan** file langsung. Lihat [7.6](#76-batasan-penting-hak-akses-sel) |
+| Banyak orang mengedit **bersamaan** dan perubahannya harus digabung | Patch per perubahan ([bagian 4](#4-level-2--save-hemat--anti-timpa-dengan-delta-patch)) |
+| Data workbook perlu di-query dengan SQL (laporan lintas file) | Tabel `jsonb` ([3.3](#33-menyimpan-ke-database-jsonb--sql-view)) |
+
+### 7.2 Gambaran alur
+
+```
+SIMPAN pertama    wb.toJSON() ──► POST /fs/:folderId/upload        ──► { id, version: 1 }    simpan id-nya
+SIMPAN berikutnya wb.toJSON() ──► POST /fs/file/:fileId/versions   ──► { id, version: 2 }    file sama, versi baru
+BUKA              GET /fs/file/:fileId ──► viewUrl ──► GET viewUrl ──► JSON ──► createWorkbook(doc)
+```
+
+Yang disimpan adalah persis isi `wb.toJSON()`, dan yang dibuka diberikan langsung ke `createWorkbook(doc)`. Isi, rumus, format, pivot, grafik, dan komentar semuanya ikut. Yang **tidak** ikut adalah `access`, `rules`, dan `types`: ketiganya memang tidak pernah ada di `toJSON()` ([bagian 5](#5-level-3--sistem-template--keamanan-server-per-bagian)) dan dipasang lagi oleh aplikasi saat membuka.
+
+### 7.3 Persiapan di API Maker Studio
+
+1. **Aktifkan File service dan pasang route template-nya:** Studio → **Settings → Files**. Route yang dipakai bagian ini:
+
+   | Route | Gunanya | Izin yang dibutuhkan |
+   |---|---|---|
+   | `POST /fs/:id/upload` | file baru di folder `:id` | `upload` di folder itu |
+   | `POST /fs/root/upload` | file baru di folder teratas | `upload` di root |
+   | `POST /fs/file/:id/versions` | versi baru dari file `:id` | `upload` di file itu |
+   | `GET /fs/file/:id` | info file, semua versinya, dan alamat `viewUrl` | `view` di file itu |
+
+   Route template boleh diubah atau diganti namanya di project Anda. Kalau Anda mengganti path-nya, sesuaikan path di kode bagian 7.4. Bentuk body dan jawabannya tetap sama.
+
+2. **Jenis file yang diizinkan** (Settings → Files). Kalau daftarnya diisi, tambahkan **`.spreadshid`**. Tanpa itu upload ditolak dengan status **415 Unsupported Media Type**. Kalau daftarnya kosong, semua jenis file diterima.
+
+3. **Batas jumlah versi** (Settings → Files). Setiap kali Simpan diklik, satu versi bertambah. Versi di atas batas dibuang otomatis, mulai dari yang tertua. Atur batasnya sesuai seberapa jauh riwayat perlu disimpan.
+
+4. **Izin folder.** Orang yang menyimpan butuh `upload`, dan orang yang membuka butuh `view` (lihat menu akses di File service).
+
+### 7.4 Modul simpan dan buka
+
+Satu modul kecil yang bisa dipakai di halaman mana pun. Login aplikasi memberi `token`, dan modul ini mengirimnya sebagai `Authorization: Bearer <token>`.
+
+<!-- contoh: 09-05-file-service.ts -->
+```ts
+// 9.7 Menyimpan workbook sebagai file di File service API Maker, dan membukanya lagi.
+// Satu modul kecil yang dipakai halaman mana pun: simpan pertama, simpan versi berikutnya, buka, dan periksa apakah orang lain sudah
+// menyimpan versi yang lebih baru. Route-nya adalah route template File service (Studio > Settings > Files > pasang route).
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { Workbook, WorkbookDoc, AccessRow, Who } from '@kufayeka/sheet/core';
+
+/** Alamat project API Maker dan token orang yang sedang masuk (dari halaman login aplikasi Anda). */
+export interface Server {
+    api: string;          // misalnya 'https://api.contoh.id'
+    token: string;        // dikirim sebagai Authorization: Bearer <token>
+}
+
+/** Jawaban File service setelah upload atau versi baru (Type FsSaved). */
+export interface FileSaved {
+    id: string;
+    name: string;
+    size: number;
+    type: string | null;
+    version: number;               // nomor versi yang baru dibuat
+    currentVersion?: number;       // versi yang ditampilkan file sekarang
+    pinned?: boolean;              // true: seseorang memilih versi tampil secara manual, upload ini tidak menggantikannya
+}
+
+/** File yang dibuka: workbook-nya, dan versi yang dibuka (dipakai untuk memeriksa bentrokan saat menyimpan). */
+export interface OpenedFile {
+    workbook: Workbook;
+    fileId: string;
+    name: string;
+    version: number;
+}
+
+const EXTENSION = '.spreadshid';
+
+// Isi workbook sebagai sebuah file di dalam form multipart. Nama field-nya WAJIB "files": itulah yang dibaca route template.
+function formOf(wb: Workbook, name: string, note?: string): FormData {
+    const fileName = name.endsWith(EXTENSION) ? name : name + EXTENSION;
+    const form = new FormData();
+    form.append('files', new Blob([JSON.stringify(wb.toJSON())], { type: 'application/json' }), fileName);
+    if (note) form.append('note', note);
+    return form;
+}
+
+// Jawaban server sebagai JSON, atau error yang menyebut status dan alasannya (401 belum masuk, 403 tidak punya izin, 404 tidak ada,
+// 415 jenis file tidak diizinkan di Settings > Files).
+async function answerOf<T>(res: Response): Promise<T> {
+    if (!res.ok) throw new Error('File service ' + res.status + ': ' + (await res.text()));
+    return (await res.json()) as T;
+}
+
+const signedIn = (server: Server) => ({ Authorization: 'Bearer ' + server.token });
+
+/** Simpan pertama kali: file baru di sebuah folder. Simpan `id` yang dikembalikan; itulah alamat file ini seterusnya. */
+export async function saveNew(server: Server, wb: Workbook, folderId: string, name: string): Promise<FileSaved> {
+    const res = await fetch(server.api + '/fs/' + folderId + '/upload', { method: 'POST', headers: signedIn(server), body: formOf(wb, name) });
+    const saved = await answerOf<FileSaved>(res);
+    wb.saved();                                                             // tombol Simpan kembali menjadi "Tersimpan"
+    return saved;
+}
+
+/** Simpan berikutnya: versi baru dari file yang sama. Versi sebelumnya tetap ada di riwayat file. */
+export async function saveVersion(server: Server, wb: Workbook, fileId: string, name: string, note?: string): Promise<FileSaved> {
+    const res = await fetch(server.api + '/fs/file/' + fileId + '/versions', { method: 'POST', headers: signedIn(server), body: formOf(wb, name, note) });
+    const saved = await answerOf<FileSaved>(res);
+    wb.saved();
+    return saved;
+}
+
+/** Info satu file (Type FsFile), hanya bagian yang dipakai di sini. */
+interface FileInfo {
+    id: string;
+    name: string;
+    currentVersion: number;
+    latestVersion: number;
+    viewUrl: string | null;
+    versions: Array<{ version: number; note?: string | null; viewUrl?: string | null; createdAt: string }>;
+}
+
+/** Info file beserta semua versinya. Setiap versi punya viewUrl sendiri yang sudah ditandatangani. */
+export async function fileInfo(server: Server, fileId: string): Promise<FileInfo> {
+    return answerOf<FileInfo>(await fetch(server.api + '/fs/file/' + fileId, { headers: signedIn(server) }));
+}
+
+/**
+ * Buka file: versi yang sedang ditampilkan file, atau satu versi tertentu. viewUrl dari server sudah membawa tanda tangan dan masa berlaku,
+ * jadi diambil tanpa token dan dipakai apa adanya (mengubah v= di dalamnya membuat tanda tangannya tidak cocok).
+ * `access`: aturan akses dan orang yang membuka, kalau workbook ini memakai hak akses (lihat batasannya di 9.7.6).
+ */
+export async function open(server: Server, fileId: string, options?: { version?: number; access?: { rows: AccessRow[]; who: Who } }): Promise<OpenedFile> {
+    const info = await fileInfo(server, fileId);
+    const wanted = options && options.version !== undefined ? info.versions.find((v) => v.version === options.version) : null;
+    const url = wanted ? wanted.viewUrl : info.viewUrl;
+    if (!url) throw new Error('File service: versi ini tidak bisa dibuka');
+    const doc = await answerOf<WorkbookDoc>(await fetch(server.api + url));
+    const workbook = createWorkbook(doc);                                   // bentuk toJSON() persis bentuk yang diterima createWorkbook()
+    if (options && options.access) workbook.setAccess(options.access.rows, options.access.who);
+    workbook.saved();
+    return { workbook, fileId: info.id, name: info.name, version: wanted ? wanted.version : info.currentVersion };
+}
+
+/**
+ * Simpan dengan aman: sebelum menimpa, periksa apakah sudah ada versi yang lebih baru dari versi yang dibuka (orang lain menyimpan lebih dulu).
+ * Kalau ada, tidak ada yang disimpan dan jawabannya { conflict: versiTerbaru }; aplikasi memutuskan apa yang dilakukan.
+ */
+export async function saveChecked(server: Server, opened: OpenedFile, note?: string): Promise<{ saved: FileSaved } | { conflict: number }> {
+    const info = await fileInfo(server, opened.fileId);
+    if (info.latestVersion > opened.version) return { conflict: info.latestVersion };
+    const saved = await saveVersion(server, opened.workbook, opened.fileId, opened.name, note);
+    opened.version = saved.version;                                         // simpanan berikutnya dibandingkan dengan versi ini
+    return { saved };
+}
+```
+<!-- /contoh -->
+
+Penjelasan setiap fungsinya:
+
+| Fungsi | Memanggil | Yang terjadi |
+|---|---|---|
+| `saveNew(server, wb, folderId, name)` | `POST /fs/:folderId/upload` | File baru dibuat. Nama tanpa `.spreadshid` diberi ekstensi itu. Kalau nama yang sama sudah ada di folder, server memberi nomor (`Anggaran 2026 (1).spreadshid`), jadi file lama tidak pernah tertimpa. Mengembalikan `id`, yang menjadi alamat file ini seterusnya. |
+| `saveVersion(server, wb, fileId, name, note?)` | `POST /fs/file/:fileId/versions` | Versi baru, dengan catatan opsional. Versi sebelumnya tetap ada. |
+| `fileInfo(server, fileId)` | `GET /fs/file/:fileId` | Info file: `currentVersion` (versi yang ditampilkan), `latestVersion` (upload terbaru), dan `versions` (semua versi, terbaru lebih dulu, masing-masing dengan `note` dan `viewUrl`). |
+| `open(server, fileId, { version?, access? })` | `GET /fs/file/:fileId`, lalu `viewUrl` | Workbook dibuka. Tanpa `version`: versi yang ditampilkan file. Dengan `version`: versi itu. `access` memasang aturan akses setelah dibuka. |
+| `saveChecked(server, opened, note?)` | `GET /fs/file/:id`, lalu `POST …/versions` | Simpan yang aman dari timpa-menimpa (lihat [7.5](#75-dua-orang-menyimpan-file-yang-sama)). |
+
+Hal-hal yang perlu diperhatikan:
+
+- **Nama field form wajib `files`.** Itulah yang dibaca route template (`input.body.files[0]`).
+- **`viewUrl` dipakai apa adanya.** Alamatnya berbentuk `/fs/file/<id>/raw?v=2&exp=…&sig=…`, ditandatangani untuk satu versi dan berlaku sebentar (Settings → Files → masa berlaku URL). Karena itu `viewUrl` diambil **tanpa** token. Mengubah `v=` di dalamnya membuat server menjawab 404. Selalu ambil `viewUrl` baru dari `GET /fs/file/:id` saat membuka; jangan disimpan untuk dipakai lain kali.
+- **Jawaban upload tidak berisi `viewUrl`.** Upload menjawab `id`, `name`, `size`, `type`, `version`, `currentVersion`, dan `pinned`. Alamat untuk membuka hanya ada di `GET /fs/file/:id`.
+- **`wb.saved()`** dipanggil setelah simpan dan setelah buka, supaya `wb.unsaved()` (tombol Simpan) kembali `false`.
+- **Versi yang dipin.** Kalau seseorang dengan izin `versionControl` memilih versi tertentu sebagai versi tampil, upload baru tetap tersimpan, tetapi file terus menampilkan versi yang dipilih. Jawabannya berisi `pinned: true`, dan `open()` tanpa `version` membuka versi yang dipilih itu.
+
+Contoh jawaban dari server:
+
+```json
+// POST /fs/<folderId>/upload
+{ "id": "e25e723e-…", "name": "Anggaran 2026.spreadshid", "size": 2952, "type": "application/json", "version": 1 }
+
+// POST /fs/file/<id>/versions  (note: "Sewa naik")
+{ "id": "e25e723e-…", "name": "Anggaran 2026.spreadshid", "size": 2952, "type": "application/json", "version": 2, "currentVersion": 2, "pinned": false }
+
+// GET /fs/file/<id>  (bagian yang dipakai modul)
+{ "name": "Anggaran 2026.spreadshid", "currentVersion": 2, "latestVersion": 2,
+  "viewUrl": "/fs/file/e25e723e-…/raw?v=2&exp=1794819267&sig=YGCf…",
+  "versions": [ { "version": 2, "note": "Sewa naik", "viewUrl": "…" }, { "version": 1, "note": null, "viewUrl": "…" } ] }
+```
+
+Kalau ada yang salah, modul ini melempar error berisi status dari server:
+
+| Status | Artinya | Yang perlu dicek |
+|---|---|---|
+| 401 | belum masuk, atau token tidak berlaku | login aplikasi, header `Authorization` |
+| 403 | tidak punya izin `upload` / `view` di folder atau file itu | izin di File service |
+| 404 | folder atau file tidak ada (atau sudah di tempat sampah), atau `viewUrl` sudah kedaluwarsa / diubah | id-nya; ambil `viewUrl` baru |
+| 415 | jenis file tidak diizinkan | tambahkan `.spreadshid` di Settings → Files |
+
+### 7.5 Dua orang menyimpan file yang sama
+
+Setiap versi berisi **seluruh** dokumen. Misalkan A dan B sama-sama membuka versi 1. A menyimpan dan menjadi versi 2. Kalau B kemudian menyimpan begitu saja, versi 3 berisi workbook B, yang tidak memuat perubahan A. Perubahan A memang tetap ada di riwayat (versi 2), tetapi tidak ada lagi di versi terbaru.
+
+`saveChecked` mencegahnya. Sebelum menyimpan, fungsi ini membaca `latestVersion`. Kalau sudah lebih besar dari versi yang dibuka, tidak ada yang disimpan dan jawabannya `{ conflict: <versi terbaru> }`:
+
+```
+A buka v1 ─┐
+B buka v1 ─┤
+A simpan ──┴─► v2 ✓
+B simpan ─────► { conflict: 2 }   tidak disimpan; B diberi tahu
+A simpan lagi ► v3 ✓               A sekarang mengikuti v2, jadi tidak bentrok dengan dirinya sendiri
+```
+
+Apa yang dilakukan saat bentrok adalah keputusan aplikasi. Yang paling sederhana: beri tahu orangnya, muat ulang versi terbaru, lalu ia mengulangi perubahannya. Kalau bentrokan seperti ini sering terjadi (banyak orang mengedit file yang sama setiap hari), itu tanda workbook-nya lebih cocok disimpan dengan patch ([bagian 4](#4-level-2--save-hemat--anti-timpa-dengan-delta-patch)), yang menggabungkan perubahan alih-alih menimpa.
+
+### 7.6 Batasan penting: hak akses sel
+
+File berisi **seluruh** workbook. Siapa pun yang punya izin `view` pada file itu bisa mengambil seluruh isinya lewat `viewUrl`, termasuk sel yang disembunyikan dengan `setAccess`. `setAccess` di browser hanya mengatur apa yang **tampil** dan apa yang **boleh diubah di layar**. Perlindungan yang sesungguhnya harus berjalan di server: `viewFor` saat membuka, serta `checkPatch` dan `mergePatch` saat menyimpan ([bab 10](10-hak-akses.md)). Route upload dan versi File service menyimpan file apa adanya, tanpa pemeriksaan itu.
+
+Jadi:
+
+| Workbook Anda | Boleh disimpan sebagai file? |
+|---|---|
+| Semua orang yang boleh membuka file boleh melihat semua isinya; `setAccess` hanya membatasi apa yang boleh **diubah** | **Ya.** Batasan ubahnya tetap berlaku di layar. Untuk aturan yang wajib ditegakkan, tambahkan pemeriksaan di server. |
+| Ada sel atau kolom yang **tidak boleh terlihat** oleh sebagian orang yang membuka file | **Tidak langsung.** Simpan dokumennya di tempat yang hanya dibaca server, lalu buat route sendiri yang mengirim `viewFor(doc, { access, who })` ke tiap orang dan menyimpan dengan `checkPatch` + `mergePatch`. |
+| Bagian yang rahasia bisa dipisah menjadi file sendiri | **Ya**, dengan dua file: yang rahasia di folder yang hanya boleh dibuka orang tertentu (izin folder File service). |
+
+### 7.7 Halaman lengkap
+
+Halaman yang membuka sebuah file anggaran, menampilkannya, dan menyimpannya sebagai versi baru dengan catatan. Selama file diambil, `<Sheet workbook={null}>` menampilkan kerangka loading. Kalau orang lain sudah menyimpan lebih dulu, halaman ini tidak menimpanya dan memberi tahu.
+
+<!-- contoh: 09-06-file-service.page.tsx -->
+```tsx
+'use client';
+// 9.7 Halaman yang membuka sebuah file anggaran dari File service, menampilkannya di <Sheet>, dan menyimpannya sebagai versi baru dengan
+// catatan. Kalau orang lain sudah menyimpan versi yang lebih baru, halaman ini tidak menimpanya dan memberi tahu.
+import { useEffect, useState } from 'react';
+import { Sheet, useWorkbook } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { open, saveChecked } from './09-05-file-service';
+import type { OpenedFile, Server } from './09-05-file-service';
+
+export default function HalamanAnggaran({ server, fileId }: { server: Server; fileId: string }) {
+    const [file, setFile] = useState<OpenedFile | null>(null);
+    const [pesan, setPesan] = useState('');
+    const [catatan, setCatatan] = useState('');
+
+    // dibuka sekali; selama file masih diambil, <Sheet workbook={null}> menampilkan kerangka loading
+    useEffect(() => {
+        open(server, fileId).then(setFile, (err: Error) => setPesan(err.message));
+    }, [server, fileId]);
+
+    const adaPerubahan = useWorkbook(file ? file.workbook : null, (w) => w.unsaved());
+
+    async function simpan() {
+        if (!file) return;
+        setPesan('Menyimpan…');
+        try {
+            const hasil = await saveChecked(server, file, catatan || undefined);
+            if ('conflict' in hasil) {
+                setPesan('Versi ' + hasil.conflict + ' sudah disimpan orang lain. Muat ulang dulu, lalu ulangi perubahan Anda.');
+                return;
+            }
+            setCatatan('');
+            setPesan('Tersimpan sebagai versi ' + hasil.saved.version);
+        } catch (err) {
+            setPesan((err as Error).message);
+        }
+    }
+
+    return (
+        <div>
+            <p style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input placeholder="Catatan versi (opsional)" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+                <button onClick={simpan} disabled={!adaPerubahan}>{adaPerubahan ? 'Simpan' : 'Tersimpan'}</button>
+                <span>{pesan}</span>
+            </p>
+            <div style={{ height: 480 }}>
+                <Sheet workbook={file ? file.workbook : null} fileName={file ? file.name.replace(/\.spreadshid$/, '') : undefined} />
+            </div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Untuk menampilkan riwayat versi (siapa menyimpan kapan, dengan catatan apa), pakai `fileInfo(server, fileId).versions`. Untuk membuka salah satu versi, pakai `open(server, fileId, { version })`. Membuka versi lama tidak mengubah apa pun di server; kalau versi itu disimpan, ia menjadi versi baru di atas yang terbaru.
+
+---
+
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [08. Validasi Data & Proteksi Sel](08-menjaga-isi.md) · Berikutnya: [10. Kontrol Akses & Perizinan (ACL/RBAC)](10-hak-akses.md)
