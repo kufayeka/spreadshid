@@ -292,7 +292,7 @@ export interface AccessUi {
  * { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Stok!col:Qty', when: '=$G2<>"Approved"', message: 'Already approved' }
  */
 export interface AccessRow {
-    /** 'user:rina', 'role:kasir' or '*' (everyone). A bare 'rina' matches nobody: the editor suggests the right forms, and the console warns about a row that has none of them (rows read from a database are plain strings, so the type cannot refuse them). */
+    /** A user ('rina', or 'user:rina' which is the same), a role ('role:kasir'), or '*' (everyone). It matches the person given as access.who. */
     who: AccessWho | (string & {});
     effect: 'allow' | 'deny';
     /** 'read', 'edit', 'see', an action of ACTIONS ('format.bold', 'sort' ...), a group ('format'), 'ui.toolbar', 'view.area', 'view.sheet' or '*'. */

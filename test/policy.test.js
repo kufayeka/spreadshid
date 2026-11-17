@@ -107,7 +107,7 @@ check('and the validator says so', validateAccess([{ who: '*', effect: 'deny', a
 
 // the validator
 check('right rows: no problems', validateAccess(ROWS).length === 0, validateAccess(ROWS));
-const bad = validateAccess([{ who: 'kasir', effect: 'maybe', action: 'format.blod', where: 'Stok!A1:ZZZZ9' }]);
+const bad = validateAccess([{ who: '', effect: 'maybe', action: 'format.blod', where: 'Stok!A1:ZZZZ9' }]);
 check('wrong who, effect, action and range are all said', bad.length === 4, bad);
 
 // A refusal tells the message of the row that refused that action, not the first deny row that has a message.
@@ -116,6 +116,23 @@ const told = resolveAccess([
     { who: 'user:4', effect: 'deny', action: 'format', message: 'Formatting is locked' },
     { who: 'user:4', effect: 'deny', action: 'sheets.add', message: 'No new sheets' }
 ], '4');
+// A who without a prefix is a user: "empat" and "user:empat" name the same person, and so do who: 'empat' and who: 'user:empat'.
+{
+    const rows = [
+        { who: 'satu', effect: 'allow', action: '*' },
+        { who: 'dua', effect: 'deny', action: 'ui.menubar', message: 'No menu bar' },
+        { who: 'empat', effect: 'deny', action: 'sheets.add', message: 'No new sheets' }
+    ];
+    check('a bare who is a user', resolveAccess(rows, 'satu').can('sheets.add') && resolveAccess(rows, { user: 'satu' }).owner, resolveAccess(rows, 'satu'));
+    check('"user:empat" as the person is empat too', resolveAccess(rows, 'user:empat').refusalFor('sheets.add') === 'No new sheets');
+    check('a bare who is no mistake', validateAccess(rows).length === 0, validateAccess(rows));
+    // dua's only message is about the menu bar: it is not told when dua is refused something else
+    check('a deny row of one action does not speak for other refusals', resolveAccess(rows, 'dua').refusalFor('sheets.add') === 'You cannot change sheets here',
+        resolveAccess(rows, 'dua').refusalFor('sheets.add'));
+    check('a deny row of everything speaks for every refusal',
+        resolveAccess([{ who: 'lima', effect: 'deny', action: '*', message: 'Read only for you' }], 'lima').refusalFor('sort') === 'Read only for you');
+}
+
 check('a refused action tells its own row\'s message', told.refusalFor('sheets.add') === 'No new sheets' && told.refusalFor('format.bold') === 'Formatting is locked',
     [told.refusalFor('sheets.add'), told.refusalFor('format.bold')]);
 check('an action refused by no deny row keeps the sheet\'s own words', resolveAccess([{ who: 'user:4', effect: 'allow', action: 'read' }], '4').refusalFor('sort') === 'You cannot sort here');

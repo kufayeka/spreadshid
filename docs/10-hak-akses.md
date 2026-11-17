@@ -81,14 +81,25 @@ Setiap baris aturan didefinisikan sebagai objek terstruktur:
 
 ```ts
 interface AccessRow {
-    who: string;           // 'role:kasir', 'user:rina', '*' (semua orang)
+    who: string;           // 'rina' (user), 'role:kasir', '*' (semua orang)
     effect: 'allow' | 'deny';
     action: string;        // 'read', 'edit', 'format.bold', 'ui.toolbar', '*'
     where?: string;        // 'Produk!A1:I13', 'Produk!col:Stok'; kosong = global
     when?: string;         // Formula evaluasi dinamis (misal '=$I2="Dihentikan"')
-    message?: string;      // Pesan error kustom saat aksi pengguna ditolak
+    message?: string;      // Pesan saat aksi INI ditolak (pada action '*': pesan untuk setiap penolakan)
 }
 ```
+
+Isi `who`:
+
+| Ditulis | Artinya | Cocok dengan `access.who` |
+|---|---|---|
+| `'rina'` | user dengan id `rina` | `'rina'`, `{ user: 'rina' }` |
+| `'user:rina'` | sama dengan `'rina'` (awalan `user:` boleh dipakai, boleh tidak) | `'rina'`, `'user:rina'`, `{ user: 'rina' }` |
+| `'role:kasir'` | semua orang yang punya role `kasir` | `{ user: '…', roles: ['kasir'] }` |
+| `'*'` | semua orang | siapa saja |
+
+`message` hanya ditampilkan untuk penolakan aksi milik baris itu. Baris `deny ui.menubar` dengan pesan "Menu dikunci" tidak akan muncul saat orang yang sama ditolak menambah sheet. Untuk satu pesan yang dipakai di **setiap** penolakan, tulis di baris `deny` dengan `action: '*'`.
 
 ---
 

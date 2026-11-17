@@ -532,7 +532,7 @@ export default function Halaman() {
 | `refused` | Perubahan ditolak oleh hak akses, rules, validasi, tipe kolom, atau `beforeOp`. | Pengguna | Popup bawaan |
 | `error` | Ada yang gagal, misalnya file impor tidak terbaca. | Pengguna | Popup bawaan |
 | `info` | Informasi saja, misalnya bagian yang dilewati saat impor. | Pengguna | Popup bawaan |
-| `warning` | Kesalahan developer: baris `access.rows` yang tidak akan pernah cocok, misalnya `who: '4'` (seharusnya `'user:4'`) atau `action: 'sheet.add'` (seharusnya `'sheets.add'`). Dicek setiap kali `access.rows` berganti. | Developer | `console.warn`, **tidak pernah** sebagai popup |
+| `warning` | Kesalahan developer: baris `access.rows` yang tidak akan pernah cocok, misalnya `action: 'sheet.add'` (seharusnya `'sheets.add'`), `who` yang kosong, atau `effect` selain allow/deny. Dicek setiap kali `access.rows` berganti. | Developer | `console.warn`, **tidak pernah** sebagai popup |
 
 #### Apa yang dikembalikan `onNotice`
 

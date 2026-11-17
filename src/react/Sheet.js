@@ -364,7 +364,7 @@ const SheetView = forwardRef(function SheetView(props, ref) {
         ];
         return () => offs.forEach((off) => off());
     }, [wb]);
-    // An access row with a mistyped who ('4' instead of 'user:4') or action ('sheet.add' instead of 'sheets.add') never matches anything, and
+    // An access row with a mistyped action ('sheet.add' instead of 'sheets.add'), an empty who or an unknown effect never matches anything, and
     // nothing would ever say so: the person simply gets less than the host meant. Every such row is told once, as a warning notice, each time the
     // host gives new rows. The checks are validateAccess's own.
     useEffect(() => {

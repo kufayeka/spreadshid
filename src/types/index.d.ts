@@ -50,7 +50,7 @@ export interface SheetNotice {
     index?: number;
     /** warning about an access row: the row itself. */
     row?: AccessRow;
-    /** warning about an access row: every problem it has, one sentence each ('who is "user:<name>", "role:<name>" or "*"'). */
+    /** warning about an access row: every problem it has, one sentence each ('who is a user ("rina" or "user:rina"), a role ("role:kasir") or everyone ("*")'). */
     problems?: string[];
 }
 

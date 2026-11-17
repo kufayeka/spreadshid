@@ -43,16 +43,26 @@ export const strongerMode = (a, b) => (!a ? b : !b ? a : RANK[b.mode] > RANK[a.m
 
 /** The person who opens: 'rina' (a user), or { user: 'rina', roles: ['kasir'] }. Made into the who-texts their rows are written with. */
 function whoTexts(who) {
+    // "user:rina" given as the person is rina too, as it is in a row
+    const bare = (u) => (u === null || u === undefined || u === '' ? null : String(u).replace(/^user:/, ''));
     if (!who) return { user: null, roles: [] };
-    if (typeof who === 'string') return { user: who, roles: [] };
-    return { user: who.user || null, roles: who.roles || [] };
+    if (typeof who === 'string') return { user: bare(who), roles: [] };
+    return { user: bare(who.user), roles: who.roles || [] };
+}
+
+// The user a row's who names: "user:rina", or a bare "rina" (a who without a prefix is a user, as a host naturally writes the id of a person and
+// passes the same id as who), or null for a role, everyone, or nothing.
+function userOfWho(w) {
+    if (w.startsWith('user:')) return w.slice(5);
+    if (w === '*' || w === '' || w.startsWith('role:')) return null;
+    return w;
 }
 
 /** How specific a row is for this person: 3 their user, 2 one of their roles, 1 everyone, 0 not for them. */
 function levelFor(row, person) {
     const w = String(row.who || '').trim();
     if (w === '*') return 1;
-    if (person.user !== null && w === 'user:' + person.user) return 3;
+    if (person.user !== null && userOfWho(w) === String(person.user)) return 3;
     if (w.startsWith('role:') && person.roles.includes(w.slice(5))) return 2;
     return 0;
 }
@@ -96,7 +106,9 @@ export function resolveAccess(rows, who) {
     const person = whoTexts(who);
     const mine = [];
     for (const row of rows) { const level = levelFor(row, person); if (level) mine.push({ ...row, level, action: String(row.action || '').trim() }); }
-    const message = (mine.find((r) => r.effect === 'deny' && r.message) || {}).message || null;
+    // The message for every refusal of this person: a deny row of everything ('*') that has one. A deny row of one action (sheets.add, ui.menubar)
+    // speaks for that action only: its words are never told for something else.
+    const message = (mine.find((r) => r.effect === 'deny' && r.action === '*' && r.message) || {}).message || null;
 
     // an action anywhere: the most specific level that says something decides, deny winning within it. Rows tied to a place (a where) are the cells'
     // to decide, except view.area and view.sheet, whose where is what they show
@@ -285,7 +297,7 @@ const UI_IDS = new Set(UI_ITEMS.map((u) => u.id));
 
 /**
  * What is wrong with the access rows, for an editor (and before they are kept): [{ row, problem }] (row = its index; empty when they are right).
- * A who that is not user:, role: or *, an effect that is not allow or deny, an unknown action or part of the screen, a where or a when that cannot be read.
+ * A who that is empty, an effect that is not allow or deny, an unknown action or part of the screen, a where or a when that cannot be read.
  * @param {unknown} rows
  */
 export function validateAccess(rows) {
@@ -295,7 +307,7 @@ export function validateAccess(rows) {
         const say = (problem) => out.push({ row, problem });
         if (!r || typeof r !== 'object') { say('a row is an object'); return; }
         const who = String(r.who || '').trim();
-        if (who !== '*' && !/^(user|role):.+/.test(who)) say('who is "user:<name>", "role:<name>" or "*"');
+        if (!who || who === 'user:' || who === 'role:') say('who is a user ("rina" or "user:rina"), a role ("role:kasir") or everyone ("*")');
         if (r.effect !== 'allow' && r.effect !== 'deny') say('effect is "allow" or "deny"');
         const action = String(r.action || '').trim();
         if (action.startsWith('ui.')) {

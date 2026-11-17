@@ -956,7 +956,7 @@ Saat membangun **sistem template spreadsheet** (memiliki styling bawaan, pre-rum
     { "who": "role:estimator", "effect": "deny",  "action": "ui.toolbar" }
   ]
   ```
-  - `who`: `'*'` | `'role:<nama>'` | `'user:<id>'` (spesifisitas: `user` > `role` > `'*'`; di level sama, `deny` mengalahkan `allow`).
+  - `who`: `'*'` | `'role:<nama>'` | `'<id user>'` (atau `'user:<id>'`, sama saja) (spesifisitas: `user` > `role` > `'*'`; di level sama, `deny` mengalahkan `allow`).
 - **Store**: Simpan di kolom `JSONB` `access` atau tabel relasional `workbook_access` (di-copy dari template saat dokumen dibuat).
 - **Load & Pasang**:
   - **Server**: Oper ke `viewFor(doc, { access, who })` saat `GET` — `viewFor()` tidak hanya menghapus sel rahasia, tapi juga **membekukan rumus yang membacanya menjadi nilai mati** agar rahasia tidak bisa direkayasa balik! Saat `PATCH`, `mergePatch()` otomatis mempertahankan sel `hidden`/`invisible` di DB agar tidak tertimpa `null` dari client.
