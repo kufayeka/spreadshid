@@ -184,6 +184,8 @@ export const SHOTS = [
     { name: 'akses-tanda-stripes', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 288, width: 760, height: 130 } },
     { name: 'akses-tanda-tanpa-gembok', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 432, width: 760, height: 130 } },
     { name: 'akses-tanda-tanpa-tanda', page: '13-25-tanda.page.tsx', clip: { x: 0, y: 576, width: 760, height: 130 } },
+    { name: 'akses-simpan-viewer', page: '13-36-simpan.page.tsx', act: steps(asWho('viewer'), clickText('.ks-menubar-item', 'File')), clip: { x: 0, y: 0, width: 1000, height: 330 } },
+    { name: 'akses-simpan-spv', page: '13-36-simpan.page.tsx', act: steps(asWho('spv'), clickText('.ks-menubar-item', 'File')), clip: { x: 0, y: 0, width: 1000, height: 330 } },
     { name: 'akses-pesan', page: '13-26-pesan.page.tsx', act: typeAt(2, 1, 'x'), clip: { x: 0, y: 0, width: 1000, height: 300 } },
     akses('akses-setup', '13-27-setup.page.tsx'),
     { name: 'akses-pilih', page: '13-28-pilih.page.tsx', clip: { x: 0, y: 0, width: 1366, height: 330 } },

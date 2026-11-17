@@ -1757,6 +1757,95 @@ export default function HalamanAnggaran({ server, fileId }: { server: Server; fi
 
 Untuk menampilkan riwayat versi (siapa menyimpan kapan, dengan catatan apa), pakai `fileInfo(server, fileId).versions`. Untuk membuka salah satu versi, pakai `open(server, fileId, { version })`. Membuka versi lama tidak mengubah apa pun di server; kalau versi itu disimpan, ia menjadi versi baru di atas yang terbaru.
 
+### 7.8 Tombol Save di menu File (`onSave`)
+
+Halaman 7.7 membuat tombol Simpan sendiri di luar sheet. Cara lain: pakai tombol yang sudah disediakan sheet di menu **File**. Isi prop `onSave`, dan tiga tombol ini muncul di bagian paling atas menu File:
+
+| Tombol | `mode` yang diterima `onSave` | Aksi hak akses |
+|---|---|---|
+| Save (juga **Ctrl+S**) | `'save'` | `file.save` |
+| Save as new version | `'saveAsNewVersion'` | `file.saveAsNewVersion` |
+| Save as a copy… | `'saveAsACopy'` | `file.saveAsACopy` |
+
+Tanpa `onSave` ketiga tombol tidak muncul, karena sheet tidak tahu ke mana harus menyimpan.
+
+Ketiga tombol memanggil **satu** fungsi yang sama. Fungsi itu menerima objek `{ mode, doc, workbook }`:
+
+- `mode`: tombol mana yang ditekan;
+- `doc`: isi workbook (`wb.toJSON()`), siap dikirim;
+- `workbook`: workbook-nya sendiri, misalnya untuk `wb.saved()`.
+
+Sheet juga mengurus hal-hal di sekitar penyimpanan, jadi Anda tidak perlu membuatnya sendiri:
+
+1. **Selama fungsi berjalan**, ketiga tombol abu-abu dan Ctrl+S diabaikan. Klik dua kali tidak menyimpan dua kali.
+2. **Kalau fungsi selesai tanpa error**, sheet menampilkan "Saved" ("Saved as a new version", "Saved as a copy").
+3. **Kalau fungsi melempar error**, sheet menampilkan "The file was not saved: " diikuti pesan error-nya.
+4. **Kalau orangnya tidak boleh menyimpan** menurut hak akses, tombolnya abu-abu. Ctrl+S menampilkan `message` dari baris aturannya, dan fungsi tidak dipanggil sama sekali.
+
+Semua pesan ini lewat `onNotice` seperti pesan sheet lainnya, jadi bisa ditampilkan dengan popup aplikasi Anda sendiri ([Bab 02 bagian 5.9](02-konsep.md#59-notifikasi-milik-aplikasi-sendiri-notices-dan-onnotice)).
+
+Arti ketiga tombol ditentukan oleh aplikasi Anda. Untuk File service:
+
+- **Save**: File service tidak pernah menimpa file, karena setiap simpan menjadi versi baru. Jadi Save menyimpan versi biasa tanpa catatan.
+- **Save as new version**: versi baru dengan catatan, untuk menandai titik penting (misalnya "Revisi setelah rapat").
+- **Save as a copy**: file baru di folder yang sama. Setelah itu halaman bekerja pada salinannya.
+
+Kalau workbook disimpan di tabel database sendiri, Save memang bisa menimpa baris yang ada.
+
+<!-- contoh: 09-07-menu-simpan.page.tsx -->
+```tsx
+'use client';
+// 9.8 Halaman anggaran yang sama dengan 9.7, tetapi tombolnya ada di menu File milik sheet: Save (Ctrl+S), Save as new version, Save as a copy.
+// Satu fungsi onSave menerima mode tombol yang dipilih dan memanggil modul File service.
+import { useEffect, useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { SheetSave } from '@kufayeka/sheet';
+import '@kufayeka/sheet/style.css';
+import { open, saveChecked, saveNew } from './09-05-file-service';
+import type { OpenedFile, Server } from './09-05-file-service';
+
+export default function HalamanAnggaran({ server, fileId, folderId }: { server: Server; fileId: string; folderId: string }) {
+    const [file, setFile] = useState<OpenedFile | null>(null);
+    const [catatan, setCatatan] = useState('');
+
+    useEffect(() => {
+        open(server, fileId).then(setFile);
+    }, [server, fileId]);
+
+    // Dipanggil oleh ketiga tombol. Melempar error = sheet menampilkan "The file was not saved: <pesan>";
+    // selesai tanpa error = sheet menampilkan "Saved". Selama fungsi ini berjalan, ketiga tombol abu-abu.
+    async function simpan({ mode }: SheetSave) {
+        if (!file) return;
+
+        if (mode === 'saveAsACopy') {
+            // file baru di folder yang sama; halaman ini lalu bekerja pada salinannya
+            const baru = await saveNew(server, file.workbook, folderId, file.name.replace(/\.spreadshid$/, '') + ' (salinan).spreadshid');
+            setFile({ workbook: file.workbook, fileId: baru.id, name: baru.name, version: baru.version });
+            return;
+        }
+
+        // File service tidak pernah menimpa: setiap simpan adalah versi baru. Save = versi biasa, Save as new version = versi dengan catatan.
+        const hasil = await saveChecked(server, file, mode === 'saveAsNewVersion' ? catatan || undefined : undefined);
+        if ('conflict' in hasil) throw new Error('versi ' + hasil.conflict + ' sudah disimpan orang lain, muat ulang dulu');
+        if (mode === 'saveAsNewVersion') setCatatan('');
+    }
+
+    return (
+        <div>
+            <p>
+                <input placeholder="Catatan untuk Save as new version" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+            </p>
+            <div style={{ height: 480 }}>
+                <Sheet workbook={file ? file.workbook : null} onSave={simpan} fileName={file ? file.name.replace(/\.spreadshid$/, '') : undefined} />
+            </div>
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+Siapa yang boleh menekan tombol mana diatur di baris hak akses, sama seperti aksi lainnya ([Bab 10 bagian 5.18](10-hak-akses.md#518-tombol-save-dan-isi-file-yang-diunduh)). Pemeriksaan di browser hanya mengatur tombolnya. Route penyimpanan di server tetap harus memeriksa izin yang sama, karena siapa pun bisa memanggil API secara langsung.
+
 ---
 
 [Daftar isi](../README.md#daftar-isi) · Sebelumnya: [08. Validasi Data & Proteksi Sel](08-menjaga-isi.md) · Berikutnya: [10. Kontrol Akses & Perizinan (ACL/RBAC)](10-hak-akses.md)

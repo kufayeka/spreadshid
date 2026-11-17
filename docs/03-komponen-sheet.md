@@ -36,6 +36,7 @@ Komunikasi antara aplikasi React dan komponen `<Sheet />` berjalan melalui tiga 
    • sheet                 • onSelectionChange   • scrollTo()
    • access                • onSheetChange       • focus()
    • fileName              • onReject            • startEdit()
+   • downloadMask          • onSave
         │                       │                │
         ▼                       │                │
 ┌───────────────────────────────┴────────────────┴───────┐
@@ -451,6 +452,8 @@ export default function Halaman() {
 | `onNotice` | `(notice: SheetNotice) => string \| null \| undefined` | `undefined` | Menerima setiap pesan sheet (`refused`, `error`, `info`, `warning`) sebelum ditampilkan, lalu boleh mengganti teksnya atau meredamnya (lihat [Bab 02 bagian 5.9](02-konsep.md#59-notifikasi-milik-aplikasi-sendiri-notices-dan-onnotice)). |
 | `notices` | `boolean` | `true` | `false`: popup bawaan tidak pernah tampil; `onNotice` tetap menerima semua pesan. |
 | `onCellError` | `(payload: { address: string, field: string, value: any, expected: string }) => void` | `undefined` | Callback saat nilai masukan melanggar tipe skema kolom. |
+| `onSave` | `(save: SheetSave) => unknown` | `undefined` | Menampilkan Save (Ctrl+S), Save as new version dan Save as a copy di menu File; ketiganya memanggil fungsi ini dengan `{ mode, doc, workbook }`. Kembalikan promise: tombol abu-abu selama berjalan, error ditampilkan (lihat [Bab 09 bagian 7.8](09-menyimpan.md#78-tombol-save-di-menu-file-onsave)). |
+| `downloadMask` | `string` | `'-'` | Isi sel `deny read` di file hasil *File → Download*; `''` untuk kosong (lihat [Bab 10 bagian 5.18](10-hak-akses.md#518-tombol-save-dan-isi-file-yang-diunduh)). |
 | `fileName` | `string` | `'Spreadsheet'` | Nama file default saat dokumen diunduh melalui menu *File → Download*. |
 | `access` | `SheetAccessConfig` | `{}` | Konfigurasi granular kontrol modul UI dan pembatasan hak akses sel/baris. |
 | `marks` | `boolean \| CellMarksConfig` | `{ lock: true, hidden: true }` | Indikator visual tanda gembok (terkunci) atau masking (tersembunyi) pada sel. |

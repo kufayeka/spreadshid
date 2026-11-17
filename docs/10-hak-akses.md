@@ -845,6 +845,167 @@ export default function PesanSendiri() {
 
 ![Notifikasi penolakan kustom di luar grid spreadsheet](img/akses-pesan.png)
 
+### 5.18 Tombol Save dan Isi File yang Diunduh
+
+#### Siapa boleh menyimpan
+
+Kalau aplikasi mengisi prop `onSave`, menu File punya tiga tombol simpan ([Bab 09 bagian 7.8](09-menyimpan.md#78-tombol-save-di-menu-file-onsave)). Masing-masing adalah aksi tersendiri, jadi bisa diizinkan atau ditolak satu per satu:
+
+| Aksi | Tombol |
+|---|---|
+| `file.save` | Save (juga Ctrl+S) |
+| `file.saveAsNewVersion` | Save as new version |
+| `file.saveAsACopy` | Save as a copy |
+| `file` atau `file.*` | ketiganya sekaligus |
+
+Contoh di bawah memakai tiga orang:
+
+- **admin**: boleh semuanya;
+- **supervisor**: tidak boleh menimpa file, tapi boleh membuat versi baru atau salinan;
+- **viewer**: tidak boleh menyimpan, tidak boleh mengubah, dan tidak boleh membaca harga beli.
+
+Tombol yang ditolak menjadi abu-abu. Kalau viewer menekan Ctrl+S, muncul `message` dari baris aturannya.
+
+<!-- contoh: 13-36-simpan.page.tsx -->
+```tsx
+import { useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import type { SheetSave } from '@kufayeka/sheet';
+import type { AccessRow } from '@kufayeka/sheet/core';
+import '@kufayeka/sheet/style.css';
+import { buatStok } from './data/stok-akses.js';
+
+// 13.36 Tombol Save di menu File, diatur per role. Admin boleh ketiganya, supervisor tidak boleh menimpa file (hanya versi baru atau salinan),
+// viewer tidak boleh menyimpan sama sekali dan tidak boleh membaca harga beli.
+const ATURAN: AccessRow[] = [
+    { who: '*', effect: 'allow', action: '*' },
+    { who: 'role:spv', effect: 'deny', action: 'file.save', message: 'Supervisor tidak menimpa file. Pakai Save as new version.' },
+    { who: 'role:viewer', effect: 'deny', action: 'file.*', message: 'Kamu hanya bisa melihat file ini.' },
+    { who: 'role:viewer', effect: 'deny', action: 'edit' },
+    { who: 'role:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
+];
+
+const ORANG: Record<string, { user: string; roles: string[] }> = {
+    admin: { user: 'yeka', roles: ['admin'] },
+    spv: { user: 'sari', roles: ['spv'] },
+    viewer: { user: 'budi', roles: ['viewer'] }
+};
+
+export default function TombolSimpan() {
+    const [wb] = useState(buatStok);
+    const [siapa, setSiapa] = useState('viewer');
+    const [catatan, setCatatan] = useState('Belum ada yang disimpan.');
+
+    // satu fungsi untuk ketiga tombol; di aplikasi sungguhan di sinilah API dipanggil (lihat bab 9 bagian 7.8)
+    async function simpan({ mode, doc }: SheetSave) {
+        const kata = { save: 'menimpa file', saveAsNewVersion: 'membuat versi baru', saveAsACopy: 'membuat salinan' }[mode];
+        setCatatan(ORANG[siapa].user + ' ' + kata + ' (workbook ' + String(doc.id).slice(0, 8) + '…)');
+    }
+
+    return (
+        <div style={{ height: 420, display: 'flex', flexDirection: 'column', font: '13px system-ui' }}>
+            <div style={{ padding: '8px 12px', display: 'flex', gap: 12, alignItems: 'center', background: '#f1f3f4' }}>
+                Lihat sebagai
+                <select className="lihat-sebagai" value={siapa} onChange={(e) => setSiapa(e.target.value)}>
+                    <option value="admin">admin (yeka)</option>
+                    <option value="spv">supervisor (sari)</option>
+                    <option value="viewer">viewer (budi)</option>
+                </select>
+                <span>{catatan}</span>
+            </div>
+            <Sheet workbook={wb} style={{ flex: 1 }} onSave={simpan} access={{ rows: ATURAN, who: ORANG[siapa] }} />
+        </div>
+    );
+}
+```
+<!-- /contoh -->
+
+![Menu File untuk viewer: ketiga tombol simpan abu-abu](img/akses-simpan-viewer.png)
+
+![Menu File untuk supervisor: hanya Save yang abu-abu](img/akses-simpan-spv.png)
+
+Seperti semua aturan di bab ini, pemeriksaan di browser hanya mengatur tombolnya. Route simpan di server harus memeriksa baris yang sama.
+
+#### Apa yang ada di file yang diunduh
+
+File yang sudah diunduh berada di luar kendali aplikasi. Siapa pun yang memegang file itu bisa membukanya di Excel, di editor teks, atau dengan meng-unzip-nya. Karena itu, *File → Download* (.xlsx dan .csv) hanya berisi apa yang dilihat orang itu di layar:
+
+| Sel | Di layar | Di file yang diunduh |
+|---|---|---|
+| `deny read` | `•••` | teks `-` |
+| `deny see` | kosong | kosong |
+| rumus yang membaca sel di atas (misalnya total atau margin) | hasilnya | **hasilnya saja**, rumusnya tidak ikut |
+| komentar di sel `deny read` / `deny see` | tidak terlihat | tidak ikut |
+| baris dan kolom | — | tetap di posisinya, tidak ada yang dihapus atau digeser |
+
+Alasannya:
+
+- **Kenapa `-`, bukan kosong?** Sel kosong berarti "datanya memang tidak ada", dan pembaca file bisa salah paham. `-` berarti "ada isinya, tapi bukan untuk Anda".
+- **Kenapa rumus dibuang?** Excel menghitung ulang rumus saat file dibuka. Rumus `=F2-E2` yang membaca `-` akan menghasilkan error atau angka yang salah. Selain itu, rumusnya sendiri memberi tahu dari sel mana angka itu dihitung.
+- **Kenapa posisi tidak digeser?** Kalau kolom rahasia dihapus dari file, semua alamat sel di kanannya bergeser dan rumus lain di file menunjuk ke sel yang salah.
+- **Kenapa tidak memakai fitur "hide" milik Excel?** Siapa pun bisa meng-unhide-nya.
+
+Tanda `-` bisa diganti lewat prop `downloadMask`: `<Sheet downloadMask="***">` atau `downloadMask=""` untuk sel kosong. Dari kode, pakai opsi `mask` pada `exportXlsx(wb, { mask })` dan `exportCsv(wb, sheet, { mask })`.
+
+Contoh berikut adalah file yang diunduh budi (viewer). Harga beli tidak boleh ia baca, kolom Status tidak boleh ia lihat, dan kolom Margin berisi rumus yang membaca harga beli:
+
+<!-- contoh: 13-37-unduh.ts -->
+```ts
+import { exportCsv, exportXlsx, importXlsx } from '@kufayeka/sheet/core';
+import type { AccessRow } from '@kufayeka/sheet/core';
+import { buatStok } from './data/stok-akses.js';
+
+// 13.37 Isi file yang diunduh budi (viewer). Harga beli tidak boleh ia baca, kolom Status tidak boleh ia lihat sama sekali, dan kolom Margin
+// adalah rumus yang membaca harga beli.
+const wb = buatStok();
+const p = wb.sheet('Produk');
+p.setValues('J1', 'Margin');
+p.setValues('J2', '=F2-E2');
+p.setValues('J3', '=F3-E3');
+
+const rows: AccessRow[] = [
+    { who: '*', effect: 'allow', action: '*' },
+    { who: 'role:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'role:viewer', effect: 'deny', action: 'see', where: 'Produk!col:Status' }
+];
+wb.setAccess(rows, { user: 'budi', roles: ['viewer'] });
+
+// CSV: tiga baris pertama
+console.log(exportCsv(wb, 'Produk').split('\r\n').slice(0, 3).join('\n'));
+
+// Excel: file dibuka lagi untuk melihat isinya
+const { workbook: file } = await importXlsx(exportXlsx(wb));
+console.log('');
+console.log('Harga beli E2 di file :', file.value('Produk', 'E2'));
+console.log('Status I2 di file     :', file.value('Produk', 'I2'));
+console.log('Margin J2 di file     :', file.value('Produk', 'J2'), '| isinya rumus?', String(file.input('Produk', 'J2')).startsWith('='));
+
+// tanda lain, atau kosong
+console.log('');
+console.log('mask "***":', exportCsv(wb, 'Produk', { mask: '***' }).split('\r\n')[1]);
+console.log('mask ""   :', exportCsv(wb, 'Produk', { mask: '' }).split('\r\n')[1]);
+```
+<!-- /contoh -->
+
+<!-- hasil: 13-37-unduh.ts -->
+```text
+Kode,Nama produk,Kategori,Satuan,Harga beli,Harga jual,Stok,Stok min.,Status,Margin
+SMN-01,Semen Portland 50 kg,Semen,zak,-,72000,420,100,,8000
+SMN-02,Semen putih 40 kg,Semen,zak,-,112000,35,40,,14000
+
+Harga beli E2 di file : -
+Status I2 di file     : null
+Margin J2 di file     : 8000 | isinya rumus? false
+
+mask "***": SMN-01,Semen Portland 50 kg,Semen,zak,***,72000,420,100,,8000
+mask ""   : SMN-01,Semen Portland 50 kg,Semen,zak,,72000,420,100,,8000
+```
+<!-- /hasil -->
+
+Kalau orang itu sama sekali tidak boleh mengunduh, tolak aksi `download`.
+
+Ini berlaku untuk file yang dibuat di browser. Kalau workbook dibuka lewat `viewFor` di server ([bagian 6](#6-penegakan-keamanan-di-server-viewfor--checkpatch)), data rahasia memang tidak pernah sampai ke browser, sehingga file yang diunduh pun tidak mungkin memuatnya.
+
 ---
 
 ## 6. Mode Desain & Pembuatan Aturan Interaktif
