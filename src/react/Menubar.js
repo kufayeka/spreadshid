@@ -30,13 +30,17 @@ import { exportXlsx, importXlsxInto, importCsvInto, exportCsv } from '../core/ex
  * @param {() => void} props.onReveal  Show the active cell (after a selection made from the menu).
  * @param {(message: string) => void} props.onError  Also how what an import left out is told.
  * @param {string} [props.fileName]  The name a download gets (without its extension).
+ * @param {(mode: 'save' | 'saveAsNewVersion' | 'saveAsACopy') => void} [props.onSave]  The three save items show only when the host saves (Sheet's
+ *   onSave); each runs it with its mode.
+ * @param {string} [props.downloadMask]  What a cell the person may not read holds in a download ("-" by default).
+ * @param {boolean} [props.saving]  A save is under way: the save items are greyed until it ends, so one click never saves twice.
  * @param {import('react').RefObject<HTMLElement>} props.container
  */
 // the action of the access policy a menu item needs, by its value ("area:what:extra")
 function actionOfMenu(value) {
     const [area, what, extra] = value.split(':');
     const BY = {
-        file: { import: 'import', download: 'download', settings: 'settings' },
+        file: { save: 'file.save', saveAsNewVersion: 'file.saveAsNewVersion', saveAsACopy: 'file.saveAsACopy', import: 'import', download: 'download', settings: 'settings' },
         edit: { cut: 'copy', copy: 'copy', paste: 'paste', pasteValues: 'paste', pasteStyles: 'paste', clear: 'edit', deleteRows: 'rows.delete', deleteCols: 'cols.delete' },
         view: { comments: 'comment.read', freezeRows: 'view.freeze', freezeCols: 'view.freeze', gridlines: 'view.gridlines', foldRows: 'rows.group', foldCols: 'cols.group' },
         insert: { pivot: 'pivot', chart: 'chart', sparkline: 'chart', comment: 'comment.create', rowsAbove: 'rows.insert', rowsBelow: 'rows.insert', colsLeft: 'cols.insert', colsRight: 'cols.insert', sheet: 'sheets.add', checkbox: 'validation', dropdown: 'validation', fn: 'edit', link: 'format.link' },
@@ -64,6 +68,13 @@ export function Menubar(props) {
 
     const MENUS = {
         File: [
+            // the host keeps the file (Sheet's onSave): without it the sheet has nowhere to save to, so these do not show
+            ...(props.onSave ? [
+                { value: 'file:save', label: 'Save', hint: 'Ctrl+S', disabled: !!props.saving },
+                { value: 'file:saveAsNewVersion', label: 'Save as new version', disabled: !!props.saving },
+                { value: 'file:saveAsACopy', label: 'Save as a copy…', disabled: !!props.saving },
+                { separator: true }
+            ] : []),
             { value: 'file:import', label: 'Import…' },
             { label: 'Download', children: [{ value: 'file:download:xlsx', label: 'Microsoft Excel (.xlsx)' }, { value: 'file:download:csv', label: 'Comma-separated values (.csv, this sheet)' }] },
             { separator: true },
@@ -189,8 +200,8 @@ export function Menubar(props) {
     function download(kind) {
         const name = (props.fileName || 'Spreadsheet') + (kind === 'csv' ? ' - ' + sheet.name + '.csv' : '.xlsx');
         // a byte order mark before a CSV text, so Excel reads its letters as UTF-8
-        const blob = kind === 'csv' ? new Blob(['\uFEFF' + exportCsv(wb, s)], { type: 'text/csv;charset=utf-8' })
-            : new Blob([exportXlsx(wb)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const blob = kind === 'csv' ? new Blob(['\uFEFF' + exportCsv(wb, s, { mask: props.downloadMask })], { type: 'text/csv;charset=utf-8' })
+            : new Blob([exportXlsx(wb, { mask: props.downloadMask })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = name;
@@ -217,7 +228,8 @@ export function Menubar(props) {
         toGrid();
         switch (area) {
             case 'file':
-                if (what === 'import') { if (fileInput.current) fileInput.current.click(); }
+                if (what === 'save' || what === 'saveAsNewVersion' || what === 'saveAsACopy') { if (props.onSave) props.onSave(what); }
+                else if (what === 'import') { if (fileInput.current) fileInput.current.click(); }
                 else if (what === 'download') download(extra);
                 else props.onSettings();
                 break;

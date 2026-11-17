@@ -111,6 +111,12 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {boolean} [props.notices]  false: the sheet never shows its own popup (onNotice still hears every message). True by default.
  * @param {(event: { address: string, field?: string, value: any, expected: string }) => void} [props.onCellError]  A value was not of its column's type.
  * @param {(sel: SheetSelection) => void} [props.onSelectionChange]  The selection changed (see SheetSelection).
+ * @param {(save: { mode: 'save' | 'saveAsNewVersion' | 'saveAsACopy', doc: object, workbook: object }) => any} [props.onSave]  The host
+ *   saves the file: File > Save (and Ctrl+S), Save as new version, Save as a copy. Without it these items do not show. Each is an action of the
+ *   access rows (file.save, file.saveAsNewVersion, file.saveAsACopy; "file" for the three). When it returns a promise the items are greyed until it
+ *   settles; a rejection is told as an error, a resolve as "Saved".
+ * @param {string} [props.downloadMask]  What a cell the person may not read (deny read) holds in File > Download: "-" by default, "" for empty.
+ *   A cell they may not see (deny see) is always empty, and a formula reading either goes out as its answer only.
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
  * @param {{ rows: object[]|null, who: any }} [props.access]  The access rows of the workbook and the person who has it open (policy.js). It is the
  *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
@@ -356,6 +362,37 @@ const SheetView = forwardRef(function SheetView(props, ref) {
         setNotice(typeof own === 'string' ? own : n.reason);
     };
     const tellError = (reason, more) => tell({ kind: 'error', reason, ...(more || {}) });
+
+    // A save asked for (the File menu or Ctrl+S). The sheet does not know where the file lives: it checks the person may do it (the same access
+    // rows as everything else, file.save / file.saveAsNewVersion / file.saveAsACopy), hands the host the document and the mode, and waits for its
+    // promise, so a second click while the first is still on its way does not save twice. The host's server must check the same rows again: the
+    // browser is never the only guard.
+    const [saving, setSaving] = useState(false);
+    const savingNow = useRef(false);
+    async function save(mode) {
+        const onSave = latest.current.onSave;
+        if (!onSave || savingNow.current) return;
+        const action = 'file.' + mode;
+        if (!wb.can(action)) { tell({ kind: 'refused', reason: wb.refusal(action), action }); return; }
+        savingNow.current = true;
+        setSaving(true);
+        try {
+            await onSave({ mode, doc: wb.toJSON(), workbook: wb });
+            tell({ kind: 'info', reason: mode === 'saveAsACopy' ? 'Saved as a copy' : mode === 'saveAsNewVersion' ? 'Saved as a new version' : 'Saved', action });
+        } catch (err) {
+            tellError('The file was not saved' + (err && err.message ? ': ' + err.message : ''), { action });
+        } finally {
+            savingNow.current = false;
+            setSaving(false);
+        }
+    }
+    // Ctrl+S (Cmd+S) anywhere in the sheet saves, instead of the browser saving the page, when the host saves at all
+    function onRootKeyDown(e) {
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 's' || e.key === 'S') && latest.current.onSave) {
+            e.preventDefault();
+            save('save');
+        }
+    }
     useEffect(() => {
         const offs = [
             wb.on('op', (e) => { if (latest.current.onOp) latest.current.onOp(e); }),
@@ -484,9 +521,10 @@ const SheetView = forwardRef(function SheetView(props, ref) {
     // what the access policy lets this person see (policy.js): the parts of the screen it hides are not drawn
     const ui = wb.access().ui;
     return (
-        <div ref={root} className={'ks-sheet' + marksClass + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet">
+        <div ref={root} className={'ks-sheet' + marksClass + (props.className ? ' ' + props.className : '')} style={props.style} data-sheet-version={VERSION} role="grid" aria-label="Spreadsheet" onKeyDownCapture={onRootKeyDown}>
             {ui.menubar ? <Menubar workbook={wb} sheetId={sheetId} sel={sel} setSel={setSel} sinkRef={sinkRef} zoom={zoom} onZoom={setZoom} onFind={onFind}
                 onLink={() => setLinking(true)} onSettings={() => { if (wb.shows('panel.settings')) setSettingsOpen(true); }} onShow={show} onError={tellError} fileName={props.fileName}
+                onSave={props.onSave ? save : undefined} saving={saving} downloadMask={props.downloadMask}
                 onConditional={() => setPanel({ kind: 'conditional', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onNames={() => setPanel({ kind: 'names', range: rectText(rectsOf(sel)[rectsOf(sel).length - 1]) })}
                 onComment={writeComment}

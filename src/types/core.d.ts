@@ -317,10 +317,11 @@ export type AccessActionName =
     | 'view.freeze' | 'view.gridlines' | 'view.area' | 'view.sheet'
     | 'sort' | 'filter' | 'validation' | 'names' | 'settings' | 'pivot' | 'chart'
     | 'copy' | 'paste' | 'download' | 'import'
+    | 'file.save' | 'file.saveAsNewVersion' | 'file.saveAsACopy'
     | 'comment.read' | 'comment.create' | 'comment.reply' | 'comment.edit' | 'comment.delete' | 'comment.moderate'
     | 'access';
 /** What an access row names: one action, a whole group of them, a part of the screen ('ui.toolbar', 'ui.tool.bold'), or '*' for everything. */
-export type AccessAction = AccessActionName | 'format' | 'rows' | 'cols' | 'sheets' | 'view' | 'comment' | `ui.${string}` | '*';
+export type AccessAction = AccessActionName | 'format' | 'rows' | 'cols' | 'sheets' | 'view' | 'file' | 'comment' | `${'format' | 'rows' | 'cols' | 'sheets' | 'view' | 'file' | 'comment'}.*` | `ui.${string}` | '*';
 /** The person who opens: 'rina' (a user), or { user: 'rina', roles: ['kasir'] }. */
 export type Who = string | { user?: string; roles?: string[] };
 export interface AccessInfo { owner: boolean; roles: string[]; ui: AccessUi; message: string | null }
@@ -634,11 +635,11 @@ export const SPARKLINE_FIELDS: ChartField[];
 /** The nodes of the chart editor's tree, in their order. */
 export const CHART_NODES: Array<{ id: string; label: string; for?: ChartType[] }>;
 
-export function exportXlsx(wb: Workbook): Uint8Array;
+export function exportXlsx(wb: Workbook, options?: { mask?: string }): Uint8Array;
 export function importXlsx(bytes: Uint8Array, options?: WorkbookOptions & { settings?: Settings }): Promise<{ workbook: Workbook; warnings: string[]; active: string }>;
 export function importXlsxInto(wb: Workbook, bytes: Uint8Array, how?: How): Promise<{ sheetIds: string[]; warnings: string[] }>;
 export function importCsvInto(wb: Workbook, text: string, name?: string, how?: How): { sheetIds: string[]; warnings: string[] };
-export function exportCsv(wb: Workbook, sheet: SheetRef, options?: { delimiter?: string }): string;
+export function exportCsv(wb: Workbook, sheet: SheetRef, options?: { delimiter?: string; mask?: string }): string;
 export function parseCsv(text: string, delimiter?: string): string[][];
 export function codeOfFormat(format: Format, settings?: Settings): string;
 

@@ -20,7 +20,7 @@
 // For cells the actions are read, edit and see: edit lets it be changed (and read), read lets it be read, deny read shows ••• (the content is not
 // sent), deny see shows an empty cell (nothing tells it holds anything). A cell nobody allows is shown empty.
 
-/** Every action a row can name. A group ('format', 'rows', 'cols', 'sheets', 'view', 'comment') names every action under it; '*' names everything. */
+/** Every action a row can name. A group ('format', 'rows', 'cols', 'sheets', 'view', 'file', 'comment', also written 'file.*') names every action under it; '*' names everything. */
 export const ACTIONS = [
     'read', 'edit', 'see',
     'format.bold', 'format.italic', 'format.underline', 'format.strike', 'format.color', 'format.fill', 'format.borders', 'format.align', 'format.wrap',
@@ -31,6 +31,7 @@ export const ACTIONS = [
     'view.freeze', 'view.gridlines', 'view.area', 'view.sheet',
     'sort', 'filter', 'validation', 'names', 'settings', 'pivot', 'chart',
     'copy', 'paste', 'download', 'import',
+    'file.save', 'file.saveAsNewVersion', 'file.saveAsACopy',
     'comment.read', 'comment.create', 'comment.reply', 'comment.edit', 'comment.delete', 'comment.moderate',
     'access'
 ];
@@ -70,6 +71,8 @@ function levelFor(row, person) {
 /** True when a row's action names this action: the same one, its group ('format' for 'format.bold'), or '*'. */
 function names(rowAction, action) {
     if (rowAction === '*') return true;
+    // "file.*" is written for the whole group as often as "file" is, so both name it
+    if (rowAction.endsWith('.*')) rowAction = rowAction.slice(0, -2);
     if (rowAction === action) return true;
     return action.startsWith(rowAction + '.');
 }
@@ -261,6 +264,7 @@ export const ACTION_INFO = [
     ['view.area', 'Only this part of a sheet shows', 'View'], ['view.sheet', 'Only these sheets show', 'View'], ['view.freeze', 'Freeze rows and columns', 'View'], ['view.gridlines', 'Show or hide gridlines', 'View'],
     ['sort', 'Sort', 'Data'], ['filter', 'Filter', 'Data'], ['pivot', 'Pivot tables', 'Data'], ['chart', 'Charts', 'Data'], ['validation', 'Data validation', 'Data'], ['names', 'Named ranges', 'Data'], ['settings', 'Spreadsheet settings', 'Data'],
     ['copy', 'Copy out', 'Clipboard and files'], ['paste', 'Paste', 'Clipboard and files'], ['download', 'Download', 'Clipboard and files'], ['import', 'Import', 'Clipboard and files'],
+    ['file.save', 'Save', 'Clipboard and files'], ['file.saveAsNewVersion', 'Save as a new version', 'Clipboard and files'], ['file.saveAsACopy', 'Save as a copy (a new file)', 'Clipboard and files'],
     ['comment.read', 'See comments', 'Comments'], ['comment.create', 'Start a comment', 'Comments'], ['comment.reply', 'Reply', 'Comments'], ['comment.edit', 'Edit own comments', 'Comments'], ['comment.delete', 'Delete own comments', 'Comments'], ['comment.moderate', 'Edit and delete anyone\'s comments', 'Comments'],
     ['access', 'Change the access policy', 'Access']
 ].map(([id, label, group]) => ({ id, label, group }));
@@ -277,7 +281,7 @@ export const UI_ITEMS = [
     ['tool.functions', 'Functions'], ['tool.clear', 'Clear formatting']
 ].map(([id, label]) => ({ id, label, group: 'Toolbar' })).concat(
     ['File', 'Edit', 'View', 'Insert', 'Format', 'Data'].map((m) => ({ id: 'menu.' + m, label: m + ' menu', group: 'Menus' })),
-    [['menu.file:import', 'File > Import'], ['menu.file:download', 'File > Download'], ['menu.file:settings', 'File > Spreadsheet settings'],
+    [['menu.file:save', 'File > Save'], ['menu.file:saveAsNewVersion', 'File > Save as new version'], ['menu.file:saveAsACopy', 'File > Save as a copy'], ['menu.file:import', 'File > Import'], ['menu.file:download', 'File > Download'], ['menu.file:settings', 'File > Spreadsheet settings'],
         ['menu.edit:find', 'Edit > Find and replace'], ['menu.edit:deleteRows', 'Edit > Delete rows'], ['menu.edit:deleteCols', 'Edit > Delete columns'],
         ['menu.view:freezeRows', 'View > Freeze rows'], ['menu.view:freezeCols', 'View > Freeze columns'], ['menu.view:group', 'View > Group'], ['menu.view:comments', 'View > Comments'],
         ['menu.view:zoom', 'View > Zoom'], ['menu.insert:rowsAbove', 'Insert > Rows'], ['menu.insert:colsLeft', 'Insert > Columns'], ['menu.insert:sheet', 'Insert > Sheet'],
@@ -313,7 +317,7 @@ export function validateAccess(rows) {
         if (action.startsWith('ui.')) {
             const id = action.slice(3);
             if (!UI_PARTS.includes(id) && id !== 'disallowed' && !UI_IDS.has(id) && !/^menu\.[a-z]+:[A-Za-z]+/.test(id)) say('there is no part of the screen "' + id + '"');
-        } else if (action !== '*' && !ACTION_IDS.has(action) && !GROUP_IDS.has(action)) say('there is no action "' + action + '"');
+        } else if (action !== '*' && !ACTION_IDS.has(action) && !GROUP_IDS.has(action.replace(/\.\*$/, ''))) say('there is no action "' + action + '"');
         if (r.where) {
             const w = parseWhere(r.where);
             if (w.range && !RANGE_TEXT.test(w.range)) say('the range "' + w.range + '" cannot be read');

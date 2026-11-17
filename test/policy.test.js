@@ -172,5 +172,22 @@ check('an action refused by no deny row keeps the sheet\'s own words', resolveAc
         [after.value('Summary', 1, 1), after.value('Summary', 2, 1), margins(after)]);
 }
 
+// ---- the three saves of the File menu: one by one, the group "file" or "file.*", a viewer who may save nothing ---------------------------------------
+{
+    const base = [{ who: '*', effect: 'allow', action: '*' }];
+    const viewer = resolveAccess(base.concat([{ who: 'role:viewer', effect: 'deny', action: 'file.*', message: 'You can only view' }]), { user: 'v', roles: ['viewer'] });
+    check('file.*: a viewer may save in none of the three ways',
+        ['file.save', 'file.saveAsNewVersion', 'file.saveAsACopy'].every((a) => !viewer.can(a)) && viewer.can('download'));
+    check('file.*: the refusal carries the message of its row', viewer.refusalFor('file.save') === 'You can only view', viewer.refusalFor('file.save'));
+    const group = resolveAccess(base.concat([{ who: '*', effect: 'deny', action: 'file' }]), 'x');
+    check('"file" names the three too', !group.can('file.save') && !group.can('file.saveAsACopy'));
+    const spv = resolveAccess(base.concat([{ who: 'role:spv', effect: 'deny', action: 'file.save' }]), { user: 's', roles: ['spv'] });
+    check('one by one: a supervisor may not overwrite, but may save a new version or a copy',
+        !spv.can('file.save') && spv.can('file.saveAsNewVersion') && spv.can('file.saveAsACopy'));
+    check('validateAccess knows the three, "file" and "file.*"',
+        validateAccess(['file.save', 'file.saveAsNewVersion', 'file.saveAsACopy', 'file', 'file.*'].map((action) => ({ who: '*', effect: 'deny', action }))).length === 0);
+    check('validateAccess still says an unknown one', validateAccess([{ who: '*', effect: 'deny', action: 'file.saveAll' }]).length === 1);
+}
+
 console.log(failures ? failures + ' FAILED' : 'ALL OK');
 process.exit(failures ? 1 : 0);

@@ -1,6 +1,6 @@
 // The public types of @kufayeka/sheet (the React part), written by hand: see core.d.ts. The build copies this file to dist/types/index.d.ts.
 import type { ForwardRefExoticComponent, RefAttributes, CSSProperties } from 'react';
-import type { Workbook, Op, Source, AccessRow, Who } from './core/index.js';
+import type { Workbook, Op, Source, AccessRow, Who, WorkbookDoc } from './core/index.js';
 
 /** The marks of the cells a person may not change (Sheet marks). */
 export interface CellMarks {
@@ -26,6 +26,14 @@ export interface SheetAccess {
     onSelect?: (index: number) => void;
     /** setup: a colour of your own for some whos (the others get one from accessColor). */
     colors?: Record<string, string>;
+}
+
+/** What onSave gets: which item was chosen, and the document to keep (wb.toJSON()). */
+export interface SheetSave {
+    /** save: overwrite this file; saveAsNewVersion: a new version of this file; saveAsACopy: a new file. Also the action: 'file.' + mode. */
+    mode: 'save' | 'saveAsNewVersion' | 'saveAsACopy';
+    doc: WorkbookDoc;
+    workbook: Workbook;
 }
 
 /** A message of the sheet (onNotice). */
@@ -101,6 +109,19 @@ export interface SheetProps {
      * True by default.
      */
     notices?: boolean;
+    /**
+     * Your app saves the file. With it the File menu has Save (also Ctrl+S), Save as new version and Save as a copy; without it they do not show.
+     * Each is an action of the access rows: file.save, file.saveAsNewVersion, file.saveAsACopy ("file" or "file.*" names the three).
+     * Return a promise: the items are greyed until it settles, a rejection shows as an error, a resolve as "Saved".
+     *
+     * onSave={async ({ mode, doc }) => { if (mode === 'saveAsACopy') await saveNew(folderId, doc); else ... }}
+     */
+    onSave?: (save: SheetSave) => unknown;
+    /**
+     * What a cell the person may not read (deny read) holds in File > Download (.xlsx and .csv): "-" by default, "" for an empty cell.
+     * A cell they may not see (deny see) is always empty, and a formula that reads either goes out as its answer only, without the formula.
+     */
+    downloadMask?: string;
     onCellError?: (event: { address: string; field?: string; value: unknown; expected: string }) => void;
     /** Called when the selection changes. A mouse drag calls it once, when the mouse is let go; a click, the arrow keys and select() call it at once. */
     onSelectionChange?: (selection: SheetSelection) => void;

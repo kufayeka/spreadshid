@@ -1,8 +1,8 @@
 // Excel and CSV, in and out. Pure (no DOM): bytes and text in, bytes and text out; the grid's File menu puts them in a download or reads them from a file.
 //
 //   exportXlsx(wb)              the workbook as an .xlsx file: values, formulas (as they read now), number formats, fonts, colours, fills, alignment,
-//                               borders, widths, heights, hidden rows and columns, merged cells, frozen panes, hidden sheets. A cell the host's rules
-//                               hide from this person is left out: what cannot be seen cannot be downloaded.
+//                               borders, widths, heights, hidden rows and columns, merged cells, frozen panes, hidden sheets. What the access rows
+//                               keep from this person is not in the file (see "What a download keeps back" below).
 //   importXlsx(bytes)           a new workbook from an .xlsx file, and what was left out (warnings)
 //   importXlsxInto(wb, bytes)   the sheets of a file added to a workbook (one change: one undo takes them all away)
 //   exportCsv(wb, s)            one sheet as CSV: the text every cell shows
@@ -11,7 +11,7 @@
 import { createWorkbook } from '../workbook.js';
 import { newId } from '../ids.js';
 import { keysBetween, keyBetween } from '../order.js';
-import { isStoredFormula } from '../refs.js';
+import { isStoredFormula, resolveRef } from '../refs.js';
 import { isError } from '../formula/xlvalue.js';
 import { currencySymbol, localeInfo } from '../format.js';
 import { buildXlsxFiles, cssToArgb } from './write.js';
@@ -61,17 +61,67 @@ export function codeOfFormat(f, settings) {
 }
 
 // one cell of a sheet as the writer takes it
-function cellModel(wb, s, r, c, settings) {
+// ---- What a download keeps back ----------------------------------------------------------------------------------------------------------------
+//
+// A downloaded file leaves the sheet for good: whatever is in it can be read by anyone who gets the file, in Excel, in a text editor, or by
+// unzipping it. So a download holds exactly what the person sees on the screen, never more:
+//   - a cell they may not read (deny read, shown as dots) holds the mask text ("-" unless the host chose another), as a plain text: there is
+//     something here, it is not for you. An empty cell would read as "there is nothing", which is a different, wrong statement;
+//   - a cell they may not even see (deny see, shown empty) is empty in the file too;
+//   - neither keeps its formula, and the comments on them are not written as notes;
+//   - a formula that reads one of those cells goes out as its answer only (the total they see on the screen), without the formula: Excel would
+//     work a formula out again from the masked cells and show a wrong number, and the formula itself tells which cells the total was made of;
+//   - rows and columns keep their places, so every other formula in the file still points at the right cells.
+// Excel's own "hidden" rows and columns are not used to keep anything back: anyone can unhide them.
+
+/** The cells of the workbook this person may not read ('hidden') or see ('invisible'), and a test for the formulas that read one of them. */
+function keptBack(wb) {
+    const modes = new Map();
+    const bySheet = new Map(); // sheet -> Map(col -> rows), to find whether a formula's range reaches a kept-back cell
+    for (const s of wb.sheetIds()) {
+        const byCol = new Map();
+        wb.forEachFilledRow(s, (r, cells) => {
+            for (const cid of Object.keys(cells)) {
+                const c = wb.colIndex(s, cid);
+                if (c < 0) continue;
+                const m = wb.modeAt(s, r, c);
+                if (!m || (m.mode !== 'hidden' && m.mode !== 'invisible')) continue;
+                modes.set(s + '|' + r + '|' + c, m.mode);
+                if (!byCol.has(c)) byCol.set(c, []);
+                byCol.get(c).push(r);
+            }
+        });
+        bySheet.set(s, byCol);
+    }
+    const reaches = (rect) => {
+        const byCol = bySheet.get(rect.s);
+        if (!byCol) return false;
+        for (const [c, rows] of byCol) if (c >= rect.c1 && c <= rect.c2 && rows.some((r) => r >= rect.r1 && r <= rect.r2)) return true;
+        return false;
+    };
+    // a formula whose ranges reach a kept-back cell: its answer goes out, not the formula
+    const readsKeptBack = (s, r, c) => {
+        if (!modes.size) return false;
+        const raw = wb.raw(s, r, c);
+        if (!isStoredFormula(raw)) return false;
+        return raw.refs.some((ref) => { const rect = resolveRef(ref, s, wb._grid); return rect && reaches(rect); });
+    };
+    return { modeOf: (s, r, c) => modes.get(s + '|' + r + '|' + c) || null, readsKeptBack };
+}
+
+function cellModel(wb, s, r, c, settings, kept, mask) {
     const raw = wb.raw(s, r, c);
     const style = wb.style(s, r, c) || {};
     const fmt = wb.cellFormat(s, r, c);
-    const m = wb.modeAt(s, r, c);
-    // what this person may not see is not written: a hidden cell goes out empty (its style stays, so the file looks the same)
-    const hidden = m && m.mode === 'hidden';
-    const value = hidden ? null : wb.value(s, r, c);
+    const mode = kept.modeOf(s, r, c);
+    const hasContent = raw !== null && raw !== undefined && raw !== '';
+    // what this person may not read goes out as the mask text, what they may not see as nothing (see "What a download keeps back"); the style
+    // stays, so the file looks like the sheet
+    const value = mode === 'invisible' ? null : mode === 'hidden' ? (hasContent && mask !== '' ? mask : null) : wb.value(s, r, c);
     const out = { r, c };
-    if (!hidden && isStoredFormula(raw)) out.formula = wb.input(s, r, c);
+    if (!mode && isStoredFormula(raw) && !kept.readsKeptBack(s, r, c)) out.formula = wb.input(s, r, c);
     if (value === null || value === undefined || value === '') out.kind = null;
+    else if (mode === 'hidden') { out.kind = 's'; out.v = String(value); }
     else if (isError(value)) { out.kind = 'e'; out.v = value.code; }
     else if (typeof value === 'number') { out.kind = 'n'; out.v = value; }
     else if (typeof value === 'boolean') { out.kind = 'b'; out.v = value; }
@@ -92,12 +142,15 @@ function cellModel(wb, s, r, c, settings) {
 }
 
 /**
- * The workbook as the bytes of an .xlsx file.
+ * The workbook as the bytes of an .xlsx file, holding only what the person sees (see "What a download keeps back").
  * @param {ReturnType<typeof createWorkbook>} wb
+ * @param {{ mask?: string }} [options]  mask: what a cell the person may not read holds in the file ("-" by default; "" leaves it empty).
  * @returns {Uint8Array}
  */
-export function exportXlsx(wb) {
+export function exportXlsx(wb, options) {
     const settings = wb.settings();
+    const mask = options && typeof options.mask === 'string' ? options.mask : '-';
+    const kept = keptBack(wb);
     const ids = wb.sheetIds();
     // the name a sheet has in the file (Excel takes a sheet name of 31 characters at most, without \ / ? * [ ] :)
     const fileName = (s) => String(wb.sheetProps(s).name || 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet1';
@@ -121,7 +174,7 @@ export function exportXlsx(wb) {
             for (const cid of seen) {
                 const c = wb.colIndex(s, cid);
                 if (c < 0) continue;
-                const cell = cellModel(wb, s, r, c, settings);
+                const cell = cellModel(wb, s, r, c, settings, kept, mask);
                 if (cell) cells.push(cell);
             }
         });
@@ -139,7 +192,8 @@ export function exportXlsx(wb) {
             conditionals: wb.conditionals(s).map((rule) => toExcelRule(rule, conditionalRects(wb, s, rule), rule.op === 'formula' ? conditionalFormulaText(wb, s, rule).slice(1) : '')).filter(Boolean),
             validations: (props.validations || []).map((rule) => ({ rule, rect: ruleRect(wb, s, rule) })).filter((x) => x.rect),
             // every thread, as one note on its cell
-            notes: wb.comments(s).filter((t) => t.at && t.items.length).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) })),
+            // (not on a cell kept back from this person)
+            notes: wb.comments(s).filter((t) => t.at && t.items.length && !kept.modeOf(s, t.at.r, t.at.c)).map((t) => ({ r: t.at.r, c: t.at.c, author: t.items[0].by ? t.items[0].by.name : '', text: noteText(t) })),
             // the charts, each naming the cells of its series in the file (a chart whose data is gone is left out), and the sparklines
             charts: wb.charts(s).filter((c) => c.at).map((c) => {
                 const model = wb.chartData(s, c.id);
@@ -379,17 +433,22 @@ function addFinishedSheets(wb, ready, how, names) {
 
 // ---- CSV ------------------------------------------------------------------------------------------------------------------------------------------
 
-/** One sheet as CSV: the text each cell shows, up to the last row and column that hold anything. */
+/**
+ * One sheet as CSV: the text each cell shows, up to the last row and column that hold anything. A cell the person may not read holds the mask
+ * text ("-" by default), one they may not see nothing, as in an .xlsx (see "What a download keeps back").
+ */
 export function exportCsv(wb, s, options) {
     const sep = (options && options.delimiter) || ',';
+    const mask = options && typeof options.mask === 'string' ? options.mask : '-';
     const last = wb.lastFilled(s);
     const lines = [];
     for (let r = 0; r <= last.r; r++) {
         const fields = [];
         for (let c = 0; c <= last.c; c++) {
-            // a cell this person may not see goes out empty, as in an .xlsx (its dots are for the screen)
             const m = wb.modeAt(s, r, c);
-            const t = m && m.mode === 'hidden' ? '' : wb.display(s, r, c).text;
+            const raw = wb.raw(s, r, c);
+            const filled = raw !== null && raw !== undefined && raw !== '';
+            const t = m && m.mode === 'invisible' ? '' : m && m.mode === 'hidden' ? (filled ? mask : '') : wb.display(s, r, c).text;
             fields.push(/["\r\n]/.test(t) || t.includes(sep) ? '"' + t.replace(/"/g, '""') + '"' : t);
         }
         lines.push(fields.join(sep));

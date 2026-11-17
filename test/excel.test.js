@@ -68,8 +68,37 @@ const serial = (y, m, d) => dateToSerial(new Date(Date.UTC(y, m - 1, d)));
     wb.setRules([{ columns: ['Cost'], mode: 'hidden' }]);
     const { workbook: back } = await importXlsx(exportXlsx(wb));
     const b = back.sheetIds()[0];
-    assert.deepStrictEqual([back.value(b, 0, 1), back.value(b, 1, 1)], ['Cost', null], 'the hidden cost is not in the file (its header is)');
-    ok('a cell the rules hide from this person is not in the file they download');
+    assert.deepStrictEqual([back.value(b, 0, 1), back.value(b, 1, 1)], ['Cost', '-'], 'the hidden cost is not in the file, a "-" stands in its place (its header is there)');
+    const { workbook: empty } = await importXlsx(exportXlsx(wb, { mask: '' }));
+    assert.strictEqual(empty.value(empty.sheetIds()[0], 1, 1), null, 'mask "" leaves it empty');
+    ok('a cell the rules hide from this person is not in the file they download: "-" by default, the host\'s own mask when it gives one');
+}
+
+// ---- the access rows: deny read is masked, deny see is empty, a formula reading either goes out as its answer only -------------------------------
+{
+    const wb = createWorkbook();
+    const [s] = wb.sheetIds();
+    wb.setValues(s, 0, 0, [['Item', 'Qty', 'Price', 'Margin', 'Total', 'Twice qty'], ['Pile', 2, 400, 0.3, null, null]]);
+    wb.setValues(s, 1, 4, '=B2*C2');
+    wb.setValues(s, 1, 5, '=B2*2');
+    wb.addComment(s, 1, 2, 'cost from supplier X', { source: 'user' });
+    wb.setAccess([
+        { who: '*', effect: 'allow', action: '*' },
+        { who: '*', effect: 'deny', action: 'read', where: 'C2' },
+        { who: '*', effect: 'deny', action: 'see', where: 'D2' }
+    ], 'rina');
+    const { workbook: back } = await importXlsx(exportXlsx(wb));
+    const b = back.sheetIds()[0];
+    assert.strictEqual(back.value(b, 1, 2), '-', 'deny read: "-" in the file');
+    assert.strictEqual(back.value(b, 1, 3), null, 'deny see: empty in the file, as on the screen');
+    assert.strictEqual(back.value(b, 1, 4), 800, 'a total that reads the hidden price goes out as the total the person sees');
+    assert.ok(!String(back.input(b, 1, 4)).startsWith('='), 'without its formula: Excel would work it out again from "-", and the formula tells what it was made of');
+    assert.strictEqual(back.input(b, 1, 5), '=B2*2', 'a formula that reads nothing hidden keeps its formula');
+    assert.strictEqual(back.comments(b).length, 0, 'the comment on the hidden cell is not written as a note');
+    const csv = exportCsv(wb, s).split('\r\n')[1];
+    assert.strictEqual(csv, 'Pile,2,-,,800,4', 'the CSV keeps back the same: "-" for deny read, empty for deny see');
+    assert.strictEqual(exportCsv(wb, s, { mask: '***' }).split('\r\n')[1], 'Pile,2,***,,800,4', 'and takes the host\'s mask');
+    ok('a download holds what the person sees: deny read masked, deny see empty, totals over them as answers, their comments left out');
 }
 
 // ---- a package as Excel writes it -----------------------------------------------------------------------------------------------------------------
