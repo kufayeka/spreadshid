@@ -1036,6 +1036,131 @@ Kalau orang itu sama sekali tidak boleh mengunduh, tolak aksi `download`.
 
 Ini berlaku untuk file yang dibuat di browser. Kalau workbook dibuka lewat `viewFor` di server ([bagian 6](#6-penegakan-keamanan-di-server-viewfor--checkpatch)), data rahasia memang tidak pernah sampai ke browser, sehingga file yang diunduh pun tidak mungkin memuatnya.
 
+### 5.19 Akun Sungguhan: Id `uuid`, Role sebagai Grup
+
+Contoh-contoh sebelumnya memakai id pendek seperti `'rina'` agar mudah dibaca. Di aplikasi sungguhan, id akun biasanya `uuid`, dan setiap akun punya **role** (`ADMINISTRATOR`, `GUDANG`, ...). Petanya ke sheet:
+
+| Di aplikasi | Di sheet |
+|---|---|
+| `id` akun (`uuid`) | `setWho({ who: id })`, baris `user:<uuid>` |
+| `role` akun | grup: baris `group:<ROLE>` |
+| Daftar akun beserta role-nya | `setPeople({ users, groups })`, dengan `groups` = akun per role |
+| Nama lengkap, username, foto | `users` di `setPeople`, hanya untuk tampilan |
+
+Sheet butuh tiga jawaban dari server:
+
+| Route | Isi | Dioper ke |
+|---|---|---|
+| `GET /auth/me` | akun yang sedang login: `{ id, role, ... }` | `id` saja ke `setWho` / `access.who` |
+| `GET /accounts/directory` | `{ users: [{ id, name, username, photoUrl }], groups: { ROLE: [id, ...] } }` | `setPeople` / prop `people` |
+| `GET /sheet/:id` | `{ content, access, version }` | `content` ke `createWorkbook`, `access` ke `setAccess` / `access.rows` |
+
+Contoh di bawah memakai tiga akun. Budi ber-role `GUDANG`, Ani `ADMINISTRATOR`, dan Citra `KEUANGAN`, role yang tidak disebut aturan mana pun:
+
+<!-- contoh: 13-38-akun.ts -->
+```ts
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { AccessRow, People } from '@kufayeka/sheet/core';
+import { buatStok } from './data/stok-akses.js';
+
+// 13.38 Akun sungguhan: id akun berupa uuid, role akun menjadi grup. Tiga jawaban server yang dipakai sheet, ditulis di sini apa adanya.
+
+// GET /auth/me: siapa yang sedang login (dari sesi/token aplikasimu)
+const BUDI = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+const ANI = '7c1f0a2e-4b3d-4a91-8e22-5f6d7a8b9c01';
+const CITRA = 'b2d4e6f8-1a3c-4e5f-9a7b-0c2d4e6f8a1b';
+
+// GET /accounts/directory: semua akun, dalam bentuk yang diterima setPeople().
+// users = kamus untuk tampilan, groups = akun per role (dibangun server dari kolom role tabel akun)
+const people: People = {
+    users: [
+        { id: ANI, name: 'Ani Wijaya', username: 'ani', photoUrl: '/foto/ani.jpg' },
+        { id: BUDI, name: 'Budi Santoso', username: 'budi', photoUrl: '/foto/budi.jpg' },
+        { id: CITRA, name: 'Citra Lestari', username: 'citra', photoUrl: null }
+    ],
+    groups: { ADMINISTRATOR: [ANI], GUDANG: [BUDI], KEUANGAN: [CITRA] }
+};
+
+// GET /sheet/:id -> access: SEMUA baris akses workbook ini (bukan hanya milik pemanggil)
+const access: AccessRow[] = [
+    { who: 'group:GUDANG', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:GUDANG', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'group:GUDANG', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:ADMINISTRATOR', effect: 'allow', action: '*' }
+];
+
+// Yang dilakukan FE setelah ketiga jawaban itu datang. Satu workbook per orang di sini, agar ketiganya bisa dibandingkan.
+const content = buatStok().toJSON();                 // = jawaban GET /sheet/:id -> content
+for (const me of [BUDI, ANI, CITRA]) {
+    const wb = createWorkbook(content);
+    wb.setPeople(people);
+    wb.setWho({ who: me });                          // hanya id akun, tidak pernah role-nya
+    wb.setAccess(access);
+    const mode = (a: string) => (wb.modeAt('Produk', a) || { mode: 'edit' }).mode;
+    console.log(wb.label(me).padEnd(22), '| grup:', wb.access().roles.join(',').padEnd(13),
+        '| Stok G2:', mode('G2').padEnd(9), '| Harga beli E2:', mode('E2').padEnd(9), '| tambah sheet:', wb.can('sheets.add'));
+}
+
+// Yang tersimpan (baris akses, penulis komentar) tetap uuid; yang tampil di layar dicari di kamus
+const wb = createWorkbook(content);
+wb.setPeople(people);
+console.log('');
+console.log('user:' + BUDI, '->', wb.label(BUDI));
+console.log('akun yang sudah dihapus ->', wb.label('0f0f0f0f-0000-4000-8000-000000000000'));
+```
+<!-- /contoh -->
+
+<!-- hasil: 13-38-akun.ts -->
+```text
+Budi Santoso - budi    | grup: GUDANG        | Stok G2: edit      | Harga beli E2: hidden    | tambah sheet: false
+Ani Wijaya - ani       | grup: ADMINISTRATOR | Stok G2: edit      | Harga beli E2: edit      | tambah sheet: true
+Citra Lestari - citra  | grup: KEUANGAN      | Stok G2: invisible | Harga beli E2: invisible | tambah sheet: false
+
+user:3fa85f64-5717-4562-b3fc-2c963f66afa6 -> Budi Santoso - budi
+akun yang sudah dihapus -> 0f0f0f0f-0000-4000-8000-000000000000
+```
+<!-- /hasil -->
+
+Budi boleh mengubah Stok tetapi Harga beli tersensor (`hidden`, tampil `•••`). Ani, lewat `group:ADMINISTRATOR` + `*`, boleh semuanya. Citra tidak disebut aturan mana pun, jadi ia tidak diberi apa-apa (`invisible`). Ia **tidak** mendapat semuanya, karena workbook ini punya aturan.
+
+Di React, ketiga jawaban itu langsung dioper ke `<Sheet>`:
+
+```tsx
+import { useEffect, useState } from 'react';
+import { Sheet } from '@kufayeka/sheet';
+import { createWorkbook } from '@kufayeka/sheet/core';
+import type { AccessRow, People, Workbook } from '@kufayeka/sheet/core';
+
+export function LembarKerja({ fileId }: { fileId: string }) {
+    const [me, setMe] = useState<string | null>(null);
+    const [people, setPeople] = useState<People>();
+    const [rows, setRows] = useState<AccessRow[]>([]);
+    const [wb, setWb] = useState<Workbook | null>(null);
+
+    useEffect(() => {
+        const get = (url: string) => fetch(url, { credentials: 'include' }).then((r) => r.json());
+        Promise.all([get('/auth/me'), get('/accounts/directory'), get('/sheet/' + fileId)]).then(([akun, orang, berkas]) => {
+            setMe(akun.id);                          // id akun saja; role-nya dibaca sheet dari `orang.groups`
+            setPeople(orang);
+            setRows(berkas.access);                  // SEMUA baris akses workbook ini
+            setWb(createWorkbook(berkas.content));
+        });
+    }, [fileId]);
+
+    return <Sheet workbook={wb} people={people} access={{ rows, who: me }} />;
+}
+```
+
+`workbook={null}` menampilkan kerangka loading. Sel baru muncul setelah ketiga jawaban datang, jadi tidak ada sel yang sempat tampil tanpa aturan.
+
+Beberapa hal yang menentukan:
+
+- **`who` hanya id akun, tidak pernah role-nya.** Role diambil sheet dari `groups` di daftar akun, dan server membangun `groups` dari kolom role tabel akun. Isi permintaan dari browser tidak pernah dipakai untuk itu, sehingga tidak ada yang bisa mengaku ber-role lain.
+- **`access` berisi semua baris, bukan hanya milik pemanggil.** Sheet sendiri yang memilih baris yang berlaku. Kalau server hanya mengirim baris yang menyebut pemanggil, orang seperti Citra akan menerima `[]`, dan `setAccess([])` berarti workbook *tanpa* aturan, sehingga ia malah boleh semuanya. Dengan semua baris terkirim, `[]` hanya punya satu arti: workbook memang tidak punya aturan.
+- **Yang tersimpan selalu uuid.** Baris akses, penulis komentar, dan pemilik semuanya menyimpan id. Layar menampilkan `"Nama - username"` dan foto dari `users`, sehingga akun yang berganti nama tetap satu orang. Akun yang sudah dihapus (tidak ada di daftar) tampil sebagai id-nya.
+- **Daftar akun terbuka untuk semua yang sudah login.** `GET /accounts/directory` mengembalikan *semua* akun aktif (nama, username, foto, role) kepada siapa pun yang login, karena sheet butuh nama setiap orang yang disebut aturan atau komentar. Ini wajar untuk aplikasi internal. Kalau daftar akun di aplikasimu bersifat rahasia (misalnya aplikasi multi-tenant), saring di server, misalnya hanya akun satu organisasi, atau hanya akun yang disebut di baris akses dan komentar workbook itu.
+- **Daftar aturan sendiri tidak rahasia, tetapi isi sel bisa rahasia.** Baris akses boleh dikirim utuh. Yang tidak boleh sampai ke browser adalah *isi* sel yang ditutup. Untuk itu server menyaring `content` dengan `viewFor(content, { access, who, people })` sebelum mengirim, dan memeriksa simpanan dengan `checkPatch` ([bagian 6](#6-penegakan-keamanan-di-server-viewfor--checkpatch)).
+
 ---
 
 ## 6. Mode Desain & Pembuatan Aturan Interaktif
