@@ -16,7 +16,7 @@ const bare = (x) => (x && typeof x === 'object' && typeof x.f === 'string' ? { f
  * The stored workbook with a patch put on it (the shape pendingPatch() gives): sheets, columns and rows written whole by id, deleted ones taken out.
  * @param {import('./workbook.js').WorkbookDoc} doc
  * @param {ReturnType<ReturnType<typeof createWorkbook>['pendingPatch']>} patch
- * @param {{ access?: object[], who?: any, rules?: object[] }} [what]  The policy and the person (as viewFor takes them): the cells they were not given
+ * @param {{ access?: object[], who?: string, people?: { users?: object[], groups?: object }, rules?: object[] }} [what]  The policy and the person (as viewFor takes them): the cells they were not given
  *   are kept as stored (their browser had them empty, or as answers), whatever the patch says of them.
  */
 export function mergePatch(doc, patch, what) {
@@ -70,7 +70,7 @@ function withFreshPivots(doc) {
  *
  * @param {import('./workbook.js').WorkbookDoc} doc  The workbook as it is stored now.
  * @param {object} patch
- * @param {{ rules?: object[], types?: Object<string, object>, access?: object[], who?: any }} what  The rules (as setRules takes them), the types per sheet
+ * @param {{ rules?: object[], types?: Object<string, object>, access?: object[], who?: string, people?: { users?: object[], groups?: object } }} what  The rules (as setRules takes them), the types per sheet
  *   name or id (as setTypes), and the access policy with the person who saves (policy.js): what they may not do is a problem too.
  */
 export function checkPatch(doc, patch, what) {
@@ -138,11 +138,15 @@ export function checkPatch(doc, patch, what) {
 
 // ---- access control on the server -------------------------------------------------------------------------------------------------------------------
 
-// a workbook of the stored doc, with the host's rules and the policy for this person
+// A workbook of the stored doc, with the host's rules and the policy for this person. The three doors of workbook.js, in the order they are given
+// here: who is asking (`who`, the bare id of the account), the people the host knows of (`people`, whose `groups` decide the group rows), and the
+// policy itself (`access`). No access rows, or an empty list, means the workbook has no policy and everything is allowed.
 function workbookFor(doc, what) {
     const wb = createWorkbook(doc);
     if (what && what.rules) wb.setRules(what.rules);
-    if (what && what.access !== undefined) wb.setAccess(what.access, what.who);
+    if (what && what.who !== undefined) wb.setWho({ who: what.who });
+    if (what && what.people !== undefined) wb.setPeople(what.people);
+    if (what && what.access !== undefined) wb.setAccess(what.access);
     return wb;
 }
 
@@ -246,7 +250,7 @@ const hiddenBySheet = new Map();
  * The workbook as a person may have it (what the server sends them): the hidden and invisible cells' content left out, and a formula that reads one of
  * them given as its answer. The host's rules and the policy (policy.js) decide, as the browser does; nothing the person may not see leaves the server.
  * @param {import('./workbook.js').WorkbookDoc} doc
- * @param {{ access?: object[], who?: any, rules?: object[] }} what
+ * @param {{ access?: object[], who?: string, people?: { users?: object[], groups?: object }, rules?: object[] }} what
  */
 export function viewFor(doc, what) {
     const wb = workbookFor(doc, what);
@@ -324,7 +328,8 @@ function sortedRows(doc, patch) {
 // the policy. Writing cells is the rules' to judge (per cell); a sort is let through as a sort.
 function refusedActions(doc, patch, wb, who) {
     const out = [];
-    const me = who && typeof who === 'object' ? who.user : typeof who === 'string' ? who.replace(/^user:/, '') : null;
+    // who is the id of the account, as setWho takes it; the workbook itself is the one that knows the rest
+    const me = who === undefined || who === null || who === '' ? null : String(who);
     const ask = (op, sheet) => { for (const a of actionsOfOp(op, me)) if (a !== 'edit' && !wb.can(a)) out.push({ sheet, address: null, reason: wb.refusal(a) }); };
     const storedSheets = new Map((doc.sheets || []).map((s) => [s.id, s]));
     const storedRows = new Map(), storedCols = new Map();

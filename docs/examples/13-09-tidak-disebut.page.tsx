@@ -5,14 +5,16 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.9 Yang tidak disebut, tidak didapat. Aturannya sekarang hanya untuk kolom A sampai D.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }, { id: 'tamu', name: 'Tamu' }], groups: { kasir: ['rina'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D13' }     // baru: A-D saja
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D13' }     // baru: A-D saja
 ];
 
 // baru: pilihan "Lihat sebagai", untuk membandingkan dua orang
 const ORANG: Record<string, Who> = {
-    rina: { user: 'rina', roles: ['kasir'] },
-    tamu: { user: 'tamu' }                                   // tanpa role
+    rina: 'rina',
+    tamu: 'tamu'                                   // tanpa role
 };
 
 export default function Halaman() {
@@ -24,7 +26,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );

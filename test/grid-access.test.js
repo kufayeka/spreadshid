@@ -17,28 +17,31 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     const cellAt = (r, c) => q(`(function(){ var h = document.querySelector('.ks-colhead[data-c="${c}"]'), v = document.querySelector('.ks-rowhead[data-r="${r}"]'); var a = h.getBoundingClientRect(), b = v.getBoundingClientRect(); return { x: Math.round(a.left + a.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
     const clickCell = async (r, c) => { const p = await cellAt(r, c); await click(p.x, p.y); await wait(150); };
     const notice = () => q('(function(){ var n = document.querySelector(".ks-notice"); return n ? n.textContent : null; })()');
-    const setAccess = (rows, who) => q(`${W}.setAccess(${JSON.stringify(rows)}, ${JSON.stringify(who)})`).then(() => wait(300));
+    // Who is here, the people the host knows of, and the rows: three doors of the workbook (setWho / setPeople / setAccess). The test says the
+    // groups the way a host does — a list of ids per group — and the workbook finds the person in them itself.
+    const PEOPLE = { users: [{ id: 'yeka', name: 'Yeka' }, { id: 'budi', name: 'Budi' }, { id: 'ani', name: 'Ani' }, { id: 'someone', name: 'Someone' }, { id: 'client', name: 'Client' }], groups: { mandor: ['budi'], viewer: ['someone'], client: ['client'] } };
+    const setAccess = (rows, who) => q(`(function(){ var w = ${W}; w.setPeople(${JSON.stringify(PEOPLE)}); w.setWho({ who: ${JSON.stringify(who)} }); w.setAccess(${JSON.stringify(rows)}); })()`).then(() => wait(300));
     const has = (sel) => q(`!!document.querySelector(${JSON.stringify(sel)})`);
     // the example's own rules (rates read only, approved lines locked, cost hidden) are the host's: they stay under the access rows
     const ROWS = [
         { who: 'user:yeka', effect: 'allow', action: '*' },
         // a mandor reads the sheet, writes the quantities, may bold, sees only A1:E20 and no menu bar or toolbar
-        { who: 'role:mandor', effect: 'allow', action: 'read' },
-        { who: 'role:mandor', effect: 'allow', action: 'edit', where: 'B2:B20' },
-        { who: 'role:mandor', effect: 'allow', action: 'format.bold' },
-        { who: 'role:mandor', effect: 'allow', action: 'view.area', where: 'A1:E20' },
-        { who: 'role:mandor', effect: 'deny', action: 'ui.menubar' },
-        { who: 'role:mandor', effect: 'deny', action: 'ui.toolbar' },
+        { who: 'group:mandor', effect: 'allow', action: 'read' },
+        { who: 'group:mandor', effect: 'allow', action: 'edit', where: 'B2:B20' },
+        { who: 'group:mandor', effect: 'allow', action: 'format.bold' },
+        { who: 'group:mandor', effect: 'allow', action: 'view.area', where: 'A1:E20' },
+        { who: 'group:mandor', effect: 'deny', action: 'ui.menubar' },
+        { who: 'group:mandor', effect: 'deny', action: 'ui.toolbar' },
         // ani types anywhere and may bold
         { who: 'user:ani', effect: 'allow', action: 'edit' },
         { who: 'user:ani', effect: 'allow', action: 'format.bold' },
         // a viewer reads, without row numbers, column letters or grid lines
-        { who: 'role:viewer', effect: 'allow', action: 'read' },
-        { who: 'role:viewer', effect: 'deny', action: 'ui.headers' },
-        { who: 'role:viewer', effect: 'deny', action: 'ui.gridlines' }
+        { who: 'group:viewer', effect: 'allow', action: 'read' },
+        { who: 'group:viewer', effect: 'deny', action: 'ui.headers' },
+        { who: 'group:viewer', effect: 'deny', action: 'ui.gridlines' }
     ];
 
-    await setAccess(ROWS, { user: 'budi', roles: ['mandor'] });
+    await setAccess(ROWS, 'budi');
     check('a mandor: no menu bar, no toolbar, the formula bar stays', !(await has('.ks-menubar')) && !(await has('.ks-toolbar')) && (await has('.ks-formulabar')));
     check('only the area A1:E20: column F has no width', (await q('Math.round(document.querySelector(\'.ks-colhead[data-c="5"]\') ? document.querySelector(\'.ks-colhead[data-c="5"]\').getBoundingClientRect().width : 0)')) === 0);
     await clickCell(1, 1);
@@ -65,7 +68,7 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     await key('Escape', 'Escape', 27);
     await wait(150);
 
-    await setAccess(ROWS, { user: 'someone', roles: ['viewer'] });
+    await setAccess(ROWS, 'someone');
     check('a viewer: no row numbers, no column letters', (await q('Array.from(document.querySelectorAll(".ks-rowhead")).every(function(h){ return h.getBoundingClientRect().width === 0; })')) && (await q('Array.from(document.querySelectorAll(".ks-colhead")).every(function(h){ return h.getBoundingClientRect().height === 0; })')));
     check('and no grid lines', !(await has('.ks-line-h')));
     const a1 = await q('(function(){ var c = document.querySelector(\'.ks-cell[data-r="0"][data-c="0"]\').getBoundingClientRect(), g = document.querySelector(".ks-grid").getBoundingClientRect(); return [Math.round(c.left - g.left), Math.round(c.top - g.top)]; })()');
@@ -74,16 +77,16 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     // a client: only the Summary sheet, an area of it, what it may not do hidden (not greyed), some parts hidden by their id
     await q(`${W}.addSheet('Summary')`);
     await setAccess([
-        { who: 'role:client', effect: 'allow', action: 'read' },
-        { who: 'role:client', effect: 'allow', action: 'format.bold' },
-        { who: 'role:client', effect: 'allow', action: 'view.sheet', where: 'Summary' },
-        { who: 'role:client', effect: 'allow', action: 'view.area', where: 'Summary!A1:C10' },
-        { who: 'role:client', effect: 'deny', action: 'ui.disallowed' },
-        { who: 'role:client', effect: 'deny', action: 'ui.menu.Insert' },
-        { who: 'role:client', effect: 'deny', action: 'ui.tool.paint' },
-        { who: 'role:client', effect: 'deny', action: 'ui.feature.contextMenu' },
-        { who: 'role:client', effect: 'deny', action: 'ui.feature.fillHandle' }
-    ], { user: 'client', roles: ['client'] });
+        { who: 'group:client', effect: 'allow', action: 'read' },
+        { who: 'group:client', effect: 'allow', action: 'format.bold' },
+        { who: 'group:client', effect: 'allow', action: 'view.sheet', where: 'Summary' },
+        { who: 'group:client', effect: 'allow', action: 'view.area', where: 'Summary!A1:C10' },
+        { who: 'group:client', effect: 'deny', action: 'ui.disallowed' },
+        { who: 'group:client', effect: 'deny', action: 'ui.menu.Insert' },
+        { who: 'group:client', effect: 'deny', action: 'ui.tool.paint' },
+        { who: 'group:client', effect: 'deny', action: 'ui.feature.contextMenu' },
+        { who: 'group:client', effect: 'deny', action: 'ui.feature.fillHandle' }
+    ], 'client');
     check('only the Summary tab, and Summary is shown', (await q('Array.from(document.querySelectorAll(".ks-tab")).map(function(t){ return t.textContent; }).join(",")')) === 'Summary');
     check('its area: column D has no width', (await q('Math.round(document.querySelector(\'.ks-colhead[data-c="3"]\') ? document.querySelector(\'.ks-colhead[data-c="3"]\').getBoundingClientRect().width : 0)')) === 0);
     check('no Insert menu', !(await q('Array.from(document.querySelectorAll(".ks-menubar-item")).some(function(x){ return x.textContent === "Insert"; })')));

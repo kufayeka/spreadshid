@@ -7,8 +7,8 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.26 Pesan penolakan ditampilkan di luar sheet, dengan kata-kata aplikasimu sendiri. Pesan bawaan sheet dimatikan.
 const ATURAN: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 
 export default function PesanSendiri() {
@@ -29,7 +29,7 @@ export default function PesanSendiri() {
             <div style={{ padding: '8px 12px', background: pesan ? '#fce8e6' : '#f1f3f4', color: pesan ? '#c5221f' : '#5f6368' }}>
                 {pesan ?? 'Klik sel lalu ketik. Hanya kolom Stok yang bisa diubah.'}
             </div>
-            <Sheet workbook={wb} style={{ flex: 1 }} onNotice={padaPesan} access={{ rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} style={{ flex: 1 }} onNotice={padaPesan} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows: ATURAN, who: 'rina' }} />
         </div>
     );
 }

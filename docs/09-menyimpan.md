@@ -950,17 +950,17 @@ Saat membangun **sistem template spreadsheet** (memiliki styling bawaan, pre-rum
 - **Bentuk data**: Array of objects (`src/core/policy.js:5-36`):
   ```json
   [
-    { "who": "role:estimator", "effect": "allow", "action": "read", "where": "RAB!A1:F100" },
-    { "who": "role:estimator", "effect": "allow", "action": "edit", "where": "RAB!col:Qty", "when": "=$G2<>\"Approved\"", "message": "Sudah disetujui" },
-    { "who": "role:estimator", "effect": "deny",  "action": "read", "where": "RAB!col:HPP Rahasia" },
-    { "who": "role:estimator", "effect": "deny",  "action": "ui.toolbar" }
+    { "who": "group:estimator", "effect": "allow", "action": "read", "where": "RAB!A1:F100" },
+    { "who": "group:estimator", "effect": "allow", "action": "edit", "where": "RAB!col:Qty", "when": "=$G2<>\"Approved\"", "message": "Sudah disetujui" },
+    { "who": "group:estimator", "effect": "deny",  "action": "read", "where": "RAB!col:HPP Rahasia" },
+    { "who": "group:estimator", "effect": "deny",  "action": "ui.toolbar" }
   ]
   ```
-  - `who`: `'*'` | `'role:<nama>'` | `'<id user>'` (atau `'user:<id>'`, sama saja) (spesifisitas: `user` > `role` > `'*'`; di level sama, `deny` mengalahkan `allow`).
+  - `who`: `'*'` | `'group:<nama>'` | `'<id user>'` (atau `'user:<id>'`, sama saja) (spesifisitas: `user` > `group` > `'*'`; di level sama, `deny` mengalahkan `allow`).
 - **Store**: Simpan di kolom `JSONB` `access` atau tabel relasional `workbook_access` (di-copy dari template saat dokumen dibuat).
 - **Load & Pasang**:
-  - **Server**: Oper ke `viewFor(doc, { access, who })` saat `GET` — `viewFor()` tidak hanya menghapus sel rahasia, tapi juga **membekukan rumus yang membacanya menjadi nilai mati** agar rahasia tidak bisa direkayasa balik! Saat `PATCH`, `mergePatch()` otomatis mempertahankan sel `hidden`/`invisible` di DB agar tidak tertimpa `null` dari client.
-  - **Client**: `wb.setAccess(accessRows, who)` (argumen pertama **array** `AccessRow[]` langsung) atau via `<Sheet workbook={wb} access={{ rows: accessRows, who }} />`.
+  - **Server**: Oper ke `viewFor(doc, { access, who, people })` saat `GET` — `viewFor()` tidak hanya menghapus sel rahasia, tapi juga **membekukan rumus yang membacanya menjadi nilai mati** agar rahasia tidak bisa direkayasa balik! Saat `PATCH`, `mergePatch()` otomatis mempertahankan sel `hidden`/`invisible` di DB agar tidak tertimpa `null` dari client.
+  - **Client**: `wb.setWho({ who })`, `wb.setPeople(people)` dan `wb.setAccess(accessRows)` (argumennya **array** `AccessRow[]` langsung) atau via `<Sheet workbook={wb} access={{ rows: accessRows, who }} people={people} />`.
 
 <!-- contoh: 12-viewfor.js -->
 ```js
@@ -1077,9 +1077,9 @@ function buatPaketTemplate() {
         doc: wb.toJSON(),
         // access, rules, dan types TIDAK masuk ke wb.toJSON() -> disimpan di kolom/tabel terpisah
         access: [
-            { who: 'role:estimator', effect: 'allow', action: 'read', where: 'RAB!A1:F3' },
-            { who: 'role:estimator', effect: 'allow', action: 'edit', where: 'RAB!C2:D2' },
-            { who: 'role:estimator', effect: 'deny', action: 'read', where: 'RAB!col:HPP Rahasia' },
+            { who: 'group:estimator', effect: 'allow', action: 'read', where: 'RAB!A1:F3' },
+            { who: 'group:estimator', effect: 'allow', action: 'edit', where: 'RAB!C2:D2' },
+            { who: 'group:estimator', effect: 'deny', action: 'read', where: 'RAB!col:HPP Rahasia' },
         ],
         types: { RAB: { headerRow: 1, fields: { Qty: { kind: 'int' } } } },
     };
@@ -1096,12 +1096,15 @@ let dbRow = {
 };
 
 // 3. LOAD DARI API (GET /api/workbooks/rab-proyek-42) -> sensor kolom rahasia via viewFor()
-const user = { user: 'andi', roles: ['estimator'] };
-const payloadUntukClient = viewFor(dbRow.doc, { access: dbRow.access, who: user });
+const user = 'andi';                                                       // id akun, bukan objek: grupnya dibaca dari `people`
+const people = { users: [{ id: 'andi', name: 'Andi Pratama', username: 'andi' }], groups: { estimator: ['andi'] } };
+const payloadUntukClient = viewFor(dbRow.doc, { access: dbRow.access, who: user, people });
 
 // Client membuka workbook + memasang access & types yang dikirim API
 const clientWb = createWorkbook(payloadUntukClient);
-clientWb.setAccess(dbRow.access, user);
+clientWb.setPeople(people);
+clientWb.setWho({ who: user });
+clientWb.setAccess(dbRow.access);
 clientWb.setTypes('RAB', dbRow.types.RAB);
 console.log('Client melihat HPP Rahasia (F2):', JSON.stringify(clientWb.value('RAB', 'F2')));
 
@@ -1126,7 +1129,7 @@ console.log('HPP Rahasia di DB tetap aman (F2):', createWorkbook(dbRow.doc).valu
 <!-- hasil: 09-02-template-api-db.js -->
 ```text
 Client melihat HPP Rahasia (F2): null
-Total baru di DB (E2): 6000000 | versi: 2
+Total baru di DB (E2): 5000000 | versi: 2
 HPP Rahasia di DB tetap aman (F2): 400000
 ```
 <!-- /hasil -->
@@ -1517,7 +1520,7 @@ Satu modul kecil yang bisa dipakai di halaman mana pun. Login aplikasi memberi `
 // Satu modul kecil yang dipakai halaman mana pun: simpan pertama, simpan versi berikutnya, buka, dan periksa apakah orang lain sudah
 // menyimpan versi yang lebih baru. Route-nya adalah route template File service (Studio > Settings > Files > pasang route).
 import { createWorkbook } from '@kufayeka/sheet/core';
-import type { Workbook, WorkbookDoc, AccessRow, Who } from '@kufayeka/sheet/core';
+import type { Workbook, WorkbookDoc, AccessRow, Who, People } from '@kufayeka/sheet/core';
 
 /** Alamat project API Maker dan token orang yang sedang masuk (dari halaman login aplikasi Anda). */
 export interface Server {
@@ -1600,14 +1603,18 @@ export async function fileInfo(server: Server, fileId: string): Promise<FileInfo
  * jadi diambil tanpa token dan dipakai apa adanya (mengubah v= di dalamnya membuat tanda tangannya tidak cocok).
  * `access`: aturan akses dan orang yang membuka, kalau workbook ini memakai hak akses (lihat batasannya di 9.7.6).
  */
-export async function open(server: Server, fileId: string, options?: { version?: number; access?: { rows: AccessRow[]; who: Who } }): Promise<OpenedFile> {
+export async function open(server: Server, fileId: string, options?: { version?: number; access?: { rows: AccessRow[]; who: Who }; people?: People }): Promise<OpenedFile> {
     const info = await fileInfo(server, fileId);
     const wanted = options && options.version !== undefined ? info.versions.find((v) => v.version === options.version) : null;
     const url = wanted ? wanted.viewUrl : info.viewUrl;
     if (!url) throw new Error('File service: versi ini tidak bisa dibuka');
     const doc = await answerOf<WorkbookDoc>(await fetch(server.api + url));
     const workbook = createWorkbook(doc);                                   // bentuk toJSON() persis bentuk yang diterima createWorkbook()
-    if (options && options.access) workbook.setAccess(options.access.rows, options.access.who);
+    if (options && options.access) {
+        workbook.setWho({ who: options.access.who });                      // siapa yang membuka: id akun saja
+        if (options.people) workbook.setPeople(options.people);            // kamus nama/foto + keanggotaan grup
+        workbook.setAccess(options.access.rows);                           // aturannya sendiri
+    }
     workbook.saved();
     return { workbook, fileId: info.id, name: info.name, version: wanted ? wanted.version : info.currentVersion };
 }

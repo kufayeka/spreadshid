@@ -25,13 +25,13 @@ await withExample(async ({ js, click, mouse, wait }) => {
     await wait(200);
     check('the dragged range comes to the host as an address', (await text('.range-terpilih')) === 'Produk!C2:C5', await text('.range-terpilih'));
 
-    await pick('.pilih-peran', 'role:kasir');
+    await pick('.pilih-peran', 'group:kasir');
     await pick('.pilih-mode', 'hidden');
     const add = await js('(function(){ var e = document.querySelector(".tambah-aturan").getBoundingClientRect(); return { x: e.left + 5, y: e.top + 5 }; })()');
     await click(add.x, add.y);
     await wait(200);
     const last = await js('Array.from(document.querySelectorAll(".daftar-aturan tbody tr")).pop().textContent');
-    check('the rule is a new row of the table: role:kasir deny read Produk!C2:C5', last.startsWith('role:kasirdenyreadProduk!C2:C5'), last);
+    check('the rule is a new row of the table: group:kasir deny read Produk!C2:C5', last.startsWith('group:kasirdenyreadProduk!C2:C5'), last);
     await wait(300);
 
     // the rules editor (setup): a square per who in the corner of each cell a rule touches, the selected rule outlined

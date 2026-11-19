@@ -1,6 +1,6 @@
 // The public types of @kufayeka/sheet (the React part), written by hand: see core.d.ts. The build copies this file to dist/types/index.d.ts.
 import type { ForwardRefExoticComponent, RefAttributes, CSSProperties } from 'react';
-import type { Workbook, Op, Source, AccessRow, Who, WorkbookDoc } from './core/index.js';
+import type { Workbook, Op, Source, AccessRow, Who, People, WorkbookDoc } from './core/index.js';
 
 /** The marks of the cells a person may not change (Sheet marks). */
 export interface CellMarks {
@@ -17,7 +17,8 @@ export interface CellMarks {
 /** The access of a Sheet: the rows, the person, and the rules editor. */
 export interface SheetAccess {
     rows: AccessRow[] | null;
-    who: Who;
+    /** The id of the account that has it open. Which groups that person is in comes from `people`, never from here. */
+    who?: Who;
     /** 'live' (default): the sheet as this person works in it. 'setup': the rules editor, each cell showing a coloured square per who with a rule there. */
     view?: 'live' | 'setup';
     /** setup: the index of the selected row, outlined in the sheet in its who's colour. */
@@ -129,6 +130,11 @@ export interface SheetProps {
     fileName?: string;
     /** The access rows and the person who opens (chapter 13). With view 'setup' the sheet is the rules editor. */
     access?: SheetAccess;
+    /**
+     * The people the host knows of: `{ users: [{ id, name, username, photoUrl }], groups: { FINANCE: [id, id] } }`. `users` is the dictionary the
+     * screen reads, `groups` the membership that decides whether a "group:FINANCE" row is this person's. Without it every id shows as itself.
+     */
+    people?: People;
     user?: { id: string; name: string };
     /** How the card of a cell's comments opens: 'hover' (default) shows it while the mouse is on a marked cell, a click keeps it; 'click': on a click only. */
     comments?: { open?: 'hover' | 'click' };

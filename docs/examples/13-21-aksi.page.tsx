@@ -6,17 +6,17 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.21 Aksi lain: satu aksi (sort), satu kelompok (format = semua format.*), dan pengecualian di dalam kelompok (bold).
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'sort' },             // baru: satu aksi
-    { who: 'role:kasir', effect: 'allow', action: 'format' },           // baru: satu kelompok
-    { who: 'role:kasir', effect: 'deny', action: 'format.bold' }        // baru: kecuali tebal
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'sort' },             // baru: satu aksi
+    { who: 'group:kasir', effect: 'allow', action: 'format' },           // baru: satu kelompok
+    { who: 'group:kasir', effect: 'deny', action: 'format.bold' }        // baru: kecuali tebal
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }

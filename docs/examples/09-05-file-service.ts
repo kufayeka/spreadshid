@@ -2,7 +2,7 @@
 // Satu modul kecil yang dipakai halaman mana pun: simpan pertama, simpan versi berikutnya, buka, dan periksa apakah orang lain sudah
 // menyimpan versi yang lebih baru. Route-nya adalah route template File service (Studio > Settings > Files > pasang route).
 import { createWorkbook } from '@kufayeka/sheet/core';
-import type { Workbook, WorkbookDoc, AccessRow, Who } from '@kufayeka/sheet/core';
+import type { Workbook, WorkbookDoc, AccessRow, Who, People } from '@kufayeka/sheet/core';
 
 /** Alamat project API Maker dan token orang yang sedang masuk (dari halaman login aplikasi Anda). */
 export interface Server {
@@ -85,14 +85,18 @@ export async function fileInfo(server: Server, fileId: string): Promise<FileInfo
  * jadi diambil tanpa token dan dipakai apa adanya (mengubah v= di dalamnya membuat tanda tangannya tidak cocok).
  * `access`: aturan akses dan orang yang membuka, kalau workbook ini memakai hak akses (lihat batasannya di 9.7.6).
  */
-export async function open(server: Server, fileId: string, options?: { version?: number; access?: { rows: AccessRow[]; who: Who } }): Promise<OpenedFile> {
+export async function open(server: Server, fileId: string, options?: { version?: number; access?: { rows: AccessRow[]; who: Who }; people?: People }): Promise<OpenedFile> {
     const info = await fileInfo(server, fileId);
     const wanted = options && options.version !== undefined ? info.versions.find((v) => v.version === options.version) : null;
     const url = wanted ? wanted.viewUrl : info.viewUrl;
     if (!url) throw new Error('File service: versi ini tidak bisa dibuka');
     const doc = await answerOf<WorkbookDoc>(await fetch(server.api + url));
     const workbook = createWorkbook(doc);                                   // bentuk toJSON() persis bentuk yang diterima createWorkbook()
-    if (options && options.access) workbook.setAccess(options.access.rows, options.access.who);
+    if (options && options.access) {
+        workbook.setWho({ who: options.access.who });                      // siapa yang membuka: id akun saja
+        if (options.people) workbook.setPeople(options.people);            // kamus nama/foto + keanggotaan grup
+        workbook.setAccess(options.access.rows);                           // aturannya sendiri
+    }
     workbook.saved();
     return { workbook, fileId: info.id, name: info.name, version: wanted ? wanted.version : info.currentVersion };
 }

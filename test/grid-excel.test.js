@@ -51,7 +51,7 @@ try {
         const b = back.sheetIds()[0];
         const shown = await q(`[${W}.value(${W}.sheetIds()[0], 1, 0), ${W}.value(${W}.sheetIds()[0], 1, 1), ${W}.value(${W}.sheetIds()[0], 1, 2)]`);
         check('the file holds what the sheet holds', JSON.stringify([back.value(b, 1, 0), back.value(b, 1, 1), back.value(b, 1, 2)]) === JSON.stringify(shown), [back.value(b, 1, 0), shown]);
-        check('but not the cost this person may not see (only its header)', back.value(b, 0, 5) === 'Cost' && back.value(b, 1, 5) === null, back.value(b, 1, 5));
+        check('but not the cost this person may not see (its header, and "-" in place of the value)', back.value(b, 0, 5) === 'Cost' && back.value(b, 1, 5) === '-', back.value(b, 1, 5));
 
         await menubar('File');
         await menuPick('Download');
@@ -59,7 +59,7 @@ try {
         await wait(300);
         const csvName = (await q('window.__saved.slice()'))[1];
         const csvText = await q('new TextDecoder("utf-8", { ignoreBOM: true }).decode(new Uint8Array(window.__savedBytes))');
-        check('this sheet as CSV, named after it, the hidden cost empty (not its dots)', /^Spreadsheet - .+\.csv$/.test(csvName) && csvText.charCodeAt(0) === 0xfeff && csvText.split('\r\n')[0].indexOf('Cost') > 0 && csvText.split('\r\n')[1].split(',')[5] === '',[csvName, csvText.slice(0, 60)]);
+        check('this sheet as CSV, named after it, the hidden cost "-" (not its dots)', /^Spreadsheet - .+\.csv$/.test(csvName) && csvText.charCodeAt(0) === 0xfeff && csvText.split('\r\n')[0].indexOf('Cost') > 0 && csvText.split('\r\n')[1].split(',')[5] === '-',[csvName, csvText.slice(0, 60)]);
 
         // File > Import… opens the file picker (the input), and the person picks the .xlsx
         await q('(function(){ window.__picked = 0; var real = HTMLInputElement.prototype.click; HTMLInputElement.prototype.click = function(){ if (this.type === "file") { window.__picked++; return; } return real.call(this); }; })()');

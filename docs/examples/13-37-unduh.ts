@@ -12,10 +12,12 @@ p.setValues('J3', '=F3-E3');
 
 const rows: AccessRow[] = [
     { who: '*', effect: 'allow', action: '*' },
-    { who: 'role:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
-    { who: 'role:viewer', effect: 'deny', action: 'see', where: 'Produk!col:Status' }
+    { who: 'group:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:viewer', effect: 'deny', action: 'see', where: 'Produk!col:Status' }
 ];
-wb.setAccess(rows, { user: 'budi', roles: ['viewer'] });
+wb.setPeople({ users: [{ id: 'budi', name: 'BUDI' }], groups: { viewer: ['budi'] } });
+wb.setWho({ who: 'budi' });
+wb.setAccess(rows);
 
 // CSV: tiga baris pertama
 console.log(exportCsv(wb, 'Produk').split('\r\n').slice(0, 3).join('\n'));

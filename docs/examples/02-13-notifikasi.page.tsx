@@ -11,8 +11,8 @@ import { buatProduk } from './data/produk.js';
 // Kasir boleh mengubah stok, tetapi harga hanya boleh diubah manajer, dan kasir tidak boleh membuat sheet baru.
 const ATURAN: AccessRow[] = [
     { who: '*', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'deny', action: 'edit', where: 'Produk!C2:C4', message: 'Harga hanya bisa diubah oleh manajer' },
-    { who: 'role:kasir', effect: 'deny', action: 'sheets.add', message: 'Sheet baru hanya dibuat oleh manajer' }
+    { who: 'group:kasir', effect: 'deny', action: 'edit', where: 'Produk!C2:C4', message: 'Harga hanya bisa diubah oleh manajer' },
+    { who: 'group:kasir', effect: 'deny', action: 'sheets.add', message: 'Sheet baru hanya dibuat oleh manajer' }
 ];
 
 type Toast = { id: number; kind: SheetNotice['kind']; text: string };
@@ -41,7 +41,8 @@ export default function Halaman() {
         <div data-siap style={{ height: 300, position: 'relative' }}>
             <Sheet
                 workbook={wb}
-                access={{ rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }}
+                people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }}
+                access={{ rows: ATURAN, who: 'rina' }}
                 notices={false}                                                     // baru: popup bawaan mati
                 onNotice={padaPesan}                                                // baru: semua pesan ke sini
             />

@@ -2,15 +2,19 @@
 // sheet for the person who opens it. The same rows, and the same code, decide on the server (viewFor, checkPatch): the browser is never trusted with
 // what a person may not see or do. Pure (no DOM).
 //
-//   who          effect  action          where             when                message
-//   role:kasir   allow   read            Stok!A1:F100
-//   role:kasir   allow   edit            Stok!col:Qty      =$G2<>"Approved"    Already approved
-//   role:kasir   deny    read            Stok!F2:F100                          (shows •••)
-//   role:kasir   deny    format.bold
-//   role:kasir   allow   view.area       Stok!A1:F20                           (only this part of the sheet shows)
-//   role:kasir   deny    ui.toolbar
-//   user:budi    allow   edit            Stok!col:Price                        (budi, a kasir, gets what kasir does not)
-//   user:yeka    allow   *                                                     (the owner)
+//   who           effect  action          where             when                message
+//   group:kasir   allow   read            Stok!A1:F100
+//   group:kasir   allow   edit            Stok!col:Qty      =$G2<>"Approved"    Already approved
+//   group:kasir   deny    read            Stok!F2:F100                          (shows •••)
+//   group:kasir   deny    format.bold
+//   group:kasir   allow   view.area       Stok!A1:F20                           (only this part of the sheet shows)
+//   group:kasir   deny    ui.toolbar
+//   user:budi     allow   edit            Stok!col:Price                        (budi, in the kasir group, gets what the group does not)
+//   user:yeka     allow   *                                                     (the owner)
+//
+// A who names an id, never a name a person reads: "user:" and the id of the account, "group:" and the id of the group. Which groups someone is in
+// is not said here and is not said by the host either: the workbook is given the groups (setPeople) and finds the person in them itself. The names
+// and the faces behind those ids are a dictionary of their own, for the screen alone (setPeople again), and nothing here reads it.
 //
 // How a question is decided ("may this person do this action, here?"):
 //   1. only the rows for this person count: their user, their roles, and '*' (everyone);
@@ -52,19 +56,19 @@ function whoTexts(who) {
 }
 
 // The user a row's who names: "user:rina", or a bare "rina" (a who without a prefix is a user, as a host naturally writes the id of a person and
-// passes the same id as who), or null for a role, everyone, or nothing.
+// passes the same id as who), or null for a group, everyone, or nothing.
 function userOfWho(w) {
     if (w.startsWith('user:')) return w.slice(5);
-    if (w === '*' || w === '' || w.startsWith('role:')) return null;
+    if (w === '*' || w === '' || w.startsWith('group:')) return null;
     return w;
 }
 
-/** How specific a row is for this person: 3 their user, 2 one of their roles, 1 everyone, 0 not for them. */
+/** How specific a row is for this person: 3 their user, 2 one of their groups, 1 everyone, 0 not for them. */
 function levelFor(row, person) {
     const w = String(row.who || '').trim();
     if (w === '*') return 1;
     if (person.user !== null && userOfWho(w) === String(person.user)) return 3;
-    if (w.startsWith('role:') && person.roles.includes(w.slice(5))) return 2;
+    if (w.startsWith('group:') && person.roles.includes(w.slice(6))) return 2;
     return 0;
 }
 
@@ -311,7 +315,7 @@ export function validateAccess(rows) {
         const say = (problem) => out.push({ row, problem });
         if (!r || typeof r !== 'object') { say('a row is an object'); return; }
         const who = String(r.who || '').trim();
-        if (!who || who === 'user:' || who === 'role:') say('who is a user ("rina" or "user:rina"), a role ("role:kasir") or everyone ("*")');
+        if (!who || who === 'user:' || who === 'group:') say('who is a user ("user:<id>"), a group ("group:<id>") or everyone ("*")');
         if (r.effect !== 'allow' && r.effect !== 'deny') say('effect is "allow" or "deny"');
         const action = String(r.action || '').trim();
         if (action.startsWith('ui.')) {

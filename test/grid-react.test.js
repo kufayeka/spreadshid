@@ -78,7 +78,7 @@ await withExample(async ({ js, click, wait }) => {
     await pressIn(js, click, wait, '.tambah');
     const after = Number(await js('document.querySelector(".total").textContent'));
     check('step 3: the button outside the sheet adds a bag of cement, and the total outside the sheet follows', after === before + 72000, [before, after]);
-}, '../docs/examples/11-langkah3.page.js');
+}, '../test/pages/11-langkah3.page.js');
 await withExample(async ({ js, click, type, key, wait }) => {
     for (let i = 0; i < 60 && !(await js('!!document.querySelector(".ks-sheet")')); i++) await wait(250);
     await wait(300);
@@ -89,7 +89,7 @@ await withExample(async ({ js, click, type, key, wait }) => {
     await pressIn(js, click, wait, '.simpan');
     await wait(400);
     check('step 5: Save sends the patch and the button says saved', (await js('document.querySelector(".simpan").textContent')) === 'Tersimpan');
-}, '../docs/examples/11-langkah5.page.js');
+}, '../test/pages/11-langkah5.page.js');
 
 console.log(failures ? '\n' + failures + ' FAILED' : '\nALL OK');
 process.exit(failures ? 1 : 0);

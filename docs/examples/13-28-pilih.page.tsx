@@ -8,9 +8,9 @@ import { buatStok } from './data/stok-akses.js';
 // 13.28 Memilih aturan. Daftar aturan di samping sheet; yang dipilih bergaris di sheet, dan kotak di sheet bisa diklik.
 const ATURAN: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 
 export default function PilihAturan() {
@@ -19,7 +19,8 @@ export default function PilihAturan() {
     return (
         <div style={{ display: 'flex', height: 420, font: '13px system-ui' }}>
             <Sheet workbook={wb} style={{ flex: 1 }}
-                access={{ rows: ATURAN, who: { user: 'yeka' }, view: 'setup',
+                people={{ users: [{ id: 'yeka', name: 'Yeka Kufa' }], groups: {  } }}
+                access={{ rows: ATURAN, who: 'yeka', view: 'setup',
                           selected: dipilih,                                        // baru: bergaris di sheet
                           onSelect: setDipilih }} />                                {/* baru: klik kotak di sheet */}
             <ul className="daftar" style={{ width: 330, margin: 0, padding: 10, listStyle: 'none', borderLeft: '1px solid #dadce0' }}>

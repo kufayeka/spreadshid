@@ -141,7 +141,8 @@ Modul entry-point utama untuk integrasi antarmuka spreadsheet pada aplikasi Reac
 
 | Simbol / Ekspor | Kategori | Deskripsi & Fungsi | Rujukan |
 |---|---|---|---|
-| `<Sheet />` | React Component | Komponen spreadsheet lengkap (virtualized grid canvas, formula bar, toolbar, sheet tabs, keyboard shortcuts, themes). | [Bab 03](03-komponen-sheet.md) |
+| `Sheet` (`<Sheet />`) | React Component | Komponen spreadsheet lengkap (virtualized grid canvas, formula bar, toolbar, sheet tabs, keyboard shortcuts, themes). | [Bab 03](03-komponen-sheet.md) |
+| `SheetLoading` | React Component | Kerangka loading yang ditampilkan `<Sheet>` saat `workbook={null}` / `loading`; bisa dipakai sendiri. | [Bab 03](03-komponen-sheet.md) |
 | `useWorkbook<T>` | React Hook | Custom hook reaktif tersinkronisasi event `tick` workbook dengan selektor komputasi. | [Bab 02](02-konsep.md), [Bab 09](09-menyimpan.md) |
 | `VERSION` | Konstanta | Versi rilis pustaka `@kufayeka/sheet`. | - |
 
@@ -178,6 +179,7 @@ Engine headless tanpa dependensi DOM browser. Berjalan pada Node.js, Deno, Bun, 
 | `findAll`, `replaceIn` | Search | Utilitas pencarian teks/regex pada sheet dan operasi find-and-replace terisolasi. | [Bab 07](07-data.md#77-pencarian-dan-penggantian-teks-find--replace) |
 | `tableOf` | Ingestion/Ekstraksi | Mengekstrak range sel tabular menjadi array of records JavaScript `{ headers, records }`. | [Bab 04](04-api-workbook.md#44-ekstraksi-data-terstruktur-tableof), [Bab 07](07-data.md) |
 | `pivot`, `PIVOT_FUNCTIONS` | Analisis Data | Engine agregasi pivot table multidimensi headless murni berbasis memori. | [Bab 07](07-data.md#76-analisis-multidimensi-pivot-table) |
+| `PIVOT_VALUE_OPS`, `PIVOT_LABEL_OPS`, `PIVOT_SHOW`, `PIVOT_DATE_GROUPS`, `parseCalculated` | Analisis Data | Daftar pilihan filter nilai/label, *Show Values As*, pengelompokan tanggal, dan parser *calculated field* pivot. | [Bab 14](14-pivot.md) |
 | `chartSeries`, `CHART_TYPES`, `CHART_DEFAULTS` | Visualisasi | Parser struktur range ke seri chart dan metadata spesifikasi konfigurasi visual grafis. | [Bab 12](12-dashboard.md) |
 | `CHART_FIELDS`, `SPARKLINE_FIELDS`, `CHART_NODES` | Visualisasi | Skema properti konfigurasi visual chart terapung dan mini sparkline in-cell. | [Bab 12](12-dashboard.md) |
 | `populate` | Ingestion | Menuliskan array of objects JSON ke dalam sheet secara terstruktur dan efisien. | [Bab 04](04-api-workbook.md#45-ingestion-data-dinamis-populate) |
@@ -220,12 +222,25 @@ Method global yang diekspos langsung pada instansi root `Workbook` (`wb`):
 | `unsaved()` | `() => boolean` | Memeriksa apakah terdapat mutasi pending yang belum tersinkronisasi. |
 | `version()` | `() => number` | Mengambil nomor versi skema dokumen internal workbook. |
 | `setRules(rules)` | `(rules: CellRule[]) => void` | Mengonfigurasi proteksi sel statis untuk pengguna saat ini. |
-| `setAccess(acl)` | `(acl: AccessRow[]) => void` | Memasang tabel Access Control List (ACL) dinamis untuk tata kelola RBAC/ABAC. |
+| `setAccess(rows)` | `(rows: AccessRow[] \| null) => void` | Memasang aturan akses (ACL). Hanya satu argumen: daftar baris. Tidak dipanggil, `null`, atau `[]` = workbook **tanpa** kebijakan akses (semua boleh). Dengan baris terpasang, orang yang tidak disebut baris mana pun tidak mendapat apa-apa. |
+| `setWho({ who })` | `(who: { who?: string \| null } \| string \| null) => void` | Siapa yang membuka: **id akun telanjang** saja. Kosong = bukan siapa-siapa (baris `user:`/`group:` tidak berlaku baginya). |
+| `setPeople(people)` | `(people: People \| null) => void` | Kamus orang `{ users: [{ id, name, username, photoUrl }], groups: { FINANCE: [id, ...] } }`. `users` untuk tampilan (komentar, kartu), `groups` menentukan baris `group:<id>` mana yang milik orang ini. Tidak disimpan, tidak masuk undo. |
+| `who()` | `() => string \| null` | Id orang yang sedang membuka (dari `setWho`). |
+| `person(id)` / `label(id)` | `(id) => Person & { label?, known }` / `(id) => string` | Cara sebuah id ditampilkan: `"name - username"`, nama saja, atau id itu sendiri bila tidak ada di kamus. |
+| `people()` | `() => People` | Kamus orang seperti yang diberikan ke `setPeople`. |
 | `access()` | `() => AccessInfo` | Mengambil evaluasi izin efektif pengguna yang sedang aktif pada workbook. |
 | `can(action, target?)` | `(action: Action, target?: string) => boolean` | Evaluasi boolean apakah pengguna aktif memiliki izin melakukan aksi tertentu. |
 | `shows(uiItem)` | `(uiItem: UiItem) => boolean` | Evaluasi boolean apakah komponen antarmuka tertentu diizinkan tampil. |
-| `setUser(user)` / `user()` | `(user?: User) => User` | Mengatur atau membaca identitas konteks pengguna aktif saat ini. |
+| `setUser(user)` / `user()` | `(user?: User) => User` | Identitas penanda tangan komentar untuk host **tanpa** sistem akun. Bila `setWho` dipakai, penulis komentar diambil dari id itu (namanya dari `setPeople`). |
 | `id()` | `() => string` | Mengambil identitas ID unik dokumen workbook. |
+
+---
+
+### Indeks Lengkap Fungsi `Workbook`
+
+Semua fungsi yang dimiliki instansi `createWorkbook()`, sesuai urutan di kode:
+
+`id`, `version`, `revision`, `rowAxis`, `colAxis`, `merges`, `mergeCells`, `unmergeCells`, `setAutoHeights`, `forEachFilledRow`, `rowContent`, `setRules`, `setTypes`, `modeAt`, `typeAt`, `setAccess`, `setWho`, `setPeople`, `access`, `can`, `who`, `person`, `label`, `people`, `refusal`, `shows`, `sheetShown`, `addValidation`, `setValidation`, `removeValidation`, `validationAt`, `choicesAt`, `invalidAt`, `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups`, `createFilter`, `removeFilter`, `setFilterColumn`, `filterOf`, `filteredOut`, `filterValues`, `dataRegion`, `addComment`, `replyComment`, `editComment`, `deleteComment`, `mayChangeComment`, `commentAt`, `comments`, `hasComment`, `setUser`, `user`, `addPivot`, `setPivot`, `removePivot`, `pivots`, `pivotAt`, `addChart`, `setChart`, `removeChart`, `charts`, `chartData`, `addSparkline`, `setSparkline`, `removeSparkline`, `sparklines`, `addName`, `setName`, `removeName`, `names`, `nameRange`, `nameProblem`, `addConditional`, `setConditional`, `removeConditional`, `moveConditional`, `conditionalStyleAt`, `shownStyle`, `conditionals`, `sheetIds`, `sheetProps`, `sheetIdByName`, `size`, `rowId`, `colId`, `rowIndex`, `colIndex`, `rowProps`, `colProps`, `settings`, `raw`, `value`, `input`, `style`, `display`, `cellFormat`, `address`, `toJSON`, `apply`, `undo`, `redo`, `canUndo`, `canRedo`, `setValues`, `clear`, `setStyle`, `setBlock`, `lastFilled`, `insertRows`, `deleteRows`, `insertCols`, `deleteCols`, `moveRows`, `moveCols`, `setRowProps`, `setColProps`, `setSheetProps`, `setSettings`, `addSheet`, `removeSheet`, `moveSheet`, `duplicateSheet`, `hideSheet`, `tick`, `pendingPatch`, `saved`, `unsaved`, `on`, `sheet`.
 
 ---
 
@@ -288,6 +303,12 @@ Method yang dieksekusi melalui controller sheet spesifik (`const sh = wb.sheet('
 
 ---
 
+### Indeks Lengkap Fungsi Sheet Handle (`wb.sheet(...)`)
+
+`id`, `name`, `raw`, `value`, `input`, `display`, `style`, `cellFormat`, `modeAt`, `typeAt`, `validationAt`, `choicesAt`, `invalidAt`, `commentAt`, `hasComment`, `conditionalStyleAt`, `shownStyle`, `setValues`, `addComment`, `filteredOut`, `pivotAt`, `setStyle`, `clear`, `mergeCells`, `unmergeCells`, `createFilter`, `addValidation`, `setValidation`, `removeValidation`, `addConditional`, `setConditional`, `setRowProps`, `setColProps`, `insertRows`, `deleteRows`, `insertCols`, `deleteCols`, `moveRows`, `moveCols`, `rowContent`, `rowProps`, `colProps`, `rowId`, `colId`, `rowIndex`, `colIndex`, `size`, `sheetProps`, `setSheetProps`, `merges`, `lastFilled`, `forEachFilledRow`, `setBlock`, `rowAxis`, `colAxis`, `setTypes`, `groupRows`, `ungroupRows`, `groupCols`, `ungroupCols`, `foldRowGroup`, `foldColGroup`, `showRowLevel`, `showColLevel`, `rowGroups`, `colGroups`, `removeFilter`, `setFilterColumn`, `filterOf`, `filterValues`, `dataRegion`, `conditionals`, `removeConditional`, `moveConditional`, `replyComment`, `editComment`, `deleteComment`, `mayChangeComment`, `comments`, `hideSheet`, `removeSheet`, `duplicateSheet`, `moveSheet`, `sheetShown`, `addPivot`, `setPivot`, `removePivot`, `pivots`, `addChart`, `setChart`, `removeChart`, `charts`, `chartData`, `addSparkline`, `setSparkline`, `removeSparkline`, `sparklines`.
+
+---
+
 ## 13.8 Indeks Spesifikasi Teknis Lintas Bab
 
 Tabel panduan cepat untuk menelusuri spesifikasi teknis mendalam pada bab-bab sebelumnya:
@@ -323,7 +344,7 @@ Tabel panduan cepat untuk menelusuri spesifikasi teknis mendalam pada bab-bab se
 | `Style`, `Format`, `Borders` | Antarmuka skema visual styling, format angka, dan dekorasi garis batas sel. |
 | `Op`, `Source`, `WorkbookEvents` | Objek mutasi transaksi atomik, origin mutasi, dan kontrak event dispatcher. |
 | `WorkbookDoc`, `Patch` | Skema serialisasi penuh dokumen (`toJSON`) dan delta patch sinkronisasi. |
-| `AccessRow`, `Who`, `AccessInfo` | Kontrak definisi aturan keamanan ACL, subjek perizinan, dan status evaluasi. |
+| `AccessRow`, `AccessWho`, `Who`, `People`, `Person`, `AccessInfo` | Baris aturan ACL; `who` sebuah baris (`'*'`, `'user:<id>'`, `'group:<id>'`); `Who` = id akun (`string \| null`); kamus orang dan keanggotaan grup; status evaluasi. |
 | `ValidationSpec`, `ConditionalSpec` | Skema deklarasi aturan validasi input dan aturan pewarnaan kondisional. |
 
 ### Contoh Implementasi Lengkap (Strict Mode):

@@ -60,10 +60,12 @@ await withExample(async ({ js, click, key, wait }) => {
     // the access rows: a viewer may save in no way, a supervisor may not overwrite but may save a version or a copy
     const ROWS = [
         { who: '*', effect: 'allow', action: '*' },
-        { who: 'role:viewer', effect: 'deny', action: 'file.*', message: 'You can only view this file' },
-        { who: 'role:spv', effect: 'deny', action: 'file.save', message: 'Save a new version instead' }
+        { who: 'group:viewer', effect: 'deny', action: 'file.*', message: 'You can only view this file' },
+        { who: 'group:spv', effect: 'deny', action: 'file.save', message: 'Save a new version instead' }
     ];
-    await q(`window.__workbook.setAccess(${JSON.stringify(ROWS)}, { user: 'v', roles: ['viewer'] })`);
+    const PEOPLE = { users: [{ id: 'v', name: 'Vina' }, { id: 's', name: 'Satria' }], groups: { viewer: ['v'], spv: ['s'] } };
+    const asPerson = (id) => q(`(function(){ var w = window.__workbook; w.setPeople(${JSON.stringify(PEOPLE)}); w.setWho({ who: ${JSON.stringify(id)} }); w.setAccess(${JSON.stringify(ROWS)}); })()`);
+    await asPerson('v');
     await wait(300);
     await openFile();
     check('a viewer: the three are greyed', (await greyed('Save')) && (await greyed('Save as new version')) && (await greyed('Save as a copy')));
@@ -75,7 +77,7 @@ await withExample(async ({ js, click, key, wait }) => {
     const refused = await lastNotice();
     check('a viewer: Ctrl+S is refused with the row\'s message and nothing is saved', refused.kind === 'refused' && refused.reason === 'You can only view this file' && (await saves()).length === before, refused);
 
-    await q(`window.__workbook.setAccess(${JSON.stringify(ROWS)}, { user: 's', roles: ['spv'] })`);
+    await asPerson('s');
     await wait(300);
     await openFile();
     check('a supervisor: Save greyed, the other two not', (await greyed('Save')) && !(await greyed('Save as new version')) && !(await greyed('Save as a copy')));

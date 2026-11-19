@@ -6,16 +6,16 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.14 Tidak terlihat sama sekali: sama dengan 13.13, tapi deny see. Kolom E tampil kosong.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
-    { who: 'role:kasir', effect: 'deny', action: 'see', where: 'Produk!col:Harga beli' }    // baru: see, bukan read
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'group:kasir', effect: 'deny', action: 'see', where: 'Produk!col:Harga beli' }    // baru: see, bukan read
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }

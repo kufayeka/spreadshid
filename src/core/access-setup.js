@@ -14,7 +14,7 @@ import { parseWhere } from './policy.js';
 const PALETTE = ['#1a73e8', '#9334e6', '#e37400', '#188038', '#d01884', '#007b83', '#b06000', '#5f6368'];
 
 /**
- * The colour of a who ('role:kasir', 'user:budi', '*'), the same everywhere and on every computer: worked out from its text, so the host's own list
+ * The colour of a who ('group:FINANCE', 'user:budi', '*'), the same everywhere and on every computer: worked out from its text, so the host's own list
  * of rules can show the same colour the sheet does. `colors` gives some of them a colour of the host's own.
  * @param {string} who
  * @param {Record<string, string>} [colors]

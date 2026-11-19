@@ -9,7 +9,7 @@ import { buatStok } from './data/stok-akses.js';
 // 13.29 Membuat aturan dari range yang dipilih. Satu tambahan dari 13.28: onSelectionChange dan tombol Tambah.
 const AWAL: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
 export default function TambahAturan() {
@@ -20,14 +20,15 @@ export default function TambahAturan() {
 
     function tambah() {                                                             // baru
         if (!range) return;
-        setRows([...rows, { who: 'role:kasir', effect: 'deny', action: 'read', where: range.sheet.name + '!' + range.address }]);
+        setRows([...rows, { who: 'group:kasir', effect: 'deny', action: 'read', where: range.sheet.name + '!' + range.address }]);
         setDipilih(rows.length);                                                    // aturan baru langsung terpilih
     }
 
     return (
         <div style={{ display: 'flex', height: 420, font: '13px system-ui' }}>
             <Sheet workbook={wb} style={{ flex: 1 }} onSelectionChange={setRange}       // baru
-                access={{ rows, who: { user: 'yeka' }, view: 'setup', selected: dipilih, onSelect: setDipilih }} />
+                people={{ users: [{ id: 'yeka', name: 'Yeka Kufa' }], groups: {  } }}
+                access={{ rows, who: 'yeka', view: 'setup', selected: dipilih, onSelect: setDipilih }} />
             <div style={{ width: 330, padding: 10, borderLeft: '1px solid #dadce0' }}>
                 <p>Range: <b className="range">{range ? range.sheet.name + '!' + range.address : '-'}</b></p>
                 <button className="tambah" onClick={tambah} disabled={!range}>Sembunyikan untuk kasir</button>

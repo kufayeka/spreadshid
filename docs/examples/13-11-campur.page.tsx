@@ -6,15 +6,15 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.11 Baca semua, ubah sebagian: baca seluruh tabel, ubah kolom G (Stok) saja.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' }     // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' }     // baru
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }

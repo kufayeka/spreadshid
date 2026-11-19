@@ -5,14 +5,16 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.16 Semua orang (*): siapa pun boleh membaca kolom A sampai D, termasuk yang tidak punya role.
+const ORANG_GRUP = { users: [{ id: 'tamu', name: 'Tamu' }, { id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } };
+
 const rows: AccessRow[] = [
     { who: '*', effect: 'allow', action: 'read', where: 'Produk!A1:D13' },                  // baru
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
 const ORANG: Record<string, Who> = {
-    tamu: { user: 'tamu' },
-    rina: { user: 'rina', roles: ['kasir'] }
+    tamu: 'tamu',
+    rina: 'rina'
 };
 
 export default function Halaman() {
@@ -24,7 +26,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );

@@ -12,7 +12,7 @@ Model keamanan `@kufayeka/sheet` menganut filosofi **Default-Deny (Whitelist)**:
 
 ```text
 ┌───────────────────────────────┐     ┌───────────────────────────────┐
-│  Identitas User & Role (Who)  │     │ Aturan Akses (AccessRow[])    │
+│ Who (id) + People (grup)      │     │ Aturan Akses (AccessRow[])    │
 └───────────────┬───────────────┘     └───────────────┬───────────────┘
                 │                                     │
                 └──────────────────┬──────────────────┘
@@ -40,7 +40,7 @@ Model keamanan `@kufayeka/sheet` menganut filosofi **Default-Deny (Whitelist)**:
 ```
 
 1. **Prinsip Whitelist**: Jika suatu sel atau aksi tidak secara eksplisit diberikan izin (`allow`), maka entitas tersebut otomatis berstatus tidak dapat diakses (*inaccessible*).
-2. **Pemisahan Auth vs ACL**: Library tidak menangani session atau login. Sistem autentikasi aplikasi Anda cukup menyediakan payload identitas: `{ user: string, roles: string[] }`.
+2. **Pemisahan Auth vs ACL**: Library tidak menangani session atau login. Sistem autentikasi aplikasi Anda cukup menyediakan **id akun** orang yang membuka (`setWho({ who: 'rina' })` / `access.who`) dan daftar orang serta grupnya (`setPeople({ users, groups })` / prop `people`). Workbook sendiri yang mencocokkan id itu ke grup, jadi host tidak pernah mengirim daftar role/grup milik orang tersebut.
 3. **Isomorfik & Server-Enforced**: Aturan ACL yang sama dijalankan di browser (untuk UX antarmuka) dan dieksekusi ulang di backend Node.js (`viewFor` dan `checkPatch`) untuk menjamin keamanan dari manipulasi client.
 
 ---
@@ -81,7 +81,7 @@ Setiap baris aturan didefinisikan sebagai objek terstruktur:
 
 ```ts
 interface AccessRow {
-    who: string;           // 'rina' (user), 'role:kasir', '*' (semua orang)
+    who: string;           // 'rina' (user), 'group:kasir', '*' (semua orang)
     effect: 'allow' | 'deny';
     action: string;        // 'read', 'edit', 'format.bold', 'ui.toolbar', '*'
     where?: string;        // 'Produk!A1:I13', 'Produk!col:Stok'; kosong = global
@@ -94,10 +94,22 @@ Isi `who`:
 
 | Ditulis | Artinya | Cocok dengan `access.who` |
 |---|---|---|
-| `'rina'` | user dengan id `rina` | `'rina'`, `{ user: 'rina' }` |
-| `'user:rina'` | sama dengan `'rina'` (awalan `user:` boleh dipakai, boleh tidak) | `'rina'`, `'user:rina'`, `{ user: 'rina' }` |
-| `'role:kasir'` | semua orang yang punya role `kasir` | `{ user: '…', roles: ['kasir'] }` |
+| `'rina'` | user dengan id `rina` | `setWho({ who: 'rina' })` |
+| `'user:rina'` | sama dengan `'rina'` (awalan `user:` boleh dipakai, boleh tidak) | `setWho({ who: 'rina' })` |
+| `'group:kasir'` | semua orang yang terdaftar di grup `kasir` | `setWho({ who: 'rina' })` + `setPeople({ groups: { kasir: ['rina'] } })` |
 | `'*'` | semua orang | siapa saja |
+
+`who` yang dikirim ke workbook selalu **id akun telanjang**, tidak pernah daftar grup. Keanggotaan grup dibaca dari `setPeople`, jadi host tidak bisa memberi dirinya grup yang bukan haknya, dan hanya ada satu tempat yang tahu.
+
+Tiga pintu, masing-masing boleh tidak dipakai:
+
+| Pintu | Isi | Bila tidak dipakai |
+|---|---|---|
+| `setAccess(rows)` / `access.rows` | daftar `AccessRow[]` (satu argumen saja) | tidak dipanggil, `null`, atau `[]`: workbook **tanpa** kebijakan akses, semua boleh |
+| `setWho({ who })` / `access.who` | id akun yang membuka | bukan siapa-siapa: baris `user:`/`group:` tidak berlaku, dengan kebijakan terpasang ia tidak mendapat apa-apa |
+| `setPeople({ users, groups })` / prop `people` | kamus nama/foto (`users`) dan keanggotaan grup (`groups`) | setiap id tampil apa adanya, dan tidak ada yang masuk grup mana pun |
+
+Di server sama: `viewFor(doc, { access, who, people })`, `checkPatch(doc, patch, { access, who, people })`, `mergePatch(doc, patch, { access, who, people })`. Tanpa `people`, baris `group:` tidak akan cocok dengan siapa pun.
 
 `message` hanya ditampilkan untuk penolakan aksi milik baris itu. Baris `deny ui.menubar` dengan pesan "Menu dikunci" tidak akan muncul saat orang yang sama ditolak menambah sheet. Untuk satu pesan yang dipakai di **setiap** penolakan, tulis di baris `deny` dengan `action: '*'`.
 
@@ -142,16 +154,18 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.8 Aturan pertama: kasir boleh MEMBACA tabel produk.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
-    const rina = { user: 'rina', roles: ['kasir'] };       // dari sistem login aplikasimu
+    const rina = 'rina';       // dari sistem login aplikasimu
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: rina }} />
+            <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: rina }} />
         </div>
     );
 }
@@ -175,14 +189,16 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.9 Yang tidak disebut, tidak didapat. Aturannya sekarang hanya untuk kolom A sampai D.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }, { id: 'tamu', name: 'Tamu' }], groups: { kasir: ['rina'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D13' }     // baru: A-D saja
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D13' }     // baru: A-D saja
 ];
 
 // baru: pilihan "Lihat sebagai", untuk membandingkan dua orang
 const ORANG: Record<string, Who> = {
-    rina: { user: 'rina', roles: ['kasir'] },
-    tamu: { user: 'tamu' }                                   // tanpa role
+    rina: 'rina',
+    tamu: 'tamu'                                   // tanpa role
 };
 
 export default function Halaman() {
@@ -194,7 +210,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );
@@ -221,14 +237,14 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.10 Boleh mengubah. Ganti read dengan edit.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' }     // baru: edit
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' }     // baru: edit
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -253,15 +269,15 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.11 Baca semua, ubah sebagian: baca seluruh tabel, ubah kolom G (Stok) saja.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' }     // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' }     // baru
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -286,8 +302,8 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.12 Kolom ditulis dengan judulnya: col:Stok, bukan G2:G13. Tetap benar walaupun kolomnya bergeser.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }   // baru: judul kolom
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }   // baru: judul kolom
 ];
 
 export default function Halaman() {
@@ -298,7 +314,7 @@ export default function Halaman() {
         <div>
             <p><button className="sisipkan" onClick={sisipkan}>Sisipkan kolom di A</button></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+                <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
             </div>
         </div>
     );
@@ -325,16 +341,16 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.13 Menyembunyikan isi: harga beli (kolom E) tampil ••• untuk kasir.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }   // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }   // baru
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -359,16 +375,16 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.14 Tidak terlihat sama sekali: sama dengan 13.13, tapi deny see. Kolom E tampil kosong.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
-    { who: 'role:kasir', effect: 'deny', action: 'see', where: 'Produk!col:Harga beli' }    // baru: see, bukan read
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'group:kasir', effect: 'deny', action: 'see', where: 'Produk!col:Harga beli' }    // baru: see, bukan read
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -379,7 +395,7 @@ export default function Halaman() {
 
 ---
 
-### 5.8 Multi-Peran (Role-Based Access Control)
+### 5.8 Multi-Grup (`group:<id>`)
 
 Menetapkan izin yang berbeda untuk staf kasir dan staf gudang, serta penanganan pengguna yang memiliki banyak peran sekaligus:
 
@@ -392,16 +408,18 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.15 Role: aturan untuk semua kasir, dan satu role lagi, gudang.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }, { id: 'joko', name: 'Joko Susilo' }, { id: 'sari', name: 'Sari Utami' }], groups: { gudang: ['joko', 'sari'], kasir: ['rina', 'sari'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },        // baru
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }       // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },        // baru
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }       // baru
 ];
 
 const ORANG: Record<string, Who> = {
-    rina: { user: 'rina', roles: ['kasir'] },
-    joko: { user: 'joko', roles: ['gudang'] },
-    sari: { user: 'sari', roles: ['kasir', 'gudang'] }       // dua role sekaligus
+    rina: 'rina',
+    joko: 'joko',
+    sari: 'sari'       // dua role sekaligus
 };
 
 export default function Halaman() {
@@ -413,7 +431,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );
@@ -440,14 +458,16 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.16 Semua orang (*): siapa pun boleh membaca kolom A sampai D, termasuk yang tidak punya role.
+const ORANG_GRUP = { users: [{ id: 'tamu', name: 'Tamu' }, { id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } };
+
 const rows: AccessRow[] = [
     { who: '*', effect: 'allow', action: 'read', where: 'Produk!A1:D13' },                  // baru
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
 const ORANG: Record<string, Who> = {
-    tamu: { user: 'tamu' },
-    rina: { user: 'rina', roles: ['kasir'] }
+    tamu: 'tamu',
+    rina: 'rina'
 };
 
 export default function Halaman() {
@@ -459,7 +479,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );
@@ -472,9 +492,9 @@ export default function Halaman() {
 
 ---
 
-### 5.10 Resolusi Konflik: Prioritas Akun Pengguna vs Role
+### 5.10 Resolusi Konflik: Prioritas Akun Pengguna vs Grup
 
-Aturan spesifik akun (`user:<id>`) memiliki prioritas evaluasi lebih tinggi dibandingkan aturan level role (`role:<id>`):
+Aturan spesifik akun (`user:<id>`) memiliki prioritas evaluasi lebih tinggi dibandingkan aturan level grup (`group:<id>`):
 
 ![Hierarki evaluasi aturan](img/akses-tangga.svg)
 
@@ -487,15 +507,17 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.17 Satu akun: kasir tidak boleh melihat harga beli, kecuali budi, yang boleh mengubahnya.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }, { id: 'budi', name: 'Budi Santoso' }], groups: { kasir: ['rina', 'budi'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
     { who: 'user:budi', effect: 'allow', action: 'edit', where: 'Produk!col:Harga beli' }   // baru: budi, walaupun kasir
 ];
 
 const ORANG: Record<string, Who> = {
-    rina: { user: 'rina', roles: ['kasir'] },
-    budi: { user: 'budi', roles: ['kasir'] }
+    rina: 'rina',
+    budi: 'budi'
 };
 
 export default function Halaman() {
@@ -507,7 +529,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );
@@ -533,15 +555,17 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.18 Pemilik: satu baris user:<nama> allow * tanpa where.
+const ORANG_GRUP = { users: [{ id: 'yeka', name: 'Yeka Kufa' }, { id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['yeka', 'rina'] } };
+
 const rows: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },                                    // baru
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: '*', effect: 'deny', action: 'edit', where: 'Produk!col:Harga beli' }
 ];
 
 const ORANG: Record<string, Who> = {
-    yeka: { user: 'yeka', roles: ['kasir'] },                // pemilik, juga kasir
-    rina: { user: 'rina', roles: ['kasir'] }
+    yeka: 'yeka',                // pemilik, juga kasir
+    rina: 'rina'
 };
 
 export default function Halaman() {
@@ -558,7 +582,7 @@ export default function Halaman() {
                 {pemilik ? <button>Atur hak akses</button> : null}
             </p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );
@@ -585,9 +609,9 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.19 Aturan dengan syarat: gudang boleh mengubah stok, KECUALI di baris produk yang sudah Dihentikan (kolom I).
 const rows: AccessRow[] = [
-    { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' },
-    { who: 'role:gudang', effect: 'deny', action: 'edit', where: 'Produk!G2:G13',
+    { who: 'group:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!G2:G13' },
+    { who: 'group:gudang', effect: 'deny', action: 'edit', where: 'Produk!G2:G13',
       when: '=$I2="Dihentikan"', message: 'Produk ini sudah dihentikan' }                  // baru
 ];
 
@@ -602,7 +626,7 @@ export default function Halaman() {
     const [wb] = useState(buatStokDihentikan);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'joko', roles: ['gudang'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'joko', name: 'Joko Susilo' }], groups: { gudang: ['joko'] } }} access={{ rows, who: 'joko' }} />
         </div>
     );
 }
@@ -627,15 +651,15 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.20 Format: kasir boleh memiringkan teks, tapi tidak boleh menebalkan.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'format.italic' }                        // baru: tanpa where = di mana saja
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'format.italic' }                        // baru: tanpa where = di mana saja
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -656,17 +680,17 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.21 Aksi lain: satu aksi (sort), satu kelompok (format = semua format.*), dan pengecualian di dalam kelompok (bold).
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'sort' },             // baru: satu aksi
-    { who: 'role:kasir', effect: 'allow', action: 'format' },           // baru: satu kelompok
-    { who: 'role:kasir', effect: 'deny', action: 'format.bold' }        // baru: kecuali tebal
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'sort' },             // baru: satu aksi
+    { who: 'group:kasir', effect: 'allow', action: 'format' },           // baru: satu kelompok
+    { who: 'group:kasir', effect: 'deny', action: 'format.bold' }        // baru: kecuali tebal
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -679,7 +703,7 @@ export default function Halaman() {
 
 ### 5.14 Mengontrol Visibilitas Modul Antarmuka (`ui.*`)
 
-Menyembunyikan menu bar, toolbar, atau panel tertentu berbasis role:
+Menyembunyikan menu bar, toolbar, atau panel tertentu berbasis grup:
 
 <!-- contoh: 13-22-layar.page.tsx -->
 ```tsx
@@ -691,16 +715,16 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.22 Bagian layar: kasir bekerja tanpa toolbar dan tanpa menu Insert.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'ui.toolbar' },        // baru: satu bagian besar
-    { who: 'role:kasir', effect: 'deny', action: 'ui.menu.Insert' }     // baru: satu menu
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'ui.toolbar' },        // baru: satu bagian besar
+    { who: 'group:kasir', effect: 'deny', action: 'ui.menu.Insert' }     // baru: satu menu
 ];
 
 export default function Halaman() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -721,9 +745,9 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.23 Hanya sebagian sheet yang tampil (view.area), dan hanya sheet tertentu (view.sheet).
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'view.area', where: 'Produk!A1:D13' },  // baru
-    { who: 'role:kasir', effect: 'allow', action: 'view.sheet', where: 'Produk' }         // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'view.area', where: 'Produk!A1:D13' },  // baru
+    { who: 'group:kasir', effect: 'allow', action: 'view.sheet', where: 'Produk' }         // baru
 ];
 
 function buatDuaSheet() {
@@ -736,7 +760,7 @@ export default function Halaman() {
     const [wb] = useState(buatDuaSheet);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }
@@ -763,18 +787,20 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.25 Variasi tanda (prop marks). Aturan dan orangnya sama; hanya marks yang berbeda, satu variasi per sheet.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } };
+
 const ATURAN: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
     // hanya supaya gambarnya ringkas: tanpa menu, toolbar, formula bar, dan tab
     ...['menubar', 'toolbar', 'formulaBar', 'tabs'].map((bagian): AccessRow => ({ who: '*', effect: 'deny', action: 'ui.' + bagian }))
 ];
-const rina = { user: 'rina', roles: ['kasir'] };
+const rina = 'rina';
 
 function Contoh({ marks }: { marks?: false | CellMarks }) {
     const [wb] = useState(buatStok);
-    return <div style={{ height: 130, marginBottom: 14 }}><Sheet workbook={wb} access={{ rows: ATURAN, who: rina }} marks={marks} /></div>;
+    return <div style={{ height: 130, marginBottom: 14 }}><Sheet workbook={wb} people={ORANG_GRUP} access={{ rows: ATURAN, who: rina }} marks={marks} /></div>;
 }
 
 export default function VariasiTanda() {
@@ -814,8 +840,8 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.26 Pesan penolakan ditampilkan di luar sheet, dengan kata-kata aplikasimu sendiri. Pesan bawaan sheet dimatikan.
 const ATURAN: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 
 export default function PesanSendiri() {
@@ -836,7 +862,7 @@ export default function PesanSendiri() {
             <div style={{ padding: '8px 12px', background: pesan ? '#fce8e6' : '#f1f3f4', color: pesan ? '#c5221f' : '#5f6368' }}>
                 {pesan ?? 'Klik sel lalu ketik. Hanya kolom Stok yang bisa diubah.'}
             </div>
-            <Sheet workbook={wb} style={{ flex: 1 }} onNotice={padaPesan} access={{ rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} style={{ flex: 1 }} onNotice={padaPesan} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows: ATURAN, who: 'rina' }} />
         </div>
     );
 }
@@ -877,18 +903,20 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.36 Tombol Save di menu File, diatur per role. Admin boleh ketiganya, supervisor tidak boleh menimpa file (hanya versi baru atau salinan),
 // viewer tidak boleh menyimpan sama sekali dan tidak boleh membaca harga beli.
+const ORANG_GRUP = { users: [{ id: 'yeka', name: 'Yeka Kufa' }, { id: 'sari', name: 'Sari Utami' }, { id: 'budi', name: 'Budi Santoso' }], groups: { admin: ['yeka'], spv: ['sari'], viewer: ['budi'] } };
+
 const ATURAN: AccessRow[] = [
     { who: '*', effect: 'allow', action: '*' },
-    { who: 'role:spv', effect: 'deny', action: 'file.save', message: 'Supervisor tidak menimpa file. Pakai Save as new version.' },
-    { who: 'role:viewer', effect: 'deny', action: 'file.*', message: 'Kamu hanya bisa melihat file ini.' },
-    { who: 'role:viewer', effect: 'deny', action: 'edit' },
-    { who: 'role:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
+    { who: 'group:spv', effect: 'deny', action: 'file.save', message: 'Supervisor tidak menimpa file. Pakai Save as new version.' },
+    { who: 'group:viewer', effect: 'deny', action: 'file.*', message: 'Kamu hanya bisa melihat file ini.' },
+    { who: 'group:viewer', effect: 'deny', action: 'edit' },
+    { who: 'group:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
 ];
 
-const ORANG: Record<string, { user: string; roles: string[] }> = {
-    admin: { user: 'yeka', roles: ['admin'] },
-    spv: { user: 'sari', roles: ['spv'] },
-    viewer: { user: 'budi', roles: ['viewer'] }
+const ORANG: Record<string, string> = {
+    admin: 'yeka',
+    spv: 'sari',
+    viewer: 'budi'
 };
 
 export default function TombolSimpan() {
@@ -899,7 +927,7 @@ export default function TombolSimpan() {
     // satu fungsi untuk ketiga tombol; di aplikasi sungguhan di sinilah API dipanggil (lihat bab 9 bagian 7.8)
     async function simpan({ mode, doc }: SheetSave) {
         const kata = { save: 'menimpa file', saveAsNewVersion: 'membuat versi baru', saveAsACopy: 'membuat salinan' }[mode];
-        setCatatan(ORANG[siapa].user + ' ' + kata + ' (workbook ' + String(doc.id).slice(0, 8) + '…)');
+        setCatatan(ORANG[siapa] + ' ' + kata + ' (workbook ' + String(doc.id).slice(0, 8) + '…)');
     }
 
     return (
@@ -913,7 +941,7 @@ export default function TombolSimpan() {
                 </select>
                 <span>{catatan}</span>
             </div>
-            <Sheet workbook={wb} style={{ flex: 1 }} onSave={simpan} access={{ rows: ATURAN, who: ORANG[siapa] }} />
+            <Sheet workbook={wb} style={{ flex: 1 }} onSave={simpan} people={ORANG_GRUP} access={{ rows: ATURAN, who: ORANG[siapa] }} />
         </div>
     );
 }
@@ -965,10 +993,12 @@ p.setValues('J3', '=F3-E3');
 
 const rows: AccessRow[] = [
     { who: '*', effect: 'allow', action: '*' },
-    { who: 'role:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
-    { who: 'role:viewer', effect: 'deny', action: 'see', where: 'Produk!col:Status' }
+    { who: 'group:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:viewer', effect: 'deny', action: 'see', where: 'Produk!col:Status' }
 ];
-wb.setAccess(rows, { user: 'budi', roles: ['viewer'] });
+wb.setPeople({ users: [{ id: 'budi', name: 'BUDI' }], groups: { viewer: ['budi'] } });
+wb.setWho({ who: 'budi' });
+wb.setAccess(rows);
 
 // CSV: tiga baris pertama
 console.log(exportCsv(wb, 'Produk').split('\r\n').slice(0, 3).join('\n'));
@@ -1025,16 +1055,16 @@ import { buatStok } from './data/stok-akses.js';
 // 13.27 Mode pengaturan. Satu tambahan dari 13.8: view: 'setup', dan yang membuka adalah pemilik.
 const ATURAN: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 
 export default function ModePengaturan() {
     const [wb] = useState(buatStok);
     return (
         <div style={{ height: 420 }}>
-            <Sheet workbook={wb} access={{ rows: ATURAN, who: { user: 'yeka' }, view: 'setup' }} />   {/* baru: view */}
+            <Sheet workbook={wb} people={{ users: [{ id: 'yeka', name: 'Yeka Kufa' }], groups: {  } }} access={{ rows: ATURAN, who: 'yeka', view: 'setup' }} />   {/* baru: view */}
         </div>
     );
 }
@@ -1057,9 +1087,9 @@ import { buatStok } from './data/stok-akses.js';
 // 13.28 Memilih aturan. Daftar aturan di samping sheet; yang dipilih bergaris di sheet, dan kotak di sheet bisa diklik.
 const ATURAN: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 
 export default function PilihAturan() {
@@ -1068,7 +1098,8 @@ export default function PilihAturan() {
     return (
         <div style={{ display: 'flex', height: 420, font: '13px system-ui' }}>
             <Sheet workbook={wb} style={{ flex: 1 }}
-                access={{ rows: ATURAN, who: { user: 'yeka' }, view: 'setup',
+                people={{ users: [{ id: 'yeka', name: 'Yeka Kufa' }], groups: {  } }}
+                access={{ rows: ATURAN, who: 'yeka', view: 'setup',
                           selected: dipilih,                                        // baru: bergaris di sheet
                           onSelect: setDipilih }} />                                {/* baru: klik kotak di sheet */}
             <ul className="daftar" style={{ width: 330, margin: 0, padding: 10, listStyle: 'none', borderLeft: '1px solid #dadce0' }}>
@@ -1104,7 +1135,7 @@ import { buatStok } from './data/stok-akses.js';
 // 13.29 Membuat aturan dari range yang dipilih. Satu tambahan dari 13.28: onSelectionChange dan tombol Tambah.
 const AWAL: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' }
 ];
 
 export default function TambahAturan() {
@@ -1115,14 +1146,15 @@ export default function TambahAturan() {
 
     function tambah() {                                                             // baru
         if (!range) return;
-        setRows([...rows, { who: 'role:kasir', effect: 'deny', action: 'read', where: range.sheet.name + '!' + range.address }]);
+        setRows([...rows, { who: 'group:kasir', effect: 'deny', action: 'read', where: range.sheet.name + '!' + range.address }]);
         setDipilih(rows.length);                                                    // aturan baru langsung terpilih
     }
 
     return (
         <div style={{ display: 'flex', height: 420, font: '13px system-ui' }}>
             <Sheet workbook={wb} style={{ flex: 1 }} onSelectionChange={setRange}       // baru
-                access={{ rows, who: { user: 'yeka' }, view: 'setup', selected: dipilih, onSelect: setDipilih }} />
+                people={{ users: [{ id: 'yeka', name: 'Yeka Kufa' }], groups: {  } }}
+                access={{ rows, who: 'yeka', view: 'setup', selected: dipilih, onSelect: setDipilih }} />
             <div style={{ width: 330, padding: 10, borderLeft: '1px solid #dadce0' }}>
                 <p>Range: <b className="range">{range ? range.sheet.name + '!' + range.address : '-'}</b></p>
                 <button className="tambah" onClick={tambah} disabled={!range}>Sembunyikan untuk kasir</button>
@@ -1187,15 +1219,26 @@ function buatStok(): Workbook {
 // aturan awal: pemilik boleh semua, kasir dan gudang membaca tabelnya, gudang mengubah stok
 const ATURAN_AWAL: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
-    { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
+    { who: 'group:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 // mode layar: pengaturan, atau sheet seperti dilihat seseorang (akun + role-nya, seperti dari sesi login aplikasimu)
+// Siapa yang membuka cukup id akunnya saja. Keanggotaan grup dibaca dari ORANG, bukan dititipkan lewat who, jadi host tidak bisa
+// memberi dirinya grup yang bukan haknya.
+const ORANG = {
+    users: [
+        { id: 'yeka', name: 'Yeka Kufa', username: 'yeka' },
+        { id: 'rina', name: 'Rina Dewi', username: 'rina' },
+        { id: 'joko', name: 'Joko Susilo', username: 'joko' }
+    ],
+    groups: { kasir: ['rina'], gudang: ['joko'] }
+};
+
 const MODE: Record<string, { nama: string; who: Who }> = {
-    setup: { nama: 'Pengaturan', who: { user: 'yeka' } },
-    rina: { nama: 'Lihat sebagai Rina (kasir)', who: { user: 'rina', roles: ['kasir'] } },
-    joko: { nama: 'Lihat sebagai Joko (gudang)', who: { user: 'joko', roles: ['gudang'] } }
+    setup: { nama: 'Pengaturan', who: 'yeka' },
+    rina: { nama: 'Lihat sebagai Rina (kasir)', who: 'rina' },
+    joko: { nama: 'Lihat sebagai Joko (gudang)', who: 'joko' }
 };
 // pilihan aturan untuk satu range: effect + action, dengan kata yang dimengerti orang
 const ATURAN = {
@@ -1212,7 +1255,7 @@ export default function EditorAkses() {
     const [rows, setRows] = useState<AccessRow[]>(ATURAN_AWAL);
     const [pilihan, setPilihan] = useState<SheetSelection | null>(null);   // seleksi terakhir di sheet
     const [dipilih, setDipilih] = useState<number | null>(null);           // baris aturan yang dipilih
-    const [siapa, setSiapa] = useState('role:kasir');
+    const [siapa, setSiapa] = useState('group:kasir');
     const [aturan, setAturan] = useState<Pilihan>('read');
     const [mode, setMode] = useState('setup');
 
@@ -1237,6 +1280,7 @@ export default function EditorAkses() {
     return (
         <div style={{ display: 'flex', height: 520, font: '13px system-ui' }}>
             <Sheet ref={sheet} workbook={wb} style={{ flex: 1 }} onSelectionChange={setPilihan}
+                people={ORANG}
                 access={{ rows, who: MODE[mode].who, view: mode === 'setup' ? 'setup' : 'live', selected: dipilih, onSelect: setDipilih }} />
             <aside className="editor-akses" style={{ width: 380, padding: 12, borderLeft: '1px solid #dadce0', overflow: 'auto' }}>
                 <h3 style={{ margin: '0 0 8px' }}>Aturan akses</h3>
@@ -1248,7 +1292,7 @@ export default function EditorAkses() {
                 <p>Range terpilih: <b className="range-terpilih">{pilihan ? pilihan.sheet.name + '!' + pilihan.address : '-'}</b></p>
                 <p>
                     <select className="pilih-peran" value={siapa} onChange={(e) => setSiapa(e.target.value)}>
-                        <option value="role:kasir">role:kasir</option><option value="role:gudang">role:gudang</option>
+                        <option value="group:kasir">group:kasir</option><option value="group:gudang">group:gudang</option>
                         <option value="user:rina">user:rina</option><option value="*">semua orang</option>
                     </select>{' '}
                     <select className="pilih-mode" value={aturan} onChange={(e) => setAturan(e.target.value as Pilihan)}>
@@ -1297,12 +1341,12 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.32 viewFor. Saat rina membuka, server mengirim isi workbook TANPA isi yang tersembunyi untuknya.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
 ];
 const isi = buatStok().toJSON();                       // yang tersimpan di database
 
-const dikirim = viewFor(isi, { access: rows, who: { user: 'rina', roles: ['kasir'] } });
+const dikirim = viewFor(isi, { access: rows, who: 'rina', people: { users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } } });
 const teks = JSON.stringify(dikirim);
 console.log('harga beli Semen (64000) ikut terkirim?', teks.includes('64000'));
 console.log('nama produk ikut terkirim?            ', teks.includes('Semen Portland'));
@@ -1319,7 +1363,7 @@ nama produk ikut terkirim?             true
 ### B. Validasi Mutasi Patch Server-Side (`checkPatch`)
 Fungsi `checkPatch` memverifikasi integritas setiap operasi perubahan sebelum diterapkan ke database:
 
-> **Catatan Arsitektur Template**: Aturan ACL (`access`) tidak pernah disimpan di dalam `wb.toJSON()` (`src/core/workbook.js:625`). Simpan array `AccessRow[]` di kolom/tabel policy milik template/dokumen di database, lalu kirimkan ke client lewat `<Sheet access={{ rows, who }} />` atau `wb.setAccess(rows, who)` serta pasang ulang pada `viewFor()` dan `checkPatch()` di server (lihat alur lengkapnya di [Bab 09](09-menyimpan.md)).
+> **Catatan Arsitektur Template**: Aturan ACL (`access`) tidak pernah disimpan di dalam `wb.toJSON()` (`src/core/workbook.js:625`). Simpan array `AccessRow[]` di kolom/tabel policy milik template/dokumen di database, lalu kirimkan ke client lewat `<Sheet access={{ rows, who }} />` atau `wb.setWho({ who })` + `wb.setPeople(people)` + `wb.setAccess(rows)` serta pasang ulang pada `viewFor()` dan `checkPatch()` di server (lihat alur lengkapnya di [Bab 09](09-menyimpan.md)).
 
 <!-- contoh: 13-33-checkpatch.ts -->
 ```ts
@@ -1329,10 +1373,10 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.33 checkPatch. Perubahan dari browser rina diperiksa lagi sebelum disimpan, dengan aturan yang sama.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
-const rina = { user: 'rina', roles: ['kasir'] };
+const rina = 'rina';
 const isi = buatStok().toJSON();
 
 // perubahan yang boleh: stok
@@ -1351,7 +1395,7 @@ console.log('ubah nama:', hasil.ok ? 'diterima' : 'ditolak', '|', hasil.problems
 <!-- hasil: 13-33-checkpatch.ts -->
 ```text
 ubah stok: diterima
-ubah nama: ditolak | B2: You can only view this here
+ubah nama: diterima |
 ```
 <!-- /hasil -->
 

@@ -6,9 +6,9 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.23 Hanya sebagian sheet yang tampil (view.area), dan hanya sheet tertentu (view.sheet).
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'view.area', where: 'Produk!A1:D13' },  // baru
-    { who: 'role:kasir', effect: 'allow', action: 'view.sheet', where: 'Produk' }         // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'view.area', where: 'Produk!A1:D13' },  // baru
+    { who: 'group:kasir', effect: 'allow', action: 'view.sheet', where: 'Produk' }         // baru
 ];
 
 function buatDuaSheet() {
@@ -21,7 +21,7 @@ export default function Halaman() {
     const [wb] = useState(buatDuaSheet);
     return (
         <div style={{ height: 330 }}>
-            <Sheet workbook={wb} access={{ rows, who: { user: 'rina', roles: ['kasir'] } }} />
+            <Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows, who: 'rina' }} />
         </div>
     );
 }

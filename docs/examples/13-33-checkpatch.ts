@@ -4,10 +4,10 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.33 checkPatch. Perubahan dari browser rina diperiksa lagi sebelum disimpan, dengan aturan yang sama.
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
-const rina = { user: 'rina', roles: ['kasir'] };
+const rina = 'rina';
 const isi = buatStok().toJSON();
 
 // perubahan yang boleh: stok

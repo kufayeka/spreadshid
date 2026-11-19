@@ -5,15 +5,17 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.17 Satu akun: kasir tidak boleh melihat harga beli, kecuali budi, yang boleh mengubahnya.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }, { id: 'budi', name: 'Budi Santoso' }], groups: { kasir: ['rina', 'budi'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
     { who: 'user:budi', effect: 'allow', action: 'edit', where: 'Produk!col:Harga beli' }   // baru: budi, walaupun kasir
 ];
 
 const ORANG: Record<string, Who> = {
-    rina: { user: 'rina', roles: ['kasir'] },
-    budi: { user: 'budi', roles: ['kasir'] }
+    rina: 'rina',
+    budi: 'budi'
 };
 
 export default function Halaman() {
@@ -25,7 +27,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );

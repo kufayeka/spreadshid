@@ -33,15 +33,26 @@ function buatStok(): Workbook {
 // aturan awal: pemilik boleh semua, kasir dan gudang membaca tabelnya, gudang mengubah stok
 const ATURAN_AWAL: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
-    { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
+    { who: 'group:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:E5' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }
 ];
 // mode layar: pengaturan, atau sheet seperti dilihat seseorang (akun + role-nya, seperti dari sesi login aplikasimu)
+// Siapa yang membuka cukup id akunnya saja. Keanggotaan grup dibaca dari ORANG, bukan dititipkan lewat who, jadi host tidak bisa
+// memberi dirinya grup yang bukan haknya.
+const ORANG = {
+    users: [
+        { id: 'yeka', name: 'Yeka Kufa', username: 'yeka' },
+        { id: 'rina', name: 'Rina Dewi', username: 'rina' },
+        { id: 'joko', name: 'Joko Susilo', username: 'joko' }
+    ],
+    groups: { kasir: ['rina'], gudang: ['joko'] }
+};
+
 const MODE: Record<string, { nama: string; who: Who }> = {
-    setup: { nama: 'Pengaturan', who: { user: 'yeka' } },
-    rina: { nama: 'Lihat sebagai Rina (kasir)', who: { user: 'rina', roles: ['kasir'] } },
-    joko: { nama: 'Lihat sebagai Joko (gudang)', who: { user: 'joko', roles: ['gudang'] } }
+    setup: { nama: 'Pengaturan', who: 'yeka' },
+    rina: { nama: 'Lihat sebagai Rina (kasir)', who: 'rina' },
+    joko: { nama: 'Lihat sebagai Joko (gudang)', who: 'joko' }
 };
 // pilihan aturan untuk satu range: effect + action, dengan kata yang dimengerti orang
 const ATURAN = {
@@ -58,7 +69,7 @@ export default function EditorAkses() {
     const [rows, setRows] = useState<AccessRow[]>(ATURAN_AWAL);
     const [pilihan, setPilihan] = useState<SheetSelection | null>(null);   // seleksi terakhir di sheet
     const [dipilih, setDipilih] = useState<number | null>(null);           // baris aturan yang dipilih
-    const [siapa, setSiapa] = useState('role:kasir');
+    const [siapa, setSiapa] = useState('group:kasir');
     const [aturan, setAturan] = useState<Pilihan>('read');
     const [mode, setMode] = useState('setup');
 
@@ -83,6 +94,7 @@ export default function EditorAkses() {
     return (
         <div style={{ display: 'flex', height: 520, font: '13px system-ui' }}>
             <Sheet ref={sheet} workbook={wb} style={{ flex: 1 }} onSelectionChange={setPilihan}
+                people={ORANG}
                 access={{ rows, who: MODE[mode].who, view: mode === 'setup' ? 'setup' : 'live', selected: dipilih, onSelect: setDipilih }} />
             <aside className="editor-akses" style={{ width: 380, padding: 12, borderLeft: '1px solid #dadce0', overflow: 'auto' }}>
                 <h3 style={{ margin: '0 0 8px' }}>Aturan akses</h3>
@@ -94,7 +106,7 @@ export default function EditorAkses() {
                 <p>Range terpilih: <b className="range-terpilih">{pilihan ? pilihan.sheet.name + '!' + pilihan.address : '-'}</b></p>
                 <p>
                     <select className="pilih-peran" value={siapa} onChange={(e) => setSiapa(e.target.value)}>
-                        <option value="role:kasir">role:kasir</option><option value="role:gudang">role:gudang</option>
+                        <option value="group:kasir">group:kasir</option><option value="group:gudang">group:gudang</option>
                         <option value="user:rina">user:rina</option><option value="*">semua orang</option>
                     </select>{' '}
                     <select className="pilih-mode" value={aturan} onChange={(e) => setAturan(e.target.value as Pilihan)}>

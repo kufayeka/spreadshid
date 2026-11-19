@@ -25,22 +25,29 @@ function buat() {
 // Semua orang boleh membaca; kolom Margin (D) ditutup untuk role sales
 const ATURAN = [
     { who: '*', effect: 'allow', action: 'read' },
-    { who: 'role:sales', effect: 'deny', action: 'read', where: 'Penjualan!D1:D100' }
+    { who: 'group:sales', effect: 'deny', action: 'read', where: 'Penjualan!D1:D100' }
 ];
+const ORANG = { users: [{ id: 'bu-ani', name: 'Ani' }, { id: 'rudi', name: 'Rudi' }], groups: { manajer: ['bu-ani'], sales: ['rudi'] } };
 const ringkas = (wb) => [1, 2, 3].map((r) => wb.display('Rekap', r, 0).text + ' ' + wb.value('Rekap', r, 1) + ' / ' + wb.value('Rekap', r, 2)).join(' | ');
 
 // 1. di browser: workbook diberi hak akses orang yang membukanya (<Sheet access> melakukan ini), pivot dihitung ulang untuk orang itu
 const manajer = buat();
-manajer.setAccess(ATURAN, { user: 'bu-ani', roles: ['manajer'] });
+manajer.setPeople({ users: [{ id: 'bu-ani', name: 'BU-ANI' }], groups: { manajer: ['bu-ani'] } });
+manajer.setWho({ who: 'bu-ani' });
+manajer.setAccess(ATURAN);
 console.log('manajer  (Omzet / Margin):', ringkas(manajer));
 
 const sales = buat();
-sales.setAccess(ATURAN, { user: 'rudi', roles: ['sales'] });
+sales.setPeople({ users: [{ id: 'rudi', name: 'RUDI' }], groups: { sales: ['rudi'] } });
+sales.setWho({ who: 'rudi' });
+sales.setAccess(ATURAN);
 console.log('salesman (Omzet / Margin):', ringkas(sales));
 
 // 2. di server: viewFor menyiapkan dokumen yang dikirim ke salesman. Isi kolom Margin tidak ikut terkirim sama sekali,
 //    jadi ringkasan yang dihitung di browsernya juga tidak punya angka margin.
-const dokumenSales = viewFor(buat().toJSON(), { access: ATURAN, who: { user: 'rudi', roles: ['sales'] } });
+const dokumenSales = viewFor(buat().toJSON(), { access: ATURAN, who: 'rudi', people: ORANG });
 const dibukaSales = createWorkbook(dokumenSales);
-dibukaSales.setAccess(ATURAN, { user: 'rudi', roles: ['sales'] });
+dibukaSales.setPeople({ users: [{ id: 'rudi', name: 'RUDI' }], groups: { sales: ['rudi'] } });
+dibukaSales.setWho({ who: 'rudi' });
+dibukaSales.setAccess(ATURAN);
 console.log('dikirim server ke salesman:', ringkas(dibukaSales));

@@ -45,19 +45,23 @@ const user = { source: 'user' };
 
 {
     const access = [
-        { who: 'role:reviewer', effect: 'allow', action: 'read' },
-        { who: 'role:reviewer', effect: 'allow', action: 'comment' },
-        { who: 'role:viewer', effect: 'allow', action: 'read' }
+        { who: 'group:reviewer', effect: 'allow', action: 'read' },
+        { who: 'group:reviewer', effect: 'allow', action: 'comment' },
+        { who: 'group:viewer', effect: 'allow', action: 'read' }
     ];
     const wb = createWorkbook(null, { user: { id: 'r', name: 'Reviewer' } });
     const [s] = wb.sheetIds();
     const said = [];
     wb.on('reject', (e) => said.push(e.reason));
-    wb.setAccess(access, { user: 'r', roles: ['reviewer'] });
+    wb.setPeople({ users: [{ id: 'r', name: 'R' }], groups: { reviewer: ['r'] } });
+    wb.setWho({ who: 'r' });
+    wb.setAccess(access);
     wb.addComment(s, 0, 0, 'Cek angka ini', user);
     wb.setValues(s, 0, 0, 5, user);
     assert.deepStrictEqual([!!wb.commentAt(s, 0, 0), wb.value(s, 0, 0), said[0]], [true, null, 'You can only view this here'], 'a reviewer comments, but does not edit');
-    wb.setAccess(access, { user: 'v', roles: ['viewer'] });
+    wb.setPeople({ users: [{ id: 'v', name: 'V' }], groups: { viewer: ['v'] } });
+    wb.setWho({ who: 'v' });
+    wb.setAccess(access);
     wb.addComment(s, 2, 2, 'Boleh?', user);
     assert.deepStrictEqual([wb.commentAt(s, 2, 2), said[1]], [null, 'You cannot comment here'], 'a viewer without "comment" cannot');
     ok('access control: a role may comment without editing; one without "comment" may not');
@@ -75,7 +79,8 @@ const user = { source: 'user' };
     const [s] = wb.sheetIds();
     const said = [];
     wb.on('reject', (e) => said.push(e.reason));
-    const as = (id) => { wb.setUser({ id, name: id.toUpperCase() }); wb.setAccess(access, id); };
+    const as = (id) => { wb.setUser({ id, name: id.toUpperCase() }); wb.setWho({ who: id });
+    wb.setAccess(access); };
 
     as('a');
     const { thread, item } = wb.addComment(s, 0, 0, 'Mulai', user);

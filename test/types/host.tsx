@@ -88,11 +88,11 @@ export function server(doc: WorkbookDoc) {
     void p.cells;
     // @ts-expect-error a pivot function that does not exist
     pivot(records, { values: [{ field: 'No', fn: 'TOTAL' }] });
-    const access: AccessRow[] = [{ who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!C2:C5' }];
+    const access: AccessRow[] = [{ who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!C2:C5' }];
     // @ts-expect-error an effect that does not exist
-    const bad: AccessRow = { who: 'role:kasir', effect: 'maybe', action: 'read' };
+    const bad: AccessRow = { who: 'group:kasir', effect: 'maybe', action: 'read' };
     void bad;
-    const result = checkPatch(doc, wb.pendingPatch(), { access, who: { user: 'rina', roles: ['kasir'] } });
+    const result = checkPatch(doc, wb.pendingPatch(), { access, who: 'rina', people: { users: [{ id: 'rina', name: 'Rina' }], groups: { kasir: ['rina'] } } });
     if (result.ok) return mergePatch(doc, wb.pendingPatch());
     const bytes: Uint8Array = exportXlsx(wb);
     void bytes;

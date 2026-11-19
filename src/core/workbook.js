@@ -629,6 +629,88 @@ export function createWorkbook(doc, options) {
     let hostRules = [];
     let access = resolveAccess(null);
     let hasPolicy = false;
+
+    // ---- who has it open, and the people it knows of ----------------------------------------------------------
+    //
+    // Three doors, and each may be left shut:
+    //   setAccess(rows)   the rules. Shut, or an empty list: the workbook has no access policy and everything is allowed.
+    //   setWho({ who })   the id of the person reading. Shut: nobody in particular, so no row that names a user or a group is theirs.
+    //   setPeople({...})  the names and faces behind the ids, and which ids are in which group. Shut: every id shows as itself.
+    //
+    // The workbook does the matching. The host says only WHO is here, never what they are: which groups someone belongs to is read from
+    // `groups`, so a host cannot hand itself a membership it does not have, and there is one place that knows it.
+    let whoId = null;
+    let people = { users: [], groups: {} };
+    const usersById = new Map();
+
+    /**
+     * The groups an id is in, as the rows name them ("group:FINANCE" -> "FINANCE"). Named for the PEOPLE it is about: this file already has a
+     * groupsOf for the folded groups of rows and columns, and two functions of one name in one scope are one function.
+     */
+    function groupsOfPerson(id) {
+        if (id === null) return [];
+        const out = [];
+        for (const name of Object.keys(people.groups)) {
+            const members = people.groups[name];
+            if (Array.isArray(members) && members.some((m) => String(m) === id)) out.push(name);
+        }
+        return out;
+    }
+    const personNow = () => ({ user: whoId, roles: groupsOfPerson(whoId) });
+
+    /**
+     * Who has the workbook open: `{ who: '<id>' }`. Nothing, or no id, means nobody in particular — the rows that name a user or a group are
+     * then nobody's, and with an access policy in place that person is given nothing.
+     */
+    function setWho(w) {
+        const given = w && typeof w === 'object' ? w.who : w;
+        const was = whoId;
+        whoId = given === undefined || given === null || given === '' ? null : String(given);
+        if (was === whoId) return;
+        if (hasPolicy) {
+            applyAccess();
+            // Another person sees other cells, so the screen is drawn again and every pivot is worked out for them (as setAccess does): the table
+            // written for the one before would otherwise stay there, and a cell would keep the mode of someone else.
+            rewriteAllPivots();
+            revision++;
+            emit('layout', {});
+        }
+        emit('access', accessInfo());
+    }
+
+    /**
+     * The people this workbook knows of: `{ users: [{ id, name, username, photoUrl }], groups: { FINANCE: [id, id] } }`.
+     *
+     * It does two jobs that look like one. `users` is a DICTIONARY for the screen: a comment, a card, a list of who may do what, all show
+     * "name - username" and the face, found by the id that is stored. `groups` is MEMBERSHIP: it is what decides whether a row for "group:FINANCE"
+     * is this person's. Nothing of it is part of the workbook; it is never saved and never undone.
+     */
+    function setPeople(p) {
+        const users = p && Array.isArray(p.users) ? p.users : [];
+        const groups = p && p.groups && typeof p.groups === 'object' && !Array.isArray(p.groups) ? p.groups : {};
+        people = { users: users.map((u) => clone(u)), groups: clone(groups) };
+        usersById.clear();
+        for (const u of people.users) if (u && u.id !== undefined && u.id !== null) usersById.set(String(u.id), u);
+        // the membership may have moved this person in or out of a group, so what they may do is worked out again, and with it the screen
+        if (hasPolicy) { applyAccess(); rewriteAllPivots(); }
+        revision++;
+        emit('access', accessInfo());
+        emit('layout', {});
+    }
+
+    /**
+     * How a person is shown: "name - username", or the name alone when there is no username, or the id itself when the dictionary does not
+     * know them. `photoUrl` is theirs when the dictionary has one; a workbook with no dictionary shows every id as itself.
+     */
+    function personOf(id) {
+        const key = id === undefined || id === null ? '' : String(id);
+        const found = usersById.get(key);
+        if (!found) return { id: key || null, name: key || 'Anonymous', username: null, photoUrl: null, known: false };
+        const name = found.name === undefined || found.name === null || found.name === '' ? key : String(found.name);
+        const username = found.username === undefined || found.username === null || found.username === '' ? null : String(found.username);
+        return { id: key, name, username, photoUrl: found.photoUrl || null, label: username ? name + ' - ' + username : name, known: true };
+    }
+    const labelOf = (id) => { const p = personOf(id); return p.label || p.name; };
     const types = new Map(); // sheet id -> Map(column id -> type)
 
     /**
@@ -642,16 +724,26 @@ export function createWorkbook(doc, options) {
         emit('layout', {});
     }
 
-    /**
-     * The access policy of the workbook and the person who has it open (policy.js): what they may do, what they see, and the rules of their ranges.
-     * It is the host's (kept in its database, given again on every open); null takes it away (everything is allowed).
-     * @param {object|null} policy
-     * @param {string|{ user?: string, roles?: string[] }} who
-     */
-    function setAccess(policy, who) {
-        access = resolveAccess(policy, who);
-        hasPolicy = !!policy;
+    /** The policy worked out again for whoever is here now: after setAccess, after setWho, and after setPeople (the groups may have moved). */
+    function applyAccess() {
+        access = resolveAccess(hasPolicy ? policyRows : null, personNow());
         rules = resolveRules(api, hostRules.concat(access.ranges));
+    }
+    let policyRows = null;
+
+    /**
+     * The access rules of this workbook (policy.js): a list of rows, each naming an id in its `who` ("user:<id>", "group:<id>" or "*").
+     * They are the host's, kept in its database and given again on every open; never part of the workbook, never saved, never undone.
+     *
+     * No rows at all — not called, null, or an empty list — means the workbook HAS no access policy, and everything is allowed. With rows in
+     * place, someone no row names is given nothing: an id the rules do not mention is a stranger, not an owner.
+     *
+     * @param {object[]|null} policy
+     */
+    function setAccess(policy) {
+        policyRows = policy && policy.length ? policy : null;
+        hasPolicy = !!policyRows;
+        applyAccess();
         // A pivot reads the cells this person may not see as empty (tableOf), so what it shows depends on who has the workbook open. Every pivot is
         // worked out again for the new person; otherwise the table written for the one before (all the margins of a manager, say) would stay on
         // the screen of someone who may not read them.
@@ -904,8 +996,14 @@ export function createWorkbook(doc, options) {
     const threadsOf = (s) => sheetOf(s).props.comments || [];
     // the comments a person may not read are not there for them (the server does not send them either: viewFor)
     const readable = () => access.can('comment.read');
-    // who writes: the person the workbook is open for (createWorkbook's user, or setUser)
-    const author = () => { const u = opt.user; return u && typeof u === 'object' ? { id: u.id === undefined ? null : u.id, name: u.name || String(u.id || '') } : u ? { id: String(u), name: String(u) } : { id: null, name: 'Anonymous' }; };
+    // Who writes: the person setWho named, else createWorkbook's `user` (or setUser) as before. The name is written down beside the id so that a
+    // comment still says who wrote it years later, when that account may be gone and the dictionary no longer holds them; what the screen SHOWS is
+    // looked up by the id every time (personOf), so a person who changes their name is not two people in one thread.
+    const author = () => {
+        if (whoId !== null) { const p = personOf(whoId); return { id: whoId, name: p.name }; }
+        const u = opt.user;
+        return u && typeof u === 'object' ? { id: u.id === undefined ? null : u.id, name: u.name || String(u.id || '') } : u ? { id: String(u), name: String(u) } : { id: null, name: 'Anonymous' };
+    };
     const putThreads = (s, list, how) => setSheetProps(s, { comments: list.length ? list : null }, how);
 
     /** Comments on a cell: a new thread, or a reply when the cell has one already (one change). Returns { thread, item } ids. */
@@ -2234,7 +2332,10 @@ export function createWorkbook(doc, options) {
         // the host's rules and types
         setRules, setTypes, modeAt, typeAt,
         // access control
-        setAccess, access: accessInfo, can: (action) => access.can(action),
+        setAccess, setWho, setPeople, access: accessInfo, can: (action) => access.can(action),
+        // who is here and what the workbook knows of people: `person` is how an id is SHOWN (name, username, photoUrl, label), `people` is the
+        // dictionary and the memberships as they were given, and `who` is the id of whoever has it open (null: nobody in particular)
+        who: () => whoId, person: personOf, label: labelOf, people: () => clone(people),
         // the sentence a person is told when an action is refused: the message of the access row that refused it
         refusal: (action) => access.refusalFor(action),
         shows, sheetShown,

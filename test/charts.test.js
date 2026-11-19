@@ -83,13 +83,15 @@ const cells = (rows) => rows.map((r) => r.map((v) => ({ value: v, text: v === nu
     const id = s.addChart({ at: 'D1:F5', data: 'A1:B2' });
     const said = [];
     wb.on('reject', (e) => said.push(e.reason));
-    wb.setAccess([{ who: '*', effect: 'allow', action: 'read' }], 'tamu');
+    wb.setWho({ who: 'tamu' });
+    wb.setAccess([{ who: '*', effect: 'allow', action: 'read' }]);
     assert.strictEqual(wb.can('chart'), false);
     // the access rows guard what a person does (source 'user'); the host's own code is not refused, as everywhere in the workbook
     s.setChart(id, { title: 'x' }, { source: 'user' });
     assert.deepStrictEqual([s.charts()[0].title, said.pop()], ['', 'You cannot change charts here'], 'refused without `chart`');
     assert.strictEqual(s.chartData(id).series.length, 1, 'but it is still read and drawn');
-    wb.setAccess([{ who: '*', effect: 'allow', action: 'read' }, { who: '*', effect: 'allow', action: 'chart' }], 'staf');
+    wb.setWho({ who: 'staf' });
+    wb.setAccess([{ who: '*', effect: 'allow', action: 'read' }, { who: '*', effect: 'allow', action: 'chart' }]);
     s.setChart(id, { title: 'y' }, { source: 'user' });
     assert.strictEqual(s.charts()[0].title, 'y', 'allowed with `chart`');
     ok('changing charts needs the access row `chart`; reading them does not');

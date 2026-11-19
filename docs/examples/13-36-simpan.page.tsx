@@ -7,18 +7,20 @@ import { buatStok } from './data/stok-akses.js';
 
 // 13.36 Tombol Save di menu File, diatur per role. Admin boleh ketiganya, supervisor tidak boleh menimpa file (hanya versi baru atau salinan),
 // viewer tidak boleh menyimpan sama sekali dan tidak boleh membaca harga beli.
+const ORANG_GRUP = { users: [{ id: 'yeka', name: 'Yeka Kufa' }, { id: 'sari', name: 'Sari Utami' }, { id: 'budi', name: 'Budi Santoso' }], groups: { admin: ['yeka'], spv: ['sari'], viewer: ['budi'] } };
+
 const ATURAN: AccessRow[] = [
     { who: '*', effect: 'allow', action: '*' },
-    { who: 'role:spv', effect: 'deny', action: 'file.save', message: 'Supervisor tidak menimpa file. Pakai Save as new version.' },
-    { who: 'role:viewer', effect: 'deny', action: 'file.*', message: 'Kamu hanya bisa melihat file ini.' },
-    { who: 'role:viewer', effect: 'deny', action: 'edit' },
-    { who: 'role:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
+    { who: 'group:spv', effect: 'deny', action: 'file.save', message: 'Supervisor tidak menimpa file. Pakai Save as new version.' },
+    { who: 'group:viewer', effect: 'deny', action: 'file.*', message: 'Kamu hanya bisa melihat file ini.' },
+    { who: 'group:viewer', effect: 'deny', action: 'edit' },
+    { who: 'group:viewer', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' }
 ];
 
-const ORANG: Record<string, { user: string; roles: string[] }> = {
-    admin: { user: 'yeka', roles: ['admin'] },
-    spv: { user: 'sari', roles: ['spv'] },
-    viewer: { user: 'budi', roles: ['viewer'] }
+const ORANG: Record<string, string> = {
+    admin: 'yeka',
+    spv: 'sari',
+    viewer: 'budi'
 };
 
 export default function TombolSimpan() {
@@ -29,7 +31,7 @@ export default function TombolSimpan() {
     // satu fungsi untuk ketiga tombol; di aplikasi sungguhan di sinilah API dipanggil (lihat bab 9 bagian 7.8)
     async function simpan({ mode, doc }: SheetSave) {
         const kata = { save: 'menimpa file', saveAsNewVersion: 'membuat versi baru', saveAsACopy: 'membuat salinan' }[mode];
-        setCatatan(ORANG[siapa].user + ' ' + kata + ' (workbook ' + String(doc.id).slice(0, 8) + '…)');
+        setCatatan(ORANG[siapa] + ' ' + kata + ' (workbook ' + String(doc.id).slice(0, 8) + '…)');
     }
 
     return (
@@ -43,7 +45,7 @@ export default function TombolSimpan() {
                 </select>
                 <span>{catatan}</span>
             </div>
-            <Sheet workbook={wb} style={{ flex: 1 }} onSave={simpan} access={{ rows: ATURAN, who: ORANG[siapa] }} />
+            <Sheet workbook={wb} style={{ flex: 1 }} onSave={simpan} people={ORANG_GRUP} access={{ rows: ATURAN, who: ORANG[siapa] }} />
         </div>
     );
 }

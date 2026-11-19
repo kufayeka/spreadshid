@@ -22,8 +22,23 @@ export function colourOf(id) {
     for (const ch of String(id || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     return COLOURS[h % COLOURS.length];
 }
-export function Avatar({ by }) {
-    return <span className="ks-avatar" style={{ background: colourOf(by && by.id) }} aria-hidden="true">{initials(by && by.name)}</span>;
+/**
+ * The face beside a comment. `wb` (when it is given) looks the id up in the dictionary the host set (setPeople): a photo when that person has one,
+ * else the circle of initials in a colour of their id, which is never wrong and never missing. Without a dictionary it falls back to the name that
+ * was written down with the comment, as before.
+ */
+export function Avatar({ by, wb }) {
+    const known = wb && by && by.id !== undefined && by.id !== null ? wb.person(by.id) : null;
+    const name = known && known.known ? known.name : (by && by.name);
+    const photo = known && known.photoUrl;
+    if (photo) return <img className="ks-avatar ks-avatar-photo" src={photo} alt="" aria-hidden="true" />;
+    return <span className="ks-avatar" style={{ background: colourOf(by && by.id) }} aria-hidden="true">{initials(name)}</span>;
+}
+
+/** How a comment's writer is named on the screen: "name - username" from the dictionary, else the name written with the comment, else "?". */
+export function byLabel(by, wb) {
+    if (by && by.id !== undefined && by.id !== null && wb) { const p = wb.person(by.id); if (p.known) return p.label || p.name; }
+    return (by && by.name) || '?';
 }
 
 /**
@@ -141,10 +156,10 @@ export function CommentCard({ workbook: wb, sheetId: s, at, revision, start, fra
                         const mayDelete = wb.mayChangeComment(s, thread.id, item.id, 'delete');
                         return (
                             <li key={item.id} className={'ks-card-item' + (own ? ' ks-mine' : '')} data-item={item.id}>
-                                <Avatar by={item.by} />
+                                <Avatar by={item.by} wb={wb} />
                                 <div className="ks-card-body">
                                     <div className="ks-card-by">
-                                        <b>{item.by ? item.by.name : '?'}</b>
+                                        <b>{byLabel(item.by, wb)}</b>
                                         <span>{when(item.at, locale)}{item.edited ? ' · edited' : ''}</span>
                                         {mayEdit || mayDelete ? (
                                             <button type="button" className="ks-card-more" aria-label="More" aria-expanded={menu === item.id}

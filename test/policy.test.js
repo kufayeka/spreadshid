@@ -7,14 +7,14 @@ let failures = 0;
 const check = (label, ok, actual) => { if (!ok) failures++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (!ok && actual !== undefined ? '   ' + JSON.stringify(actual) : '')); };
 
 const ROWS = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Stok!A1:F10' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Stok!C2:C10' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'Stok!D2:D10', when: '=$E2<>"Approved"', message: 'Already approved' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Stok!F2:F10' },
-    { who: 'role:kasir', effect: 'allow', action: 'format' },
-    { who: 'role:kasir', effect: 'deny', action: 'format.bold' },
-    { who: 'role:kasir', effect: 'deny', action: 'ui.toolbar' },
-    { who: 'role:kasir', effect: 'allow', action: 'sort' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Stok!A1:F10' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Stok!C2:C10' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'Stok!D2:D10', when: '=$E2<>"Approved"', message: 'Already approved' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Stok!F2:F10' },
+    { who: 'group:kasir', effect: 'allow', action: 'format' },
+    { who: 'group:kasir', effect: 'deny', action: 'format.bold' },
+    { who: 'group:kasir', effect: 'deny', action: 'ui.toolbar' },
+    { who: 'group:kasir', effect: 'allow', action: 'sort' },
     { who: 'user:budi', effect: 'allow', action: 'edit', where: 'Stok!B2:B10' },
     { who: 'user:budi', effect: 'allow', action: 'format.bold' },
     { who: 'user:yeka', effect: 'allow', action: '*' },
@@ -48,7 +48,10 @@ check('someone with no rows may do nothing', !resolveAccess(ROWS, { user: 'tamu'
 
 // cells
 const wb = stok();
-wb.setAccess(ROWS, { user: 'rina', roles: ['kasir'] });
+const PEOPLE = { users: [{ id: 'rina', name: 'Rina' }, { id: 'budi', name: 'Budi' }, { id: 'yeka', name: 'Yeka' }, { id: 'tamu', name: 'Tamu' }], groups: { kasir: ['rina', 'budi', 'yeka'] } };
+wb.setPeople(PEOPLE);
+wb.setWho({ who: 'rina' });
+wb.setAccess(ROWS);
 const mode = (a) => { const m = wb.modeAt('Stok', ...cellOf(a)); return m ? m.mode : 'edit'; };
 function cellOf(a) { const c = a.charCodeAt(0) - 65, r = Number(a.slice(1)) - 1; return [r, c]; }
 check('A2: read', mode('A2') === 'readonly', mode('A2'));
@@ -58,11 +61,15 @@ check('D3: read once the row is Approved (when)', mode('D3') === 'readonly', mod
 check('F2: deny read shows •••', mode('F2') === 'hidden', mode('F2'));
 check('B2: read for rina', mode('B2') === 'readonly', mode('B2'));
 check('H1: nobody allows it, it is empty', mode('H1') === 'invisible', mode('H1'));
-wb.setAccess(ROWS, { user: 'budi', roles: ['kasir'] });
+wb.setPeople(PEOPLE);
+wb.setWho({ who: 'budi' });
+wb.setAccess(ROWS);
 check('B2: edit for budi (his own row)', mode('B2') === 'edit', mode('B2'));
 
 // a person's change is refused where they may not write; the code of the app is not stopped
-wb.setAccess(ROWS, { user: 'rina', roles: ['kasir'] });
+wb.setPeople(PEOPLE);
+wb.setWho({ who: 'rina' });
+wb.setAccess(ROWS);
 const s = wb.sheet('Stok');
 s.setValues('C2', 12, { source: 'user' });
 s.setValues('A2', 'X', { source: 'user' });
@@ -70,33 +77,37 @@ check('rina writes Qty, not the code', s.value('C2') === 12 && s.value('A2') ===
 
 // the server: the same rows
 const doc = stok().toJSON();
-const seen = viewFor(doc, { access: ROWS, who: { user: 'rina', roles: ['kasir'] } });
+const seen = viewFor(doc, { access: ROWS, who: 'rina', people: PEOPLE });
 const json = JSON.stringify(seen);
 check('viewFor does not send the hidden Modal (42000)', !json.includes('42000') && json.includes('Semen'));
 const other = createWorkbook(doc);
-other.setAccess(ROWS, { user: 'budi', roles: ['kasir'] });
+other.setPeople(PEOPLE);
+other.setWho({ who: 'budi' });
+other.setAccess(ROWS);
 other.sheet('Stok').setValues('B2', 'Semen Gresik', { source: 'user' });
 const patch = other.pendingPatch();
-check('checkPatch lets budi change Barang', checkPatch(doc, patch, { access: ROWS, who: { user: 'budi', roles: ['kasir'] } }).ok);
-check('checkPatch refuses the same change from rina', !checkPatch(doc, patch, { access: ROWS, who: { user: 'rina', roles: ['kasir'] } }).ok);
+check('checkPatch lets budi change Barang', checkPatch(doc, patch, { access: ROWS, who: 'budi', people: PEOPLE }).ok);
+check('checkPatch refuses the same change from rina', !checkPatch(doc, patch, { access: ROWS, who: 'rina', people: PEOPLE }).ok);
 
 // the owner: a deny for a role or for everyone does not take it away, a deny for the owner's own user does
-const OWNED = [{ who: 'user:yeka', effect: 'allow', action: '*' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }, { who: 'role:kasir', effect: 'deny', action: 'ui.toolbar' }];
+const OWNED = [{ who: 'user:yeka', effect: 'allow', action: '*' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }, { who: 'group:kasir', effect: 'deny', action: 'ui.toolbar' }];
 check('yeka (also a kasir) stays the owner despite denies for everyone and for kasir', resolveAccess(OWNED, { user: 'yeka', roles: ['kasir'] }).owner === true);
 check('a deny for yeka herself ends it', resolveAccess([...OWNED, { who: 'user:yeka', effect: 'deny', action: 'download' }], 'yeka').owner === false);
 
 // a deny of edit only caps: alone, it gives nothing to read
 const capped = stok();
-capped.setAccess([{ who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
+capped.setWho({ who: 'tamu' });
+capped.setAccess([{ who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }]);
 check('deny edit with no allow: the cell stays unseen (not read only)', capped.modeAt('Stok', 1, 5).mode === 'invisible', capped.modeAt('Stok', 1, 5));
-capped.setAccess([{ who: '*', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
+capped.setAccess([{ who: '*', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }]);
 check('deny edit over an allow edit of the same level: read only', capped.modeAt('Stok', 1, 5).mode === 'readonly', capped.modeAt('Stok', 1, 5));
-capped.setAccess([{ who: 'user:tamu', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }], 'tamu');
+capped.setAccess([{ who: 'user:tamu', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'edit', where: 'Stok!F:F' }]);
 check('a user\'s own allow edit beats a deny of edit for everyone', capped.modeAt('Stok', 1, 5) === null, capped.modeAt('Stok', 1, 5));
 
 // every way of writing a range, and one that cannot be read touches nothing (never the whole sheet)
 const shapes = stok();
-const at = (where, a) => { shapes.setAccess([{ who: '*', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'read', where }], 'x'); const m = shapes.modeAt('Stok', ...cellOf(a)); return m ? m.mode : 'edit'; };
+shapes.setWho({ who: 'x' });
+const at = (where, a) => { shapes.setAccess([{ who: '*', effect: 'allow', action: 'edit' }, { who: '*', effect: 'deny', action: 'read', where }]); const m = shapes.modeAt('Stok', ...cellOf(a)); return m ? m.mode : 'edit'; };
 check('one cell "C2": C2 hidden, C3 not', at('Stok!C2', 'C2') === 'hidden' && at('Stok!C2', 'C3') === 'edit');
 check('with $: "$C$2"', at('Stok!$C$2', 'C2') === 'hidden');
 check('whole columns "C:D": C3 and D3 hidden, E3 not', at('Stok!C:D', 'C3') === 'hidden' && at('Stok!C:D', 'D3') === 'hidden' && at('Stok!C:D', 'E3') === 'edit');
@@ -150,23 +161,28 @@ check('an action refused by no deny row keeps the sheet\'s own words', resolveAc
     };
     const rules = [
         { who: '*', effect: 'allow', action: 'read' },
-        { who: 'role:rep', effect: 'allow', action: 'edit', where: 'Sales!C2:C100' },
-        { who: 'role:rep', effect: 'deny', action: 'read', where: 'Sales!D1:D100' }
+        { who: 'group:rep', effect: 'allow', action: 'edit', where: 'Sales!C2:C100' },
+        { who: 'group:rep', effect: 'deny', action: 'read', where: 'Sales!D1:D100' }
     ];
-    const rep = { user: 'rudi', roles: ['rep'] };
+    const rep = 'rudi';
+    const REPS = { users: [{ id: 'rudi', name: 'Rudi' }], groups: { rep: ['rudi'] } };
     const margins = (wb) => [1, 2, 3].map((r) => wb.value('Summary', r, 2));
 
     const onScreen = sales();
-    onScreen.setAccess(rules, rep);
+    onScreen.setPeople(REPS);
+    onScreen.setWho({ who: rep });
+    onScreen.setAccess(rules);
     check('a pivot is worked out again for the person the access is set for', margins(onScreen).every((v) => v === 0), margins(onScreen));
 
     const stored = sales().toJSON();
-    const sent = createWorkbook(viewFor(stored, { access: rules, who: rep }));
+    const sent = createWorkbook(viewFor(stored, { access: rules, who: rep, people: REPS }));
     check('the server does not send the margins a pivot holds', margins(sent).every((v) => v === null || v === 0), margins(sent));
 
-    sent.setAccess(rules, rep);
+    sent.setPeople(REPS);
+    sent.setWho({ who: rep });
+    sent.setAccess(rules);
     sent.setValues('Sales', 'C2', 20, { source: 'user' });
-    const after = createWorkbook(mergePatch(stored, sent.pendingPatch(), { access: rules, who: rep }));
+    const after = createWorkbook(mergePatch(stored, sent.pendingPatch(), { access: rules, who: rep, people: REPS }));
     check('a save by that person keeps the full pivot, worked out again with their change',
         after.value('Summary', 1, 1) === 15 && after.value('Summary', 2, 1) === 20 && margins(after).join() === '22,24,46',
         [after.value('Summary', 1, 1), after.value('Summary', 2, 1), margins(after)]);
@@ -175,13 +191,13 @@ check('an action refused by no deny row keeps the sheet\'s own words', resolveAc
 // ---- the three saves of the File menu: one by one, the group "file" or "file.*", a viewer who may save nothing ---------------------------------------
 {
     const base = [{ who: '*', effect: 'allow', action: '*' }];
-    const viewer = resolveAccess(base.concat([{ who: 'role:viewer', effect: 'deny', action: 'file.*', message: 'You can only view' }]), { user: 'v', roles: ['viewer'] });
+    const viewer = resolveAccess(base.concat([{ who: 'group:viewer', effect: 'deny', action: 'file.*', message: 'You can only view' }]), { user: 'v', roles: ['viewer'] });
     check('file.*: a viewer may save in none of the three ways',
         ['file.save', 'file.saveAsNewVersion', 'file.saveAsACopy'].every((a) => !viewer.can(a)) && viewer.can('download'));
     check('file.*: the refusal carries the message of its row', viewer.refusalFor('file.save') === 'You can only view', viewer.refusalFor('file.save'));
     const group = resolveAccess(base.concat([{ who: '*', effect: 'deny', action: 'file' }]), 'x');
     check('"file" names the three too', !group.can('file.save') && !group.can('file.saveAsACopy'));
-    const spv = resolveAccess(base.concat([{ who: 'role:spv', effect: 'deny', action: 'file.save' }]), { user: 's', roles: ['spv'] });
+    const spv = resolveAccess(base.concat([{ who: 'group:spv', effect: 'deny', action: 'file.save' }]), { user: 's', roles: ['spv'] });
     check('one by one: a supervisor may not overwrite, but may save a new version or a copy',
         !spv.can('file.save') && spv.can('file.saveAsNewVersion') && spv.can('file.saveAsACopy'));
     check('validateAccess knows the three, "file" and "file.*"',

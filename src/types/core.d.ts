@@ -304,8 +304,8 @@ export interface AccessRow {
     /** What the person is told when this refuses something. */
     message?: string | null;
 }
-/** Who an access row is for: everyone, one user, or everyone with a role. */
-export type AccessWho = '*' | `user:${string}` | `role:${string}`;
+/** Who an access row is for: everyone, one user, or everyone in a group. Both name an id, never a name a person reads. */
+export type AccessWho = '*' | `user:${string}` | `group:${string}`;
 /** Every action an access row can name, one by one (the same list as ACTIONS in policy.js). */
 export type AccessActionName =
     | 'read' | 'edit' | 'see'
@@ -322,8 +322,21 @@ export type AccessActionName =
     | 'access';
 /** What an access row names: one action, a whole group of them, a part of the screen ('ui.toolbar', 'ui.tool.bold'), or '*' for everything. */
 export type AccessAction = AccessActionName | 'format' | 'rows' | 'cols' | 'sheets' | 'view' | 'file' | 'comment' | `${'format' | 'rows' | 'cols' | 'sheets' | 'view' | 'file' | 'comment'}.*` | `ui.${string}` | '*';
-/** The person who opens: 'rina' (a user), or { user: 'rina', roles: ['kasir'] }. */
-export type Who = string | { user?: string; roles?: string[] };
+/**
+ * The person who opens: the bare id of their account, nothing more. Which groups they are in is read from the dictionary (People), never said here,
+ * so a host cannot hand itself a membership it does not have. null, or nobody, means nobody in particular.
+ */
+export type Who = string | null;
+
+/** One person in the dictionary: the id is what is stored and matched, the rest is for the screen. */
+export interface Person { id: string; name: string; username?: string | null; photoUrl?: string | null }
+
+/**
+ * The people a workbook knows of. `users` is the dictionary the screen reads (a comment shows "name - username" and the face, found by the id it
+ * stored); `groups` is the membership that decides whether a "group:FINANCE" row is this person's. Neither is part of the workbook: never saved,
+ * never undone.
+ */
+export interface People { users?: Person[]; groups?: Record<string, string[]> }
 export interface AccessInfo { owner: boolean; roles: string[]; ui: AccessUi; message: string | null }
 export interface CellMode { mode: RangeMode; message?: string }
 
@@ -545,7 +558,23 @@ export interface Workbook extends WithSheet<Omit<SheetFns, 'setValues'>> {
     /** The person the workbook is open for (createWorkbook's user, or setUser), as their comments are signed. */
     user(): { id: string | null; name: string };
     setRules(rules: Rule[]): void;
-    setAccess(rows: AccessRow[] | null, who?: Who): void;
+    /**
+     * The access rules of this workbook: a list of rows, each naming an id in its `who`. No rows at all — not called, null, or an empty list — means
+     * the workbook HAS no access policy and everything is allowed. With rows in place, someone no row names is given nothing.
+     */
+    setAccess(rows: AccessRow[] | null): void;
+    /** Who has the workbook open: the id of their account. Nothing, or no id, means nobody in particular. */
+    setWho(who: { who?: Who } | Who): void;
+    /** The people this workbook knows of: the dictionary for the screen, and the membership that decides the group rows. */
+    setPeople(people: People | null): void;
+    /** How a person is shown: "name - username", the name alone, or the id itself when the dictionary does not know them. */
+    person(id: Who): Person & { label?: string; known: boolean };
+    /** The one line a person is named by on the screen. */
+    label(id: Who): string;
+    /** The id of whoever has it open (setWho), or null. */
+    who(): string | null;
+    /** The dictionary as it was given (setPeople). */
+    people(): People;
     access(): AccessInfo;
     can(action: string): boolean;
     /** The sentence told when this action is refused: the message of the access row that refused it, or the sheet's own words. */
@@ -596,9 +625,9 @@ export function fromApiMakerType(type: object, library?: Record<string, object>)
 export function fieldType(field: object, library?: Record<string, object>): ColumnType;
 export function checkValue(type: ColumnType, value: unknown): string | null;
 
-export function mergePatch(doc: WorkbookDoc, patch: Patch, what?: { rules?: Rule[]; access?: AccessRow[]; who?: Who }): WorkbookDoc;
-export function checkPatch(doc: WorkbookDoc, patch: Patch, what: { rules?: Rule[]; types?: Record<string, TypesSpec>; access?: AccessRow[]; who?: Who }): { ok: boolean; problems: Array<{ sheet: string | null; address: string | null; reason: string }> };
-export function viewFor(doc: WorkbookDoc, what: { rules?: Rule[]; access?: AccessRow[]; who?: Who }): WorkbookDoc;
+export function mergePatch(doc: WorkbookDoc, patch: Patch, what?: { rules?: Rule[]; access?: AccessRow[]; who?: Who; people?: People }): WorkbookDoc;
+export function checkPatch(doc: WorkbookDoc, patch: Patch, what: { rules?: Rule[]; types?: Record<string, TypesSpec>; access?: AccessRow[]; who?: Who; people?: People }): { ok: boolean; problems: Array<{ sheet: string | null; address: string | null; reason: string }> };
+export function viewFor(doc: WorkbookDoc, what: { rules?: Rule[]; access?: AccessRow[]; who?: Who; people?: People }): WorkbookDoc;
 
 /** A copy of cells (copyBlock), to paste with pasteClip. */
 export interface Clip { v: 1; h: number; w: number; origin: { sheet: string; r: number; c: number }; cells: object[][]; cut?: boolean }
@@ -643,7 +672,7 @@ export function exportCsv(wb: Workbook, sheet: SheetRef, options?: { delimiter?:
 export function parseCsv(text: string, delimiter?: string): string[][];
 export function codeOfFormat(format: Format, settings?: Settings): string;
 
-export function resolveAccess(rows: AccessRow[] | null, who?: Who): AccessInfo & { can(action: string): boolean; refusalFor(action: string): string };
+export function resolveAccess(rows: AccessRow[] | null, who?: string | { user?: string; roles?: string[] } | null): AccessInfo & { can(action: string): boolean; refusalFor(action: string): string };
 export const ACTIONS: string[];
 export const ACTION_INFO: Array<{ id: string; label: string; group: string }>;
 export const UI_ITEMS: Array<{ id: string; label: string; group: string }>;

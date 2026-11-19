@@ -103,7 +103,7 @@ await withExample(async ({ js, click, mouse, key, wait }) => {
     void k30;
 
     // without the access row `chart`: seen, not changed
-    await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'read' }], 'tamu')`);
+    await q(`${W}.setWho({ who: 'tamu' })`); await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'read' }])`);
     await wait(300);
     const only = await q(`${W}.charts(${S})[0].id`);
     await q(`${W}.setChart(${S}, ${JSON.stringify(only)}, { at: 'B3:E14' })`);

@@ -5,16 +5,18 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.15 Role: aturan untuk semua kasir, dan satu role lagi, gudang.
+const ORANG_GRUP = { users: [{ id: 'rina', name: 'Rina Dewi' }, { id: 'joko', name: 'Joko Susilo' }, { id: 'sari', name: 'Sari Utami' }], groups: { gudang: ['joko', 'sari'], kasir: ['rina', 'sari'] } };
+
 const rows: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
-    { who: 'role:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },        // baru
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }       // baru
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:gudang', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },        // baru
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' }       // baru
 ];
 
 const ORANG: Record<string, Who> = {
-    rina: { user: 'rina', roles: ['kasir'] },
-    joko: { user: 'joko', roles: ['gudang'] },
-    sari: { user: 'sari', roles: ['kasir', 'gudang'] }       // dua role sekaligus
+    rina: 'rina',
+    joko: 'joko',
+    sari: 'sari'       // dua role sekaligus
 };
 
 export default function Halaman() {
@@ -26,7 +28,7 @@ export default function Halaman() {
                 {Object.keys(ORANG).map((nama) => <option key={nama}>{nama}</option>)}
             </select></p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );

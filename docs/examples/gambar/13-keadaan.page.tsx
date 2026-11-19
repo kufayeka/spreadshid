@@ -16,16 +16,16 @@ function buat() {
     return wb;
 }
 const ATURAN: AccessRow[] = [
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'A1:D1' },
-    { who: 'role:kasir', effect: 'allow', action: 'edit', where: 'A2' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'B2' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'C2' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'A1:D1' },
+    { who: 'group:kasir', effect: 'allow', action: 'edit', where: 'A2' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'B2' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'C2' },
     ...['menubar', 'toolbar', 'formulaBar', 'tabs', 'headers'].map((p): AccessRow => ({ who: '*', effect: 'deny', action: 'ui.' + p }))
 ];
 
 export default function Keadaan() {
     const [wb] = useState(buat);
-    return <div style={{ height: 70, width: 524, padding: 8 }}><Sheet workbook={wb} access={{ rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }} /></div>;
+    return <div style={{ height: 70, width: 524, padding: 8 }}><Sheet workbook={wb} people={{ users: [{ id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['rina'] } }} access={{ rows: ATURAN, who: 'rina' }} /></div>;
 }
 import { createRoot } from 'react-dom/client';
 const root = document.getElementById('root');

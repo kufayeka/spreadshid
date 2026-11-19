@@ -24,9 +24,9 @@ const LAYAR = ['menubar', 'toolbar', 'formulaBar', 'tabs'].map((p): AccessRow =>
 const LAYAR_PEMILIK = ['menubar', 'toolbar', 'formulaBar', 'tabs'].map((p): AccessRow => ({ who: 'user:yeka', effect: 'deny', action: 'ui.' + p }));
 const ATURAN: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D4' },
-    { who: 'role:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
-    { who: 'role:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:D4' },
+    { who: 'group:kasir', effect: 'deny', action: 'read', where: 'Produk!col:Harga beli' },
+    { who: 'group:gudang', effect: 'allow', action: 'edit', where: 'Produk!col:Stok' },
     ...LAYAR
 ];
 
@@ -37,8 +37,8 @@ function Panel({ judul, live }: { judul: string; live: boolean }) {
             <div style={{ padding: '6px 10px', font: '600 13px system-ui' }}>{judul}</div>
             <div style={{ height: 130 }}>
                 <Sheet workbook={wb} access={live
-                    ? { rows: ATURAN, who: { user: 'rina', roles: ['kasir'] } }
-                    : { rows: [...ATURAN, ...LAYAR_PEMILIK], who: { user: 'yeka' }, view: 'setup' }} />
+                    ? { rows: ATURAN, who: 'rina' }
+                    : { rows: [...ATURAN, ...LAYAR_PEMILIK], who: 'yeka', view: 'setup' }} />
             </div>
         </div>
     );

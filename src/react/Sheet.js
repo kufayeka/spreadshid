@@ -88,7 +88,8 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @property {(event: { address: string, field?: string, value: any, expected: string }) => void} [onCellError]
  * @property {(sel: SheetSelection) => void} [onSelectionChange]
  * @property {string} [fileName]
- * @property {{ rows: object[]|null, who: any }} [access]
+ * @property {{ rows: object[]|null, who?: string|null }} [access]
+ * @property {{ users?: object[], groups?: Object<string, string[]> }} [people]
  * @property {{ id: string, name: string }} [user]
  * @property {false|{ lock?: boolean, hidden?: boolean, tint?: boolean, stripes?: boolean }} [marks]
  * @property {string} [className]
@@ -118,9 +119,17 @@ const FIND_START = { open: false, dialog: false, query: '', replacement: '', mat
  * @param {string} [props.downloadMask]  What a cell the person may not read (deny read) holds in File > Download: "-" by default, "" for empty.
  *   A cell they may not see (deny see) is always empty, and a formula reading either goes out as its answer only.
  * @param {string} [props.fileName]  The name a download from File > Download gets, without its extension ("Spreadsheet" when not given).
- * @param {{ rows: object[]|null, who: any }} [props.access]  The access rows of the workbook and the person who has it open (policy.js). It is the
- *   host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only applies it.
- * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments.
+ * @param {{ rows: object[]|null, who?: string|null }} [props.access]  The access rows of the workbook and the id of the person who has it open
+ *   (policy.js). It is the host's own: made by its code (or an editor the host builds with ACTIONS and UI_ITEMS), kept in its database; the sheet only
+ *   applies it. `who` is the bare id of the account, nothing more: which groups that person is in is read from `people`, never said here. Rows but no
+ *   `who`, or a `who` the rows do not name, means that person is given nothing; no rows at all (null, or an empty list) means there is no policy and
+ *   everything is allowed.
+ * @param {{ users?: object[], groups?: Object<string, string[]> }} [props.people]  The people the host knows of:
+ *   `{ users: [{ id, name, username, photoUrl }], groups: { FINANCE: [id, id] } }`. `users` is the dictionary the screen reads — a comment shows
+ *   "name - username" and the face, found by the id it stored — and `groups` is the membership that decides whether a "group:FINANCE" row is this
+ *   person's. Without it every id shows as itself and nobody is in any group.
+ * @param {{ id: string, name: string }} [props.user]  The person who has the sheet open: their name goes on their comments. `access.who` with
+ *   `people` says it better (the name is looked up, so it follows the account); this stays for a host that has no account system.
  * @param {{ open?: 'hover' | 'click' }} [props.comments]  How the card of a cell's comments opens: 'hover' (the default) shows it while the mouse
  *   is on a marked cell and keeps it open on a click; 'click' shows it on a click only.
  * @param {false|{ lock?: boolean, hidden?: boolean, tint?: boolean, stripes?: boolean }} [props.marks]  How the cells this person may not change are
@@ -299,10 +308,14 @@ const SheetView = forwardRef(function SheetView(props, ref) {
     }
     // the person who writes (their name on their comments)
     useEffect(() => { if (props.user) wb.setUser(props.user); }, [wb, props.user && props.user.id, props.user && props.user.name]);
-    // the host's access policy for the person who has the sheet open, applied to the workbook whenever the host gives another
+    // The host's access policy for the person who has the sheet open, applied to the workbook whenever the host gives another. Three doors, each on
+    // its own: who is here, the people the host knows of, and the rows themselves. The workbook does the matching.
     const accessRows = props.access ? props.access.rows : null;
     const who = props.access ? props.access.who : null;
-    useEffect(() => { if (props.access) wb.setAccess(accessRows, who); }, [wb, accessRows, JSON.stringify(who), !!props.access]);
+    const people = props.people;
+    useEffect(() => { if (props.access) wb.setWho({ who }); }, [wb, who, !!props.access]);
+    useEffect(() => { if (people) wb.setPeople(people); }, [wb, JSON.stringify(people || null)]);
+    useEffect(() => { if (props.access) wb.setAccess(accessRows); }, [wb, accessRows, !!props.access]);
 
     // How the cells this person may not change are marked (live): a lock and an eye by default, a tint and stripes on request, any of them together;
     // false: none. The rules editor (access.view 'setup') shows who has a rule in each cell instead, so the live marks are left out there.

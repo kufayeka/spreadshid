@@ -148,7 +148,7 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     await escape();
 
     // the access rows decide what is offered
-    await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'read' }, { who: '*', effect: 'allow', action: 'comment.read' }, { who: '*', effect: 'allow', action: 'comment.reply' }], 'x')`);
+    await q(`${W}.setWho({ who: 'x' })`); await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'read' }, { who: '*', effect: 'allow', action: 'comment.read' }, { who: '*', effect: 'allow', action: 'comment.reply' }])`);
     await wait(250);
     await clickCell(5, 5);
     await q('window.__events.notice.length = 0');
@@ -157,7 +157,7 @@ await withExample(async ({ js, click, mouse, type, key, wait }) => {
     check('reply only: Ctrl+Alt+M on a cell without a discussion is refused, no card', (await card()) === null && (await q('window.__events.notice.some(function(n){ return n.kind === "refused" && n.action === "comment.create"; })')));
     await clickCell(1, 0);
     check('but a discussion\'s card has its reply box, and no ⋯ menu', (await card()) === 'Comments on A2' && (await q(`!!${box('Reply on A2')}`)) && !(await q(`!!document.querySelector('.ks-card-more')`)));
-    await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'edit' }], 'y')`);
+    await q(`${W}.setWho({ who: 'y' })`); await q(`${W}.setAccess([{ who: '*', effect: 'allow', action: 'edit' }])`);
     await wait(250);
     await clickCell(1, 0);
     check('no comment.read: no marks, no card', !(await marked(3, 3)) && (await card()) === null);

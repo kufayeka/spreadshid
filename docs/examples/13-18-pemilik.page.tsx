@@ -5,15 +5,17 @@ import '@kufayeka/sheet/style.css';
 import { buatStok } from './data/stok-akses.js';
 
 // 13.18 Pemilik: satu baris user:<nama> allow * tanpa where.
+const ORANG_GRUP = { users: [{ id: 'yeka', name: 'Yeka Kufa' }, { id: 'rina', name: 'Rina Dewi' }], groups: { kasir: ['yeka', 'rina'] } };
+
 const rows: AccessRow[] = [
     { who: 'user:yeka', effect: 'allow', action: '*' },                                    // baru
-    { who: 'role:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
+    { who: 'group:kasir', effect: 'allow', action: 'read', where: 'Produk!A1:I13' },
     { who: '*', effect: 'deny', action: 'edit', where: 'Produk!col:Harga beli' }
 ];
 
 const ORANG: Record<string, Who> = {
-    yeka: { user: 'yeka', roles: ['kasir'] },                // pemilik, juga kasir
-    rina: { user: 'rina', roles: ['kasir'] }
+    yeka: 'yeka',                // pemilik, juga kasir
+    rina: 'rina'
 };
 
 export default function Halaman() {
@@ -30,7 +32,7 @@ export default function Halaman() {
                 {pemilik ? <button>Atur hak akses</button> : null}
             </p>
             <div style={{ height: 300 }}>
-                <Sheet workbook={wb} access={{ rows, who: ORANG[sebagai] }} />
+                <Sheet workbook={wb} people={ORANG_GRUP} access={{ rows, who: ORANG[sebagai] }} />
             </div>
         </div>
     );

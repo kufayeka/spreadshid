@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { rectText } from './FormulaBar.js';
-import { Avatar, when } from './CommentCard.js';
+import { Avatar, byLabel, when } from './CommentCard.js';
 
 /**
  * Every discussion of the workbook, in a panel on the right of the grid (View > Comments), as a list to find one: "Dewi commented on Produk!E7",
@@ -56,14 +56,14 @@ export function CommentsPanel({ workbook: wb, sheetId, active, revision, onOpen,
                         <li key={t.id} data-thread={t.id}>
                             <button type="button" className={'ks-thread' + (current ? ' ks-current' : '')} onClick={() => onOpen(id, t.at.r, t.at.c)}>
                                 <span className="ks-thread-top">
-                                    <Avatar by={first.by} />
+                                    <Avatar by={first.by} wb={wb} />
                                     <span className="ks-thread-who">
-                                        <span><b>{first.by ? first.by.name : '?'}</b> commented on <span className="ks-thread-cell">{where}</span></span>
+                                        <span><b>{byLabel(first.by, wb)}</b> commented on <span className="ks-thread-cell">{where}</span></span>
                                         <small>{when(first.at, locale)}</small>
                                     </span>
                                 </span>
                                 <span className="ks-thread-text">{first.text}</span>
-                                {replies ? <span className="ks-thread-more">{replies === 1 ? '1 reply' : replies + ' replies'} · last {last.by ? last.by.name : '?'}, {when(last.at, locale)}</span> : null}
+                                {replies ? <span className="ks-thread-more">{replies === 1 ? '1 reply' : replies + ' replies'} · last {byLabel(last.by, wb)}, {when(last.at, locale)}</span> : null}
                             </button>
                         </li>
                     );

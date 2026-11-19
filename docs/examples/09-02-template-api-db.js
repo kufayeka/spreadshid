@@ -20,9 +20,9 @@ function buatPaketTemplate() {
         doc: wb.toJSON(),
         // access, rules, dan types TIDAK masuk ke wb.toJSON() -> disimpan di kolom/tabel terpisah
         access: [
-            { who: 'role:estimator', effect: 'allow', action: 'read', where: 'RAB!A1:F3' },
-            { who: 'role:estimator', effect: 'allow', action: 'edit', where: 'RAB!C2:D2' },
-            { who: 'role:estimator', effect: 'deny', action: 'read', where: 'RAB!col:HPP Rahasia' },
+            { who: 'group:estimator', effect: 'allow', action: 'read', where: 'RAB!A1:F3' },
+            { who: 'group:estimator', effect: 'allow', action: 'edit', where: 'RAB!C2:D2' },
+            { who: 'group:estimator', effect: 'deny', action: 'read', where: 'RAB!col:HPP Rahasia' },
         ],
         types: { RAB: { headerRow: 1, fields: { Qty: { kind: 'int' } } } },
     };
@@ -39,12 +39,15 @@ let dbRow = {
 };
 
 // 3. LOAD DARI API (GET /api/workbooks/rab-proyek-42) -> sensor kolom rahasia via viewFor()
-const user = { user: 'andi', roles: ['estimator'] };
-const payloadUntukClient = viewFor(dbRow.doc, { access: dbRow.access, who: user });
+const user = 'andi';                                                       // id akun, bukan objek: grupnya dibaca dari `people`
+const people = { users: [{ id: 'andi', name: 'Andi Pratama', username: 'andi' }], groups: { estimator: ['andi'] } };
+const payloadUntukClient = viewFor(dbRow.doc, { access: dbRow.access, who: user, people });
 
 // Client membuka workbook + memasang access & types yang dikirim API
 const clientWb = createWorkbook(payloadUntukClient);
-clientWb.setAccess(dbRow.access, user);
+clientWb.setPeople(people);
+clientWb.setWho({ who: user });
+clientWb.setAccess(dbRow.access);
 clientWb.setTypes('RAB', dbRow.types.RAB);
 console.log('Client melihat HPP Rahasia (F2):', JSON.stringify(clientWb.value('RAB', 'F2')));
 
